@@ -1,11 +1,11 @@
 #!/bin/bash
 # Generate API client code from OpenAPI specification
-# Uses swagger-typescript-api (JavaScript-native, no Java required!)
+# Uses openapi-generator-cli to generate Dart/Flutter client
 
 set -e
 
 SPEC_FILE="api-spec/openapi.json"
-OUTPUT_DIR="src/api/generated"
+OUTPUT_DIR="lib/api/generated"
 
 if [ ! -f "$SPEC_FILE" ]; then
     echo "❌ OpenAPI spec not found at $SPEC_FILE"
@@ -13,24 +13,28 @@ if [ ! -f "$SPEC_FILE" ]; then
     exit 1
 fi
 
-echo "🔧 Generating TypeScript API client..."
-echo "📦 Using swagger-typescript-api (no Java required!)"
+echo "🔧 Generating Dart API client for Flutter..."
+echo "📦 Using openapi-generator-cli with dart-dio generator"
 
-# Generate TypeScript client with swagger-typescript-api
-npx swagger-typescript-api generate \
-    --path "$SPEC_FILE" \
-    --output "$OUTPUT_DIR" \
-    --name "api-client.ts" \
-    --axios \
-    --modular \
-    --extract-request-params \
-    --extract-request-body \
-    --single-http-client \
-    --unwrap-response-data \
-    --clean-output
+# Create output directory if it doesn't exist
+mkdir -p "$OUTPUT_DIR"
+
+# Generate Dart client with openapi-generator-cli
+npx @openapitools/openapi-generator-cli generate \
+    -i "$SPEC_FILE" \
+    -g dart-dio \
+    -o "$OUTPUT_DIR" \
+    --additional-properties=pubName=pocket_guide_api \
+    --additional-properties=useEnumExtension=true \
+    --additional-properties=ensureUniqueParams=true \
+    --additional-properties=legacyDiscriminatorBehavior=false
 
 echo ""
-echo "✅ TypeScript client generated at $OUTPUT_DIR"
-echo "📝 Import and use: import { Api } from './api/generated/api-client'"
+echo "✅ Dart client generated at $OUTPUT_DIR"
+echo "📝 Import and use: import 'package:pocket_guide_mobile/api/generated/lib/pocket_guide_api.dart';"
 echo ""
 echo "🎉 Generation complete!"
+echo ""
+echo "Next steps:"
+echo "  1. Run 'flutter pub get' to install generated dependencies"
+echo "  2. Use the generated API client in your Flutter app"

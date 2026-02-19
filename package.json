@@ -1,16 +1,13 @@
 {
   "name": "pocket-guide-mobile",
   "version": "0.1.0",
-  "description": "Pocket Guide Mobile App - Customized tour generator for travelers",
+  "description": "Pocket Guide Mobile App (Flutter) - Customized tour generator for travelers",
   "scripts": {
     "fetch-api": "./scripts/fetch-api-spec.sh",
     "generate-api": "./scripts/generate-api-client.sh",
     "update-api": "npm run fetch-api && npm run generate-api"
   },
-  "dependencies": {
-    "axios": "^1.6.0"
-  },
   "devDependencies": {
-    "swagger-typescript-api": "^13.2.18"
+    "@openapitools/openapi-generator-cli": "^2.7.0"
   }
 }

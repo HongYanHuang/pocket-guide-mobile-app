@@ -1,6 +1,6 @@
 # Pocket Guide Mobile App
 
-Cross-platform mobile application for customized tour generation.
+Cross-platform mobile application (iOS & Android) built with Flutter for customized tour generation.
 
 ## Project Structure
 
@@ -10,19 +10,30 @@ pocket-guide-mobile-app/
 │   └── openapi.json          # OpenAPI specification from backend
 ├── scripts/
 │   ├── fetch-api-spec.sh     # Fetch latest API spec
-│   └── generate-api-client.sh # Generate type-safe client
-├── src/
+│   └── generate-api-client.sh # Generate type-safe Dart client
+├── lib/
+│   ├── main.dart             # App entry point
 │   └── api/
-│       └── generated/        # Auto-generated API client (gitignored)
-└── package.json
+│       ├── generated/        # Auto-generated API client (gitignored)
+│       └── example_usage.dart # Example usage patterns
+├── ios/                      # iOS platform code
+├── android/                  # Android platform code
+└── pubspec.yaml              # Flutter dependencies
 ```
 
 ## Setup
 
+### Prerequisites
+
+- Flutter 3.41.1 or later
+- Dart 3.11.0 or later
+- Xcode (for iOS development)
+- Android Studio (for Android development)
+
 ### 1. Install Dependencies
 
 ```bash
-npm install
+flutter pub get
 ```
 
 ### 2. Fetch Latest API Spec
@@ -40,12 +51,12 @@ API_URL=https://api.pocket-guide.com npm run fetch-api
 
 ### 3. Generate API Client
 
-Generate TypeScript client (NO JAVA REQUIRED!):
+Generate Dart client using openapi-generator:
 ```bash
 npm run generate-api
 ```
 
-This uses `swagger-typescript-api` - a JavaScript-native code generator.
+This uses `openapi-generator-cli` with the `dart-dio` generator.
 
 ### 4. Update Everything (Recommended Workflow)
 
@@ -54,62 +65,153 @@ Fetch the latest spec and regenerate client in one command:
 npm run update-api
 ```
 
-## Usage in App Code
+## Usage in Flutter Code
 
-### React Native / TypeScript Example
+### Basic Example
 
-```typescript
-import { HttpClient } from './api/generated/http-client'
-import { Tour } from './api/generated/Tour'
-import { Tours } from './api/generated/Tours'
-import type { TourGenerationRequest } from './api/generated/data-contracts'
+```dart
+import 'package:pocket_guide_mobile/api/generated/lib/pocket_guide_api.dart';
+import 'package:dio/dio.dart';
 
-// Create HTTP client
-const httpClient = new HttpClient({
-  baseURL: 'https://api.pocket-guide.com',
-  // Add auth headers if needed
-  // headers: { 'Authorization': 'Bearer token' }
-})
+// Create Dio instance
+final dio = Dio(BaseOptions(
+  baseUrl: 'http://localhost:8000',
+  connectTimeout: Duration(seconds: 5),
+  receiveTimeout: Duration(seconds: 3),
+));
 
-// Create API instances
-const tourApi = new Tour(httpClient)
-const toursApi = new Tours(httpClient)
+// Create API client
+final api = PocketGuideApi(dio: dio);
 
-// Generate a tour (fully type-safe!)
-const request: TourGenerationRequest = {
-  city: 'rome',
-  days: 3,
-  interests: ['history', 'art'],
-  provider: 'anthropic',
-  pace: 'normal',
-  language: 'en',
-  save: true
-}
+// Generate a tour
+Future<void> generateTour() async {
+  try {
+    final request = TourGenerationRequest(
+      city: 'rome',
+      days: 3,
+      interests: ['history', 'art'],
+      provider: 'anthropic',
+      pace: 'normal',
+      language: 'en',
+      save: true,
+    );
 
-try {
-  const response = await tourApi.generateTourTourGeneratePost(request)
-  console.log('Tour ID:', response.data.tour_id)
-  console.log('Itinerary:', response.data.itinerary)
-} catch (error) {
-  console.error('Failed to generate tour:', error)
+    final response = await api.getTourApi().generateTourTourGeneratePost(request);
+
+    print('Tour ID: ${response.data?.tourId}');
+    print('Itinerary: ${response.data?.itinerary}');
+  } catch (e) {
+    print('Failed to generate tour: $e');
+  }
 }
 
 // Get tour by ID
-const tour = await toursApi.getTourDetailToursTourIdGet('rome-tour-20260217-123456-abc123')
+Future<void> getTour(String tourId) async {
+  final tour = await api.getToursApi().getTourDetailToursTourIdGet(tourId);
+  print('Tour: ${tour.data}');
+}
 
 // List all tours
-const tours = await toursApi.listToursToursGet({ city: 'rome', limit: 10 })
+Future<void> listTours() async {
+  final tours = await api.getToursApi().listToursToursGet(
+    city: 'rome',
+    limit: 10,
+  );
+  print('Tours: ${tours.data}');
+}
+```
+
+### Flutter Widget Example
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:pocket_guide_mobile/api/generated/lib/pocket_guide_api.dart';
+
+class TourListScreen extends StatefulWidget {
+  @override
+  _TourListScreenState createState() => _TourListScreenState();
+}
+
+class _TourListScreenState extends State<TourListScreen> {
+  final api = PocketGuideApi(dio: Dio(BaseOptions(
+    baseUrl: 'http://localhost:8000',
+  )));
+
+  List<Tour>? tours;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadTours();
+  }
+
+  Future<void> loadTours() async {
+    try {
+      final response = await api.getToursApi().listToursToursGet();
+      setState(() {
+        tours = response.data;
+        loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        loading = false;
+      });
+      print('Error loading tours: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: Text('My Tours')),
+      body: ListView.builder(
+        itemCount: tours?.length ?? 0,
+        itemBuilder: (context, index) {
+          final tour = tours![index];
+          return ListTile(
+            title: Text(tour.city ?? 'Unknown'),
+            subtitle: Text('${tour.days} days'),
+          );
+        },
+      ),
+    );
+  }
+}
 ```
 
 ### More Examples
 
-See `src/api/example-usage.ts` for complete examples including:
+See `lib/api/example_usage.dart` for complete examples including:
 - Tour generation with all parameters
 - POI management and transcripts
 - Combo ticket lookups
-- React Native custom hooks
 - Error handling patterns
+- State management with Provider/Riverpod
 - Batch operations
+
+## Running the App
+
+### iOS
+```bash
+flutter run -d ios
+```
+
+### Android
+```bash
+flutter run -d android
+```
+
+### Web (for testing)
+```bash
+flutter run -d chrome
+```
 
 ## API Spec Updates
 
@@ -118,24 +220,24 @@ The OpenAPI spec should be updated whenever the backend API changes:
 1. Backend team updates the API and deploys
 2. Mobile team runs `npm run update-api`
 3. Review generated code changes
-4. Update mobile app code if needed
+4. Update Flutter app code if needed
 5. Commit the new `api-spec/openapi.json` (NOT the generated code)
 
 ## Benefits of This Approach
 
-✅ **Type Safety**: Full TypeScript/Dart type checking
+✅ **Type Safety**: Full Dart type checking
 ✅ **Auto-Complete**: IDE knows all API endpoints and models
 ✅ **Single Source of Truth**: Backend defines API contract
 ✅ **No Manual Updates**: Changes sync automatically
 ✅ **Error Prevention**: Compile-time errors for API mismatches
-✅ **Documentation**: Generated code includes JSDoc/DartDoc comments
+✅ **Documentation**: Generated code includes DartDoc comments
 
 ## Development Workflow
 
 1. **Backend changes API** → Updates FastAPI code
 2. **Mobile fetches spec** → `npm run fetch-api`
 3. **Mobile regenerates client** → `npm run generate-api`
-4. **TypeScript compiler** → Shows errors if breaking changes
+4. **Dart analyzer** → Shows errors if breaking changes
 5. **Mobile developer** → Fixes code to match new API
 6. **Commit** → Only commit `api-spec/openapi.json`, not generated code
 
@@ -150,14 +252,14 @@ The OpenAPI spec should be updated whenever the backend API changes:
 
 Key endpoints in the generated client:
 
-- `tourGeneratePost()` - Generate a new tour
-- `toursGet()` - List all tours
-- `toursTourIdGet()` - Get tour details
-- `toursTourIdReplacePoiPost()` - Replace POI in tour
-- `poisCityGet()` - List POIs for a city
-- `poisCityPoiIdGet()` - Get POI details
-- `poisCityPoiIdTranscriptGet()` - Get POI transcript
-- `comboTicketsGet()` - List combo tickets
+- `generateTourTourGeneratePost()` - Generate a new tour
+- `listToursToursGet()` - List all tours
+- `getTourDetailToursTourIdGet()` - Get tour details
+- `replacePoiToursTourIdReplacePoiPost()` - Replace POI in tour
+- `listPoisPoisCityGet()` - List POIs for a city
+- `getPoiDetailPoisCityPoiIdGet()` - Get POI details
+- `getPoiTranscriptPoisCityPoiIdTranscriptGet()` - Get POI transcript
+- `listComboTicketsComboTicketsGet()` - List combo tickets
 - And more...
 
 ## Troubleshooting
@@ -169,18 +271,24 @@ A: Make sure you're using the latest API spec. Run `npm run update-api`
 A: Check the base URL configuration. Development uses `localhost:8000`, production will be different.
 
 **Q: Need authentication?**
-A: Add headers in Configuration:
-```typescript
-const config = new Configuration({
-  basePath: 'https://api.pocket-guide.com',
-  baseOptions: {
-    headers: { 'Authorization': `Bearer ${token}` }
-  }
-})
+A: Add interceptor to Dio:
+```dart
+dio.interceptors.add(InterceptorsWrapper(
+  onRequest: (options, handler) {
+    options.headers['Authorization'] = 'Bearer $token';
+    return handler.next(options);
+  },
+));
 ```
 
 **Q: Want to customize generated code?**
-A: Don't edit generated files directly. They'll be overwritten. Instead, create wrapper functions in your own code.
+A: Don't edit generated files directly. They'll be overwritten. Instead, create wrapper classes in your own code.
+
+**Q: Flutter doctor shows issues?**
+A: Run `flutter doctor` to see what needs to be installed. You may need:
+- Xcode (for iOS): https://developer.apple.com/xcode/
+- Android Studio (for Android): https://developer.android.com/studio
+- CocoaPods (for iOS): `sudo gem install cocoapods`
 
 ## License
 
