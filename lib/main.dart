@@ -724,7 +724,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   Widget _buildListMode() {
     final itinerary = _tourDetail!.itinerary.toList();
-    final backupPoisMap = _tourDetail!.backupPois?.toMap() ?? {};
 
     return Column(
       children: [
@@ -776,7 +775,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       itemCount: pois.length,
                       itemBuilder: (context, poiIndex) {
                         final poi = pois[poiIndex];
-                        final backupPoisList = backupPoisMap[poi.poi]?.toList() ?? [];
 
                         return Column(
                           children: [
@@ -809,43 +807,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               ),
                             ),
                             // Show backup options if enabled
-                            if (_showBackupOptions && backupPoisList.isNotEmpty) ...[
+                            if (_showBackupOptions) ...[
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 color: Colors.amber.shade50,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                child: Row(
                                   children: [
-                                    Text(
-                                      'Backup Options (${backupPoisList.length}):',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.amber.shade900,
+                                    Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Backup options available - feature coming soon',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.amber.shade900,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    ...backupPoisList.map((backup) {
-                                      return Padding(
-                                        padding: const EdgeInsets.only(left: 8, top: 4),
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.subdirectory_arrow_right,
-                                                size: 16, color: Colors.grey.shade600),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                backup.poi,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
                                   ],
                                 ),
                               ),
