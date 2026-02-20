@@ -834,25 +834,130 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             ),
                             // Show backup options if enabled
                             if (_showBackupOptions) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                color: Colors.amber.shade50,
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Backup options available - feature coming soon',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.amber.shade900,
+                              if (_tourDetail!.backupPois != null && _tourDetail!.backupPois!.containsKey(poi.poi)) ...[
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  color: Colors.blue.shade50,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Alternative Options',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue.shade900,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 8),
+                                      ..._tourDetail!.backupPois![poi.poi]!.take(3).map((backup) => Padding(
+                                        padding: const EdgeInsets.only(bottom: 6),
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Container(
+                                              margin: const EdgeInsets.only(top: 4),
+                                              width: 4,
+                                              height: 4,
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.shade400,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    backup.poi,
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.blue.shade900,
+                                                    ),
+                                                  ),
+                                                  if (backup.reason.isNotEmpty)
+                                                    Text(
+                                                      backup.reason,
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors.grey.shade700,
+                                                      ),
+                                                    ),
+                                                  if (backup.substituteScenario.isNotEmpty)
+                                                    Text(
+                                                      backup.substituteScenario,
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontStyle: FontStyle.italic,
+                                                        color: Colors.grey.shade600,
+                                                      ),
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.green.shade100,
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                '${(backup.similarityScore * 100).toInt()}%',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.green.shade800,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )),
+                                      if (_tourDetail!.backupPois![poi.poi]!.length > 3)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 4),
+                                          child: Text(
+                                            '+${_tourDetail!.backupPois![poi.poi]!.length - 3} more options',
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.blue.shade700,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  color: Colors.grey.shade100,
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'No backup options available for this POI',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey.shade700,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
+                              ],
                             ],
                             if (poiIndex < pois.length - 1)
                               Divider(height: 1, color: Colors.grey.shade300),
