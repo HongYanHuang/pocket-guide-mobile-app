@@ -31,6 +31,23 @@ npx @openapitools/openapi-generator-cli generate \
 
 echo ""
 echo "✅ Dart client generated at $OUTPUT_DIR"
+echo ""
+echo "🔧 Fixing SDK version and running build_runner..."
+
+# Fix SDK version to match main project
+sed -i '' "s/sdk: '>=2.18.0 <4.0.0'/sdk: ^3.11.0/" "$OUTPUT_DIR/pubspec.yaml"
+
+# Fix TourDetail metadata assignment issue
+sed -i '' 's/result.metadata = valueDes;/result.metadata.replace(valueDes);/' "$OUTPUT_DIR/lib/src/model/tour_detail.dart"
+
+# Install dependencies and run build_runner
+cd "$OUTPUT_DIR"
+flutter pub get > /dev/null 2>&1
+flutter pub run build_runner build --delete-conflicting-outputs > /dev/null 2>&1
+cd - > /dev/null
+
+echo "✅ Build runner completed"
+echo ""
 echo "📝 Import and use: import 'package:pocket_guide_mobile/api/generated/lib/pocket_guide_api.dart';"
 echo ""
 echo "🎉 Generation complete!"
