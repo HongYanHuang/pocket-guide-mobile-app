@@ -41,6 +41,14 @@ dependencies:
   # JSON serialization
   json_annotation: ^4.8.1
 
+  # Generated API client
+  pocket_guide_api:
+    path: lib/api/generated
+
+  # For built_value serialization
+  built_collection: ^5.1.1
+  built_value: ^8.12.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

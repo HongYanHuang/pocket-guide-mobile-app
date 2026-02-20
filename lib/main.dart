@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_guide_mobile/services/api_service.dart';
+import 'package:pocket_guide_api/pocket_guide_api.dart';
 
 void main() {
   runApp(const PocketGuideApp());
@@ -76,20 +78,33 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _selectedCity;
+  final ApiService _apiService = ApiService();
+  List<String> _cities = [];
+  bool _loadingCities = true;
 
-  // Popular cities list
-  final List<String> _popularCities = [
-    'Rome',
-    'Paris',
-    'London',
-    'Tokyo',
-    'New York',
-    'Barcelona',
-    'Amsterdam',
-    'Venice',
-    'Florence',
-    'Berlin',
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadCities();
+  }
+
+  Future<void> _loadCities() async {
+    setState(() => _loadingCities = true);
+    try {
+      final cities = await _apiService.getCities();
+      setState(() {
+        _cities = cities;
+        _loadingCities = false;
+      });
+    } catch (e) {
+      setState(() => _loadingCities = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load cities: $e')),
+        );
+      }
+    }
+  }
 
   void _showCitySelector() {
     showModalBottomSheet(
@@ -99,7 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) => CitySelectionBottomSheet(
-        popularCities: _popularCities,
+        cities: _cities,
+        loading: _loadingCities,
         onCitySelected: (city) {
           setState(() {
             _selectedCity = city;
@@ -188,12 +204,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // City Selection Bottom Sheet
 class CitySelectionBottomSheet extends StatefulWidget {
-  final List<String> popularCities;
+  final List<String> cities;
+  final bool loading;
   final Function(String) onCitySelected;
 
   const CitySelectionBottomSheet({
     super.key,
-    required this.popularCities,
+    required this.cities,
+    required this.loading,
     required this.onCitySelected,
   });
 
@@ -208,15 +226,23 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
   @override
   void initState() {
     super.initState();
-    _filteredCities = widget.popularCities;
+    _filteredCities = widget.cities;
+  }
+
+  @override
+  void didUpdateWidget(CitySelectionBottomSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.cities != oldWidget.cities) {
+      _filteredCities = widget.cities;
+    }
   }
 
   void _filterCities(String query) {
     setState(() {
       if (query.isEmpty) {
-        _filteredCities = widget.popularCities;
+        _filteredCities = widget.cities;
       } else {
-        _filteredCities = widget.popularCities
+        _filteredCities = widget.cities
             .where((city) => city.toLowerCase().contains(query.toLowerCase()))
             .toList();
       }
@@ -294,18 +320,32 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
           const SizedBox(height: 8),
           // Cities list
           Flexible(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _filteredCities.length,
-              itemBuilder: (context, index) {
-                final city = _filteredCities[index];
-                return ListTile(
-                  leading: const Icon(Icons.location_city),
-                  title: Text(city),
-                  onTap: () => widget.onCitySelected(city),
-                );
-              },
-            ),
+            child: widget.loading
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : _filteredCities.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Text('No cities found'),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: _filteredCities.length,
+                        itemBuilder: (context, index) {
+                          final city = _filteredCities[index];
+                          return ListTile(
+                            leading: const Icon(Icons.location_city),
+                            title: Text(city),
+                            onTap: () => widget.onCitySelected(city),
+                          );
+                        },
+                      ),
           ),
           const SizedBox(height: 16),
         ],
@@ -321,40 +361,102 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
 }
 
 // Tours List Widget
-class ToursList extends StatelessWidget {
+class ToursList extends StatefulWidget {
   final String city;
 
   const ToursList({super.key, required this.city});
 
   @override
+  State<ToursList> createState() => _ToursListState();
+}
+
+class _ToursListState extends State<ToursList> {
+  final ApiService _apiService = ApiService();
+  List<TourSummary> _tours = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTours();
+  }
+
+  @override
+  void didUpdateWidget(ToursList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.city != oldWidget.city) {
+      _loadTours();
+    }
+  }
+
+  Future<void> _loadTours() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final tours = await _apiService.getToursByCity(widget.city);
+      setState(() {
+        _tours = tours;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mock tour data - will be replaced with actual API data later
-    final mockTours = [
-      {
-        'title': '$city Classic Tour',
-        'days': 3,
-        'price': '\$299',
-        'rating': 4.8,
-      },
-      {
-        'title': '$city Food & Culture',
-        'days': 5,
-        'price': '\$499',
-        'rating': 4.9,
-      },
-      {
-        'title': '$city Historical Journey',
-        'days': 4,
-        'price': '\$399',
-        'rating': 4.7,
-      },
-    ];
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text('Failed to load tours', style: TextStyle(color: Colors.red.shade600)),
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadTours,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_tours.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.tour_outlined, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'No tours available for ${widget.city}',
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
+      );
+    }
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: mockTours.length,
+      itemCount: _tours.length,
       itemBuilder: (context, index) {
-        final tour = mockTours[index];
+        final tour = _tours[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
           child: Padding(
@@ -363,7 +465,7 @@ class ToursList extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tour['title'] as String,
+                  tour.tourId ?? 'Untitled Tour',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -373,19 +475,17 @@ class ToursList extends StatelessWidget {
                   children: [
                     Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
                     const SizedBox(width: 4),
-                    Text('${tour['days']} days'),
+                    Text('${tour.days ?? 0} days'),
                     const SizedBox(width: 16),
-                    Icon(Icons.star, size: 16, color: Colors.amber),
+                    Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
                     const SizedBox(width: 4),
-                    Text('${tour['rating']}'),
+                    Text(tour.city ?? 'Unknown'),
                     const Spacer(),
-                    Text(
-                      tour['price'] as String,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                    ),
+                    if (tour.totalPois != null) ...[
+                      Icon(Icons.place, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text('${tour.totalPois} POIs'),
+                    ],
                   ],
                 ),
               ],
