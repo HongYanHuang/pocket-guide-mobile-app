@@ -50,19 +50,26 @@ class ApiService {
   /// Get list of tours for a specific city
   Future<List<TourSummary>> getToursByCity(String city) async {
     try {
+      print('Fetching tours for city: $city');
       final response = await _api.listToursToursGet();
+      print('API response received: ${response.data?.length ?? 0} tours');
+
       if (response.data == null) {
+        print('No tour data returned');
         return [];
       }
 
       // Filter tours by city (case-insensitive)
       final cityLower = city.toLowerCase();
-      return response.data!
-          .where((tour) => tour.city?.toLowerCase() == cityLower)
+      final filteredTours = response.data!
+          .where((tour) => tour.city.toLowerCase() == cityLower)
           .toList();
+
+      print('Filtered ${filteredTours.length} tours for $city');
+      return filteredTours;
     } catch (e) {
       print('Error fetching tours: $e');
-      return [];
+      rethrow;
     }
   }
 
