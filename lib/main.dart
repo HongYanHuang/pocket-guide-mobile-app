@@ -643,8 +643,30 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
   Widget _buildTourMetadata() {
     final metadata = _tourDetail!.metadata;
-    final totalDistance = metadata?.totalWalkingDistance ?? 0;
-    final interests = metadata?.interests?.toList() ?? [];
+    final itinerary = _tourDetail!.itinerary.toList();
+
+    // Calculate total walking distance from all days
+    final totalDistance = itinerary.fold<num>(
+      0,
+      (sum, day) => sum + day.totalWalkingKm,
+    );
+
+    // Get duration from itinerary length
+    final durationDays = itinerary.length;
+
+    // Try to get interests from input parameters (it's a JsonObject, so we need to handle it)
+    final List<String> interests = [];
+    try {
+      final inputParams = _tourDetail!.inputParameters;
+      if (inputParams.value is Map) {
+        final params = inputParams.value as Map;
+        if (params['interests'] is List) {
+          interests.addAll((params['interests'] as List).cast<String>());
+        }
+      }
+    } catch (e) {
+      // Ignore if can't parse
+    }
 
     return Container(
       width: double.infinity,
@@ -659,7 +681,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _tourDetail!.metadata?.city ?? 'Unknown City',
+            metadata.city,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -670,14 +692,14 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade700),
               const SizedBox(width: 4),
               Text(
-                '${metadata?.durationDays ?? 0} days',
+                '$durationDays days',
                 style: TextStyle(color: Colors.grey.shade700),
               ),
               const SizedBox(width: 24),
               Icon(Icons.directions_walk, size: 16, color: Colors.grey.shade700),
               const SizedBox(width: 4),
               Text(
-                '${(totalDistance / 1000).toStringAsFixed(1)} km',
+                '${totalDistance.toStringAsFixed(1)} km',
                 style: TextStyle(color: Colors.grey.shade700),
               ),
             ],
@@ -701,7 +723,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Widget _buildListMode() {
-    final itinerary = _tourDetail!.itinerary?.toList() ?? [];
+    final itinerary = _tourDetail!.itinerary.toList();
+    final backupPoisMap = _tourDetail!.backupPois?.toMap() ?? {};
 
     return Column(
       children: [
@@ -736,16 +759,16 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             itemCount: itinerary.length,
             itemBuilder: (context, dayIndex) {
               final day = itinerary[dayIndex];
-              final pois = day.pois?.toList() ?? [];
+              final pois = day.pois.toList();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 child: ExpansionTile(
                   title: Text(
-                    'Day ${day.dayNumber}',
+                    'Day ${day.day}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${pois.length} POIs'),
+                  subtitle: Text('${pois.length} POIs • ${day.totalHours.toStringAsFixed(1)} hours'),
                   children: [
                     ListView.builder(
                       shrinkWrap: true,
@@ -753,7 +776,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       itemCount: pois.length,
                       itemBuilder: (context, poiIndex) {
                         final poi = pois[poiIndex];
-                        final backupPois = poi.backupPois?.toList() ?? [];
+                        final backupPoisList = backupPoisMap[poi.poi]?.toList() ?? [];
 
                         return Column(
                           children: [
@@ -761,28 +784,32 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               leading: CircleAvatar(
                                 child: Text('${poiIndex + 1}'),
                               ),
-                              title: Text(poi.name ?? 'Unknown POI'),
+                              title: Text(poi.poi),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  if (poi.category != null)
-                                    Text(poi.category!),
-                                  if (poi.suggestedDuration != null)
-                                    Text('${poi.suggestedDuration} min'),
+                                  if (poi.reason.isNotEmpty)
+                                    Text(
+                                      poi.reason,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  const SizedBox(height: 4),
+                                  Text('${poi.estimatedHours.toStringAsFixed(1)} hours'),
                                 ],
                               ),
-                              trailing: poi.priority != null
-                                  ? Chip(
-                                      label: Text(
-                                        poi.priority!,
-                                        style: const TextStyle(fontSize: 10),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    )
-                                  : null,
+                              trailing: Chip(
+                                label: Text(
+                                  poi.priority,
+                                  style: const TextStyle(fontSize: 10),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                              ),
                             ),
                             // Show backup options if enabled
-                            if (_showBackupOptions && backupPois.isNotEmpty) ...[
+                            if (_showBackupOptions && backupPoisList.isNotEmpty) ...[
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 color: Colors.amber.shade50,
@@ -790,7 +817,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Backup Options (${backupPois.length}):',
+                                      'Backup Options (${backupPoisList.length}):',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
@@ -798,7 +825,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    ...backupPois.map((backup) {
+                                    ...backupPoisList.map((backup) {
                                       return Padding(
                                         padding: const EdgeInsets.only(left: 8, top: 4),
                                         child: Row(
@@ -808,7 +835,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                             const SizedBox(width: 4),
                                             Expanded(
                                               child: Text(
-                                                backup.name ?? 'Unknown',
+                                                backup.poi,
                                                 style: TextStyle(
                                                   fontSize: 12,
                                                   color: Colors.grey.shade700,
