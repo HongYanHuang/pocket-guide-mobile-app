@@ -477,7 +477,7 @@ class _ToursListState extends State<ToursList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tour.tourId ?? 'Untitled Tour',
+                    tour.tourId,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
