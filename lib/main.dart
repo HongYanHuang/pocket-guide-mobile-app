@@ -554,6 +554,23 @@ class TourDetailScreen extends StatefulWidget {
   State<TourDetailScreen> createState() => _TourDetailScreenState();
 }
 
+// POI Swap tracking class
+class POISwap {
+  final String originalPoi;
+  final String replacementPoi;
+  final int dayNumber;
+  final int poiIndexInDay;
+
+  POISwap({
+    required this.originalPoi,
+    required this.replacementPoi,
+    required this.dayNumber,
+    required this.poiIndexInDay,
+  });
+
+  String get key => '$dayNumber-$poiIndexInDay';
+}
+
 class _TourDetailScreenState extends State<TourDetailScreen> {
   final ApiService _apiService = ApiService();
   TourDetail? _tourDetail;
@@ -561,6 +578,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   String? _error;
   bool _isMapMode = false;
   bool _showBackupOptions = false;
+
+  // Track pending POI swaps
+  Map<String, POISwap> _pendingSwaps = {};
+  bool _applying = false;
 
   @override
   void initState() {
@@ -585,6 +606,170 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         _error = e.toString();
         _loading = false;
       });
+    }
+  }
+
+  // Get all currently selected POIs (including swapped ones)
+  Set<String> _getAllSelectedPOIs() {
+    final selectedPOIs = <String>{};
+
+    if (_tourDetail == null) return selectedPOIs;
+
+    final itinerary = _tourDetail!.itinerary.toList();
+    for (int dayIndex = 0; dayIndex < itinerary.length; dayIndex++) {
+      final day = itinerary[dayIndex];
+      final pois = day.pois.toList();
+
+      for (int poiIndex = 0; poiIndex < pois.length; poiIndex++) {
+        final poi = pois[poiIndex];
+        final swapKey = '${dayIndex + 1}-$poiIndex';
+
+        // Check if this POI has been swapped
+        if (_pendingSwaps.containsKey(swapKey)) {
+          selectedPOIs.add(_pendingSwaps[swapKey]!.replacementPoi);
+        } else {
+          selectedPOIs.add(poi.poi);
+        }
+      }
+    }
+
+    return selectedPOIs;
+  }
+
+  // Check if a backup POI is already selected elsewhere
+  bool _isBackupPOIAlreadySelected(String backupPoi, int currentDay, int currentPoiIndex) {
+    final selectedPOIs = _getAllSelectedPOIs();
+
+    // Remove the current POI from the set to allow self-selection
+    if (_tourDetail != null) {
+      final itinerary = _tourDetail!.itinerary.toList();
+      if (currentDay - 1 < itinerary.length) {
+        final day = itinerary[currentDay - 1];
+        final pois = day.pois.toList();
+        if (currentPoiIndex < pois.length) {
+          final swapKey = '$currentDay-$currentPoiIndex';
+          if (_pendingSwaps.containsKey(swapKey)) {
+            selectedPOIs.remove(_pendingSwaps[swapKey]!.replacementPoi);
+          } else {
+            selectedPOIs.remove(pois[currentPoiIndex].poi);
+          }
+        }
+      }
+    }
+
+    return selectedPOIs.contains(backupPoi);
+  }
+
+  // Handle POI swap
+  void _handlePOISwap(String originalPoi, String backupPoi, int dayNumber, int poiIndexInDay) {
+    setState(() {
+      final swapKey = '$dayNumber-$poiIndexInDay';
+
+      // If swapping back to original, remove from pending swaps
+      if (backupPoi == originalPoi) {
+        _pendingSwaps.remove(swapKey);
+      } else {
+        _pendingSwaps[swapKey] = POISwap(
+          originalPoi: originalPoi,
+          replacementPoi: backupPoi,
+          dayNumber: dayNumber,
+          poiIndexInDay: poiIndexInDay,
+        );
+      }
+    });
+  }
+
+  // Get the currently displayed POI (either original or swapped)
+  String _getCurrentPOI(String originalPoi, int dayNumber, int poiIndexInDay) {
+    final swapKey = '$dayNumber-$poiIndexInDay';
+    if (_pendingSwaps.containsKey(swapKey)) {
+      return _pendingSwaps[swapKey]!.replacementPoi;
+    }
+    return originalPoi;
+  }
+
+  // Check if there are duplicates in the current selection
+  bool _hasDuplicates() {
+    final selectedPOIs = _getAllSelectedPOIs();
+    if (_tourDetail == null) return false;
+
+    final itinerary = _tourDetail!.itinerary.toList();
+    int totalPOIs = 0;
+    for (final day in itinerary) {
+      totalPOIs += day.pois.length;
+    }
+
+    return selectedPOIs.length != totalPOIs;
+  }
+
+  // Apply all pending swaps to the API
+  Future<void> _applyChanges() async {
+    if (_pendingSwaps.isEmpty) return;
+
+    // Check for duplicates before applying
+    if (_hasDuplicates()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Duplicate POIs detected. Please review your selections.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _applying = true;
+    });
+
+    try {
+      final replacements = _pendingSwaps.values.map((swap) {
+        return {
+          'original_poi': swap.originalPoi,
+          'replacement_poi': swap.replacementPoi,
+          'day': swap.dayNumber,
+        };
+      }).toList();
+
+      final requestBody = {
+        'replacements': replacements,
+        'mode': 'simple',
+        'language': 'zh-cn', // Use the tour's language from metadata if available
+      };
+
+      print('Applying ${_pendingSwaps.length} POI swaps...');
+      print('Request: $requestBody');
+
+      final response = await _apiService.batchReplacePOIs(widget.tourId, requestBody);
+
+      if (response.success) {
+        setState(() {
+          _pendingSwaps.clear();
+          _applying = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Successfully updated ${replacements.length} POI(s)'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Reload tour details to get updated data
+        await _loadTourDetail();
+      } else {
+        throw Exception('Failed to apply changes');
+      }
+    } catch (e) {
+      setState(() {
+        _applying = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error applying changes: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -753,7 +938,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
 
     return Column(
       children: [
-        // Backup Options Switch
+        // Backup Options Switch and Apply Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -762,18 +947,65 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               bottom: BorderSide(color: Colors.grey.shade300),
             ),
           ),
-          child: Row(
+          child: Column(
             children: [
-              const Text('Show Backup Options'),
-              const Spacer(),
-              Switch(
-                value: _showBackupOptions,
-                onChanged: (value) {
-                  setState(() {
-                    _showBackupOptions = value;
-                  });
-                },
+              Row(
+                children: [
+                  const Text('Show Backup Options'),
+                  const Spacer(),
+                  Switch(
+                    value: _showBackupOptions,
+                    onChanged: (value) {
+                      setState(() {
+                        _showBackupOptions = value;
+                      });
+                    },
+                  ),
+                ],
               ),
+              if (_pendingSwaps.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade400),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.pending_actions, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${_pendingSwaps.length} pending change${_pendingSwaps.length > 1 ? 's' : ''}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: _applying ? null : _applyChanges,
+                        icon: _applying
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.check, size: 16),
+                        label: Text(_applying ? 'Applying...' : 'Apply'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -801,15 +1033,37 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       itemCount: pois.length,
                       itemBuilder: (context, poiIndex) {
                         final poi = pois[poiIndex];
+                        final dayNumber = day.day;
+                        final swapKey = '$dayNumber-$poiIndex';
+                        final isSwapped = _pendingSwaps.containsKey(swapKey);
+                        final currentPOI = _getCurrentPOI(poi.poi, dayNumber, poiIndex);
 
                         return Column(
                           children: [
-                            ListTile(
-                              leading: CircleAvatar(
-                                child: Text('${poiIndex + 1}'),
-                              ),
-                              title: Text(poi.poi),
-                              subtitle: Column(
+                            Container(
+                              color: isSwapped ? Colors.orange.shade50 : null,
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: isSwapped ? Colors.orange : null,
+                                  child: Text('${poiIndex + 1}'),
+                                ),
+                                title: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        currentPOI,
+                                        style: TextStyle(
+                                          fontWeight: isSwapped ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSwapped) ...[
+                                      const SizedBox(width: 8),
+                                      Icon(Icons.swap_horiz, size: 16, color: Colors.orange.shade700),
+                                    ],
+                                  ],
+                                ),
+                                subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   if (poi.reason.isNotEmpty)
@@ -832,132 +1086,216 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                 padding: const EdgeInsets.symmetric(horizontal: 4),
                               ),
                             ),
+                            ),
                             // Show backup options if enabled
                             if (_showBackupOptions) ...[
-                              if (_tourDetail!.backupPois != null && _tourDetail!.backupPois!.containsKey(poi.poi)) ...[
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  color: Colors.blue.shade50,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                              Builder(
+                                builder: (context) {
+                                  // Determine which POI's backups to show
+                                  // If swapped, show backups for the replacement POI
+                                  // Otherwise show backups for the original POI
+                                  final displayPOI = isSwapped ? currentPOI : poi.poi;
+                                  final hasBackups = _tourDetail!.backupPois != null && _tourDetail!.backupPois!.containsKey(displayPOI);
+
+                                  return Column(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Alternative Options',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.blue.shade900,
+                                      // If this POI was swapped, show option to revert
+                                      if (isSwapped) ...[
+                                        InkWell(
+                                          onTap: () => _handlePOISwap(poi.poi, poi.poi, dayNumber, poiIndex),
+                                          child: Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.all(12),
+                                            color: Colors.orange.shade50,
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.undo, size: 16, color: Colors.orange.shade700),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        'Revert to: ${poi.poi}',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: Colors.orange.shade900,
+                                                        ),
+                                                      ),
+                                                      Text(
+                                                        'Tap to switch back to original POI',
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors.orange.shade700,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Icon(Icons.chevron_right, color: Colors.orange.shade700),
+                                              ],
                                             ),
                                           ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ..._tourDetail!.backupPois![poi.poi]!.take(3).map((backup) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 6),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              margin: const EdgeInsets.only(top: 4),
-                                              width: 4,
-                                              height: 4,
-                                              decoration: BoxDecoration(
-                                                color: Colors.blue.shade400,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                        ),
+                                      ],
+                                      // Show backup options if available
+                                      if (hasBackups) ...[
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(12),
+                                          color: Colors.blue.shade50,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
                                                 children: [
+                                                  Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
+                                                  const SizedBox(width: 8),
                                                   Text(
-                                                    backup.poi,
+                                                    'Alternative Options (tap to switch)',
                                                     style: TextStyle(
                                                       fontSize: 12,
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight: FontWeight.bold,
                                                       color: Colors.blue.shade900,
                                                     ),
                                                   ),
-                                                  if (backup.reason.isNotEmpty)
-                                                    Text(
-                                                      backup.reason,
-                                                      style: TextStyle(
-                                                        fontSize: 11,
-                                                        color: Colors.grey.shade700,
-                                                      ),
-                                                    ),
-                                                  if (backup.substituteScenario.isNotEmpty)
-                                                    Text(
-                                                      backup.substituteScenario,
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontStyle: FontStyle.italic,
-                                                        color: Colors.grey.shade600,
-                                                      ),
-                                                    ),
                                                 ],
                                               ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: Colors.green.shade100,
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Text(
-                                                '${(backup.similarityScore * 100).toInt()}%',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.green.shade800,
-                                                  fontWeight: FontWeight.bold,
+                                              const SizedBox(height: 8),
+                                              ..._tourDetail!.backupPois![displayPOI]!.map((backup) {
+                                                final isAlreadySelected = _isBackupPOIAlreadySelected(backup.poi, dayNumber, poiIndex);
+                                                final isCurrentlySelected = currentPOI == backup.poi;
+
+                                                return InkWell(
+                                                  onTap: isAlreadySelected && !isCurrentlySelected
+                                                      ? null
+                                                      : () => _handlePOISwap(poi.poi, backup.poi, dayNumber, poiIndex),
+                                                  child: Opacity(
+                                                    opacity: isAlreadySelected && !isCurrentlySelected ? 0.4 : 1.0,
+                                                    child: Container(
+                                                      margin: const EdgeInsets.only(bottom: 6),
+                                                      padding: const EdgeInsets.all(8),
+                                                      decoration: BoxDecoration(
+                                                        color: isCurrentlySelected ? Colors.green.shade100 : Colors.white,
+                                                        borderRadius: BorderRadius.circular(8),
+                                                        border: Border.all(
+                                                          color: isCurrentlySelected
+                                                              ? Colors.green.shade400
+                                                              : (isAlreadySelected ? Colors.red.shade200 : Colors.blue.shade200),
+                                                          width: isCurrentlySelected ? 2 : 1,
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          if (isCurrentlySelected)
+                                                            Icon(Icons.check_circle, size: 16, color: Colors.green.shade700)
+                                                          else if (isAlreadySelected)
+                                                            Icon(Icons.block, size: 16, color: Colors.red.shade400)
+                                                          else
+                                                            Container(
+                                                              margin: const EdgeInsets.only(top: 4),
+                                                              width: 4,
+                                                              height: 4,
+                                                              decoration: BoxDecoration(
+                                                                color: Colors.blue.shade400,
+                                                                shape: BoxShape.circle,
+                                                              ),
+                                                            ),
+                                                          const SizedBox(width: 8),
+                                                          Expanded(
+                                                            child: Column(
+                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                              children: [
+                                                                Text(
+                                                                  backup.poi,
+                                                                  style: TextStyle(
+                                                                    fontSize: 12,
+                                                                    fontWeight: FontWeight.w600,
+                                                                    color: isCurrentlySelected
+                                                                        ? Colors.green.shade900
+                                                                        : (isAlreadySelected ? Colors.grey.shade600 : Colors.blue.shade900),
+                                                                  ),
+                                                                ),
+                                                                if (backup.reason.isNotEmpty)
+                                                                  Text(
+                                                                    backup.reason,
+                                                                    style: TextStyle(
+                                                                      fontSize: 11,
+                                                                      color: Colors.grey.shade700,
+                                                                    ),
+                                                                  ),
+                                                                if (backup.substituteScenario.isNotEmpty)
+                                                                  Text(
+                                                                    backup.substituteScenario,
+                                                                    style: TextStyle(
+                                                                      fontSize: 10,
+                                                                      fontStyle: FontStyle.italic,
+                                                                      color: Colors.grey.shade600,
+                                                                    ),
+                                                                  ),
+                                                                if (isAlreadySelected && !isCurrentlySelected)
+                                                                  Text(
+                                                                    'Already selected elsewhere',
+                                                                    style: TextStyle(
+                                                                      fontSize: 10,
+                                                                      color: Colors.red.shade600,
+                                                                      fontWeight: FontWeight.bold,
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          Container(
+                                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                            decoration: BoxDecoration(
+                                                              color: Colors.green.shade100,
+                                                              borderRadius: BorderRadius.circular(8),
+                                                            ),
+                                                            child: Text(
+                                                              '${(backup.similarityScore * 100).toInt()}%',
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                color: Colors.green.shade800,
+                                                                fontWeight: FontWeight.bold,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              }),
+                                            ],
+                                          ),
+                                        ),
+                                      ] else if (!isSwapped) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          color: Colors.grey.shade100,
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  'No backup options available for this POI',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.grey.shade700,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      )),
-                                      if (_tourDetail!.backupPois![poi.poi]!.length > 3)
-                                        Padding(
-                                          padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            '+${_tourDetail!.backupPois![poi.poi]!.length - 3} more options',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: Colors.blue.shade700,
-                                              fontStyle: FontStyle.italic,
-                                            ),
+                                            ],
                                           ),
                                         ),
+                                      ],
                                     ],
-                                  ),
-                                ),
-                              ] else ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  color: Colors.grey.shade100,
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.info_outline, size: 16, color: Colors.grey.shade600),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'No backup options available for this POI',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade700,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                  );
+                                },
+                              ),
                             ],
                             if (poiIndex < pois.length - 1)
                               Divider(height: 1, color: Colors.grey.shade300),

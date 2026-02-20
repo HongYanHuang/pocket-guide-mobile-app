@@ -105,4 +105,30 @@ class ApiService {
       return null;
     }
   }
+
+  /// Batch replace POIs in a tour
+  Future<BatchPOIReplacementResponse> batchReplacePOIs(String tourId, Map<String, dynamic> requestBody) async {
+    try {
+      print('Batch replacing POIs for tour: $tourId');
+      print('Request body: $requestBody');
+
+      final response = await _dio.post(
+        '/tours/$tourId/replace-pois-batch',
+        data: requestBody,
+      );
+
+      print('Batch replacement response: ${response.data}');
+
+      // Parse the response
+      return BatchPOIReplacementResponse(
+        (b) => b
+          ..success = response.data['success'] ?? false
+          ..newVersion = response.data['new_version']
+          ..message = response.data['message'],
+      );
+    } catch (e) {
+      print('Error batch replacing POIs: $e');
+      rethrow;
+    }
+  }
 }
