@@ -462,34 +462,44 @@ class _ToursListState extends State<ToursList> {
         final tour = _tours[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tour.tourId ?? 'Untitled Tour',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+          child: InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TourDetailScreen(tourId: tour.tourId),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Text('${tour.durationDays} days'),
-                    const SizedBox(width: 16),
-                    Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Text(tour.city),
-                    const Spacer(),
-                    Icon(Icons.place, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Text('${tour.totalPois} POIs'),
-                  ],
-                ),
-              ],
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tour.tourId ?? 'Untitled Tour',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text('${tour.durationDays} days'),
+                      const SizedBox(width: 16),
+                      Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text(tour.city),
+                      const Spacer(),
+                      Icon(Icons.place, size: 16, color: Colors.grey.shade600),
+                      const SizedBox(width: 4),
+                      Text('${tour.totalPois} POIs'),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -529,6 +539,325 @@ class AccountsScreen extends StatelessWidget {
       ),
       body: const Center(
         child: Text('Accounts Screen'),
+      ),
+    );
+  }
+}
+
+// Tour Detail Screen
+class TourDetailScreen extends StatefulWidget {
+  final String tourId;
+
+  const TourDetailScreen({super.key, required this.tourId});
+
+  @override
+  State<TourDetailScreen> createState() => _TourDetailScreenState();
+}
+
+class _TourDetailScreenState extends State<TourDetailScreen> {
+  final ApiService _apiService = ApiService();
+  TourDetail? _tourDetail;
+  bool _loading = true;
+  String? _error;
+  bool _isMapMode = false;
+  bool _showBackupOptions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTourDetail();
+  }
+
+  Future<void> _loadTourDetail() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final tour = await _apiService.getTourById(widget.tourId);
+      setState(() {
+        _tourDetail = tour;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(_tourDetail?.metadata?.city ?? 'Tour Details'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text('Failed to load tour', style: TextStyle(color: Colors.red.shade600)),
+                      const SizedBox(height: 8),
+                      Text(_error!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadTourDetail,
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                )
+              : _tourDetail == null
+                  ? const Center(child: Text('Tour not found'))
+                  : Column(
+                      children: [
+                        // Tour Metadata
+                        _buildTourMetadata(),
+                        // Content (List or Map mode)
+                        Expanded(
+                          child: _isMapMode ? _buildMapMode() : _buildListMode(),
+                        ),
+                      ],
+                    ),
+      floatingActionButton: _loading || _error != null
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () {
+                setState(() {
+                  _isMapMode = !_isMapMode;
+                });
+              },
+              icon: Icon(_isMapMode ? Icons.list : Icons.map),
+              label: Text(_isMapMode ? 'List View' : 'Map View'),
+            ),
+    );
+  }
+
+  Widget _buildTourMetadata() {
+    final metadata = _tourDetail!.metadata;
+    final totalDistance = metadata?.totalWalkingDistance ?? 0;
+    final interests = metadata?.interests?.toList() ?? [];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        border: Border(
+          bottom: BorderSide(color: Colors.grey.shade300),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _tourDetail!.metadata?.city ?? 'Unknown City',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade700),
+              const SizedBox(width: 4),
+              Text(
+                '${metadata?.durationDays ?? 0} days',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+              const SizedBox(width: 24),
+              Icon(Icons.directions_walk, size: 16, color: Colors.grey.shade700),
+              const SizedBox(width: 4),
+              Text(
+                '${(totalDistance / 1000).toStringAsFixed(1)} km',
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+            ],
+          ),
+          if (interests.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: interests.map((interest) {
+                return Chip(
+                  label: Text(interest, style: const TextStyle(fontSize: 12)),
+                  backgroundColor: Colors.blue.shade100,
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListMode() {
+    final itinerary = _tourDetail!.itinerary?.toList() ?? [];
+
+    return Column(
+      children: [
+        // Backup Options Switch
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            border: Border(
+              bottom: BorderSide(color: Colors.grey.shade300),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text('Show Backup Options'),
+              const Spacer(),
+              Switch(
+                value: _showBackupOptions,
+                onChanged: (value) {
+                  setState(() {
+                    _showBackupOptions = value;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+        // Itinerary List
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: itinerary.length,
+            itemBuilder: (context, dayIndex) {
+              final day = itinerary[dayIndex];
+              final pois = day.pois?.toList() ?? [];
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 16),
+                child: ExpansionTile(
+                  title: Text(
+                    'Day ${day.dayNumber}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text('${pois.length} POIs'),
+                  children: [
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: pois.length,
+                      itemBuilder: (context, poiIndex) {
+                        final poi = pois[poiIndex];
+                        final backupPois = poi.backupPois?.toList() ?? [];
+
+                        return Column(
+                          children: [
+                            ListTile(
+                              leading: CircleAvatar(
+                                child: Text('${poiIndex + 1}'),
+                              ),
+                              title: Text(poi.name ?? 'Unknown POI'),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (poi.category != null)
+                                    Text(poi.category!),
+                                  if (poi.suggestedDuration != null)
+                                    Text('${poi.suggestedDuration} min'),
+                                ],
+                              ),
+                              trailing: poi.priority != null
+                                  ? Chip(
+                                      label: Text(
+                                        poi.priority!,
+                                        style: const TextStyle(fontSize: 10),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    )
+                                  : null,
+                            ),
+                            // Show backup options if enabled
+                            if (_showBackupOptions && backupPois.isNotEmpty) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                color: Colors.amber.shade50,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Backup Options (${backupPois.length}):',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.amber.shade900,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ...backupPois.map((backup) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(left: 8, top: 4),
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.subdirectory_arrow_right,
+                                                size: 16, color: Colors.grey.shade600),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                backup.name ?? 'Unknown',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            if (poiIndex < pois.length - 1)
+                              Divider(height: 1, color: Colors.grey.shade300),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMapMode() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.map, size: 100, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Map View',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.grey.shade600,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Map integration coming soon',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+        ],
       ),
     );
   }
