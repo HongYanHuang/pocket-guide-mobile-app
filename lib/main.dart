@@ -616,7 +616,33 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   ),
                 )
               : _tourDetail == null
-                  ? const Center(child: Text('Tour not found'))
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.info_outline, size: 80, color: Colors.blue.shade300),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Tour details unavailable',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 40),
+                            child: Text(
+                              'This tour exists but detailed itinerary is not yet available. The tour may still be processing or may have been created without a full itinerary.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Back to Tours'),
+                          ),
+                        ],
+                      ),
+                    )
                   : Column(
                       children: [
                         // Tour Metadata

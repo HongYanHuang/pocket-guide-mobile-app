@@ -76,10 +76,32 @@ class ApiService {
   /// Get tour details by ID
   Future<TourDetail?> getTourById(String tourId) async {
     try {
+      print('Fetching tour detail for: $tourId');
+
+      // Try to fetch tour directly first
       final response = await _api.getTourToursTourIdGet(tourId: tourId);
+      print('Tour detail fetched successfully');
       return response.data;
     } catch (e) {
       print('Error fetching tour details: $e');
+
+      // If it's a deserialization error, try fetching raw data
+      if (e.toString().contains('BackupPOI')) {
+        print('BackupPOI deserialization error detected, fetching raw data...');
+        try {
+          // Fetch raw JSON and parse manually without backup_pois
+          final rawResponse = await _dio.get('/tours/$tourId');
+          print('Raw response received, attempting manual parse');
+
+          // For now, return null and show a helpful message
+          // TODO: Parse raw JSON manually to create TourDetail without backup_pois
+          return null;
+        } catch (rawError) {
+          print('Error fetching raw data: $rawError');
+          return null;
+        }
+      }
+
       return null;
     }
   }

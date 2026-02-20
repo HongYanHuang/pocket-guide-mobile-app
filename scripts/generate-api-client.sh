@@ -40,6 +40,30 @@ sed -i '' "s/sdk: '>=2.18.0 <4.0.0'/sdk: ^3.11.0/" "$OUTPUT_DIR/pubspec.yaml"
 # Fix TourDetail metadata assignment issue
 sed -i '' 's/result.metadata = valueDes;/result.metadata.replace(valueDes);/' "$OUTPUT_DIR/lib/src/model/tour_detail.dart"
 
+# Add missing builder factories for BackupPOI nested types
+# This fixes the "No builder factory for BuiltList<BackupPOI>" error
+SERIALIZERS_FILE="$OUTPUT_DIR/lib/src/serializers.dart"
+if ! grep -q "BuiltList, \[FullType(BackupPOI)\]" "$SERIALIZERS_FILE"; then
+  echo "Adding BackupPOI builder factories to serializers..."
+  # Use a Python script to add the builder factories after TourSummary
+  python3 << 'PYTHON_SCRIPT'
+import re
+
+file_path = "lib/api/generated/lib/src/serializers.dart"
+with open(file_path, 'r') as f:
+    content = f.read()
+
+# Find the TourSummary builder factory and add BackupPOI factories after it
+search = r'(..addBuilderFactory\(\s*const FullType\(BuiltList, \[FullType\(TourSummary\)\]\),\s*\(\) => ListBuilder<TourSummary>\(\),\s*\))'
+replacement = r'\1\n      ..addBuilderFactory(\n        const FullType(BuiltList, [FullType(BackupPOI)]),\n        () => ListBuilder<BackupPOI>(),\n      )\n      ..addBuilderFactory(\n        const FullType(BuiltMap, [FullType(String), FullType(BuiltList, [FullType(BackupPOI)])]),\n        () => MapBuilder<String, BuiltList<BackupPOI>>(),\n      )'
+
+content = re.sub(search, replacement, content, flags=re.MULTILINE | re.DOTALL)
+
+with open(file_path, 'w') as f:
+    f.write(content)
+PYTHON_SCRIPT
+fi
+
 # Install dependencies and run build_runner
 cd "$OUTPUT_DIR"
 flutter pub get > /dev/null 2>&1
