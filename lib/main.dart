@@ -1097,11 +1097,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             if (_showBackupOptions) ...[
                               Builder(
                                 builder: (context) {
-                                  // Determine which POI's backups to show
-                                  // If swapped, show backups for the replacement POI
-                                  // Otherwise show backups for the original POI
-                                  final displayPOI = isSwapped ? currentPOI : poi.poi;
-                                  final hasBackups = _tourDetail!.backupPois != null && _tourDetail!.backupPois!.containsKey(displayPOI);
+                                  // Always use the original POI (poi.poi) to look up backups
+                                  // The backup list for the original POI contains all alternatives
+                                  // We'll show them all and let the user select which one is current
+                                  final hasBackups = _tourDetail!.backupPois != null && _tourDetail!.backupPois!.containsKey(poi.poi);
 
                                   return Column(
                                     children: [
@@ -1169,7 +1168,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                                 ],
                                               ),
                                               const SizedBox(height: 8),
-                                              ..._tourDetail!.backupPois![displayPOI]!.map((backup) {
+                                              ..._tourDetail!.backupPois![poi.poi]!.map((backup) {
                                                 final isAlreadySelected = _isBackupPOIAlreadySelected(backup.poi, dayNumber, poiIndex);
                                                 final isCurrentlySelected = currentPOI == backup.poi;
 
