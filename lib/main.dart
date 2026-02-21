@@ -730,10 +730,16 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         };
       }).toList();
 
+      // Get the tour's language from metadata
+      String language = 'en'; // Default to English
+      if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
+        language = _tourDetail!.metadata!.languages!.first;
+      }
+
       final requestBody = {
         'replacements': replacements,
         'mode': 'simple',
-        'language': 'zh-cn', // Use the tour's language from metadata if available
+        'language': language,
       };
 
       print('Applying ${_pendingSwaps.length} POI swaps...');
