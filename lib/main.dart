@@ -702,6 +702,108 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     return selectedPOIs.length != totalPOIs;
   }
 
+  // Show summary of all pending changes
+  Future<bool> _showChangesSummary() async {
+    final swaps = _pendingSwaps.values.toList();
+
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Confirm ${swaps.length} Change${swaps.length > 1 ? 's' : ''}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'You are about to apply the following changes:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              ...swaps.map((swap) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Day ${swap.dayNumber}, POI ${swap.poiIndexInDay + 1}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.blue.shade900,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              swap.originalPoi,
+                              style: TextStyle(
+                                fontSize: 12,
+                                decoration: TextDecoration.lineThrough,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Icon(Icons.arrow_downward, size: 12, color: Colors.green.shade700),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              swap.replacementPoi,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              )),
+              const SizedBox(height: 8),
+              Text(
+                'All changes will be saved together.',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Apply All'),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
   // Apply all pending swaps to the API
   Future<void> _applyChanges() async {
     if (_pendingSwaps.isEmpty) return;
@@ -717,11 +819,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       return;
     }
 
+    // Show summary and get confirmation
+    final confirmed = await _showChangesSummary();
+    if (!confirmed) return;
+
     setState(() {
       _applying = true;
     });
 
     try {
+      // Convert all pending swaps to the API format
+      // IMPORTANT: We send ALL swaps in _pendingSwaps, ensuring no changes are lost
       final replacements = _pendingSwaps.values.map((swap) {
         return {
           'original_poi': swap.originalPoi,
@@ -729,6 +837,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           'day': swap.dayNumber,
         };
       }).toList();
+
+      // Verify we have all swaps
+      if (replacements.length != _pendingSwaps.length) {
+        throw Exception('Mismatch in swap count! Expected ${_pendingSwaps.length}, got ${replacements.length}');
+      }
 
       // Get the tour's language from metadata
       String language = 'en'; // Default to English
@@ -742,8 +855,14 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         'language': language,
       };
 
-      print('Applying ${_pendingSwaps.length} POI swaps...');
-      print('Request: $requestBody');
+      print('=== Applying POI Swaps ===');
+      print('Total swaps to apply: ${_pendingSwaps.length}');
+      print('Swaps details:');
+      for (var i = 0; i < replacements.length; i++) {
+        print('  ${i + 1}. Day ${replacements[i]['day']}: ${replacements[i]['original_poi']} → ${replacements[i]['replacement_poi']}');
+      }
+      print('Request body: $requestBody');
+      print('=========================');
 
       final response = await _apiService.batchReplacePOIs(widget.tourId, requestBody);
 
