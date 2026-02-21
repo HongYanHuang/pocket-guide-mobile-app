@@ -148,4 +148,22 @@ class ApiService {
       rethrow;
     }
   }
+
+  /// Fetch transcript for a POI
+  Future<String> fetchTranscript(String city, String poiId) async {
+    try {
+      print('Fetching transcript for: $city/$poiId');
+
+      final response = await _dio.get('/pois/$city/$poiId/transcript');
+
+      if (response.data != null && response.data is Map) {
+        return response.data['transcript'] ?? 'No transcript content available';
+      }
+
+      return 'No transcript available';
+    } catch (e) {
+      print('Error fetching transcript: $e');
+      rethrow;
+    }
+  }
 }

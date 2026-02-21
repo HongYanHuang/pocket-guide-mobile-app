@@ -898,6 +898,101 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     }
   }
 
+  // Show transcript dialog for a POI
+  Future<void> _showTranscript(String poiName, String city) async {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.8,
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.description, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      poiName,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const Divider(),
+              Expanded(
+                child: FutureBuilder<String>(
+                  future: _fetchTranscript(poiName, city),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Failed to load transcript',
+                              style: TextStyle(color: Colors.red.shade700),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              snapshot.error.toString(),
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return SingleChildScrollView(
+                      child: Text(
+                        snapshot.data ?? 'No transcript available',
+                        style: const TextStyle(fontSize: 14, height: 1.6),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Fetch transcript content for a POI
+  Future<String> _fetchTranscript(String poiName, String city) async {
+    try {
+      // Convert POI name to ID format (lowercase, replace spaces with hyphens)
+      final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+
+      print('Fetching transcript for: $city/$poiId');
+
+      final response = await _apiService.fetchTranscript(city, poiId);
+      return response;
+    } catch (e) {
+      print('Error fetching transcript: $e');
+      throw Exception('Could not load transcript: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1146,6 +1241,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 16),
                 child: ExpansionTile(
+                  initiallyExpanded: dayIndex == 0, // Day 1 default open
                   title: Text(
                     'Day ${day.day}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1203,12 +1299,27 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                   Text('${poi.estimatedHours.toStringAsFixed(1)} hours'),
                                 ],
                               ),
-                              trailing: Chip(
-                                label: Text(
-                                  poi.priority,
-                                  style: const TextStyle(fontSize: 10),
-                                ),
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Transcript button
+                                  IconButton(
+                                    icon: const Icon(Icons.description_outlined, size: 20),
+                                    onPressed: () => _showTranscript(currentPOI, _tourDetail!.metadata!.city),
+                                    tooltip: 'View transcript',
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Priority chip
+                                  Chip(
+                                    label: Text(
+                                      poi.priority,
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                  ),
+                                ],
                               ),
                             ),
                             ),
