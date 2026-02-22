@@ -1334,15 +1334,6 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(),
                                   ),
-                                  const SizedBox(width: 8),
-                                  // Priority chip
-                                  Chip(
-                                    label: Text(
-                                      poi.priority,
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                  ),
                                 ],
                               ),
                             ),
