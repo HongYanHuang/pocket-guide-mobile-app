@@ -149,12 +149,18 @@ class ApiService {
     }
   }
 
-  /// Fetch transcript for a POI
-  Future<String> fetchTranscript(String city, String poiId) async {
+  /// Fetch tour-specific transcript for a POI
+  Future<String> fetchTranscript(String city, String poiId, String tourId, String language) async {
     try {
-      print('Fetching transcript for: $city/$poiId');
+      print('Fetching transcript for: $city/$poiId (tour: $tourId, language: $language)');
 
-      final response = await _dio.get('/pois/$city/$poiId/transcript');
+      final response = await _dio.get(
+        '/pois/$city/$poiId/transcript',
+        queryParameters: {
+          'language': language,
+          'tour_id': tourId,
+        },
+      );
 
       if (response.data != null && response.data is Map) {
         return response.data['transcript'] ?? 'No transcript content available';

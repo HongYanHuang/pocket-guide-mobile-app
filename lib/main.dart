@@ -983,9 +983,18 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       // Convert POI name to ID format (lowercase, replace spaces with hyphens)
       final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
-      print('Fetching transcript for: $city/$poiId');
+      // Get tour ID
+      final tourId = widget.tourId;
 
-      final response = await _apiService.fetchTranscript(city, poiId);
+      // Get language from tour metadata
+      String language = 'en'; // Default to English
+      if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
+        language = _tourDetail!.metadata!.languages!.first;
+      }
+
+      print('Fetching tour-specific transcript for: $city/$poiId (tour: $tourId, language: $language)');
+
+      final response = await _apiService.fetchTranscript(city, poiId, tourId, language);
       return response;
     } catch (e) {
       print('Error fetching transcript: $e');
