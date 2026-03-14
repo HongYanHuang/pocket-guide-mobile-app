@@ -477,7 +477,7 @@ class _ToursListState extends State<ToursList> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    tour.tourId,
+                    tour.titleDisplay ?? tour.tourId,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -1009,7 +1009,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(_tourDetail?.metadata?.city ?? 'Tour Details'),
+        title: Text(_tourDetail?.metadata?.titleDisplay ?? _tourDetail?.metadata?.city ?? 'Tour Details'),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -1123,7 +1123,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            metadata.city,
+            metadata.titleDisplay ?? metadata.city,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -1511,10 +1511,10 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                                                   overflow: TextOverflow.ellipsis,
                                                                 ),
                                                               ],
-                                                              if (backup.substituteScenario.isNotEmpty) ...[
+                                                              if (backup.substituteScenario?.isNotEmpty == true) ...[
                                                                 const SizedBox(height: 4),
                                                                 Text(
-                                                                  backup.substituteScenario,
+                                                                  backup.substituteScenario!,
                                                                   style: TextStyle(
                                                                     fontSize: 9,
                                                                     fontStyle: FontStyle.italic,
