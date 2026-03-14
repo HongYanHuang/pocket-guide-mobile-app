@@ -172,4 +172,34 @@ class ApiService {
       rethrow;
     }
   }
+
+  /// Fetch sectioned transcript with audio for a POI
+  Future<SectionedTranscriptData?> fetchSectionedTranscript(
+    String city,
+    String poiId,
+    String tourId,
+    String language,
+  ) async {
+    try {
+      print('Fetching sectioned transcript for: $city/$poiId (tour: $tourId, language: $language)');
+
+      final response = await _api.getSectionedTranscriptPoisCityPoiIdSectionedTranscriptGet(
+        city: city,
+        poiId: poiId,
+        language: language,
+        tourId: tourId,
+      );
+
+      return response.data;
+    } catch (e) {
+      print('Error fetching sectioned transcript: $e');
+      // Return null to allow fallback to regular transcript
+      return null;
+    }
+  }
+
+  /// Get audio file URL for a POI section
+  String getAudioUrl(String city, String poiId, String audioFile) {
+    return '$baseUrl/pois/$city/$poiId/audio/$audioFile';
+  }
 }
