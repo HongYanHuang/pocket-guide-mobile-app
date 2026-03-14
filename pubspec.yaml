@@ -49,6 +49,9 @@ dependencies:
   built_collection: ^5.1.1
   built_value: ^8.12.3
 
+  # Audio player
+  audioplayers: ^5.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

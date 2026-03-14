@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const PocketGuideApp());
@@ -907,19 +908,19 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       barrierDismissible: true,
       builder: (context) => Dialog(
         child: Container(
-          width: MediaQuery.of(context).size.width * 0.8,
-          height: MediaQuery.of(context).size.height * 0.8,
+          width: MediaQuery.of(context).size.width * 0.9,
+          height: MediaQuery.of(context).size.height * 0.85,
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.description, color: Colors.blue.shade700),
+                  Icon(Icons.headphones, color: Colors.blue.shade700),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      poiName,
+                      '$poiName Audio Guide',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -934,8 +935,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               ),
               const Divider(),
               Expanded(
-                child: FutureBuilder<String>(
-                  future: _fetchTranscript(poiName, city),
+                child: FutureBuilder<SectionedTranscriptData?>(
+                  future: _fetchSectionedTranscript(poiName, city),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const Center(child: CircularProgressIndicator());
@@ -949,7 +950,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                             Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
                             const SizedBox(height: 16),
                             Text(
-                              'Failed to load transcript',
+                              'Failed to load audio guide',
                               style: TextStyle(color: Colors.red.shade700),
                             ),
                             const SizedBox(height: 8),
@@ -963,12 +964,14 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                       );
                     }
 
-                    return SingleChildScrollView(
-                      child: Text(
-                        snapshot.data ?? 'No transcript available',
-                        style: const TextStyle(fontSize: 14, height: 1.6),
-                      ),
-                    );
+                    final sectionedData = snapshot.data;
+                    if (sectionedData == null) {
+                      return const Center(
+                        child: Text('No audio guide available for this POI'),
+                      );
+                    }
+
+                    return _buildSectionedTranscriptView(sectionedData, city, poiName);
                   },
                 ),
               ),
@@ -979,8 +982,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     );
   }
 
-  // Fetch transcript content for a POI
-  Future<String> _fetchTranscript(String poiName, String city) async {
+  // Fetch sectioned transcript content for a POI
+  Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
     try {
       // Convert POI name to ID format (lowercase, replace spaces with hyphens)
       final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
@@ -994,14 +997,58 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         language = _tourDetail!.metadata!.languages!.first;
       }
 
-      print('Fetching tour-specific transcript for: $city/$poiId (tour: $tourId, language: $language)');
+      print('Fetching sectioned transcript for: $city/$poiId (tour: $tourId, language: $language)');
 
-      final response = await _apiService.fetchTranscript(city, poiId, tourId, language);
+      final response = await _apiService.fetchSectionedTranscript(city, poiId, tourId, language);
       return response;
     } catch (e) {
-      print('Error fetching transcript: $e');
-      throw Exception('Could not load transcript: $e');
+      print('Error fetching sectioned transcript: $e');
+      throw Exception('Could not load audio guide: $e');
     }
+  }
+
+  // Build sectioned transcript view with audio players
+  Widget _buildSectionedTranscriptView(SectionedTranscriptData data, String city, String poiName) {
+    final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+
+    return Column(
+      children: [
+        // Header info
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.mic, size: 16, color: Colors.blue.shade700),
+              const SizedBox(width: 8),
+              Text(
+                '${data.totalSections} sections • ${(data.estimatedDurationSeconds / 60).toStringAsFixed(0)} min',
+                style: TextStyle(fontSize: 12, color: Colors.blue.shade900),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Sections list
+        Expanded(
+          child: ListView.builder(
+            itemCount: data.sections.length,
+            itemBuilder: (context, index) {
+              final section = data.sections[index];
+              return _SectionCard(
+                section: section,
+                audioUrl: section.audioFile != null
+                    ? _apiService.getAudioUrl(city, poiId, section.audioFile!)
+                    : null,
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -1605,6 +1652,274 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             'Map integration coming soon',
             style: TextStyle(color: Colors.grey.shade500),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// Section Card with Audio Player
+class _SectionCard extends StatefulWidget {
+  final TranscriptSection section;
+  final String? audioUrl;
+
+  const _SectionCard({
+    required this.section,
+    this.audioUrl,
+  });
+
+  @override
+  State<_SectionCard> createState() => _SectionCardState();
+}
+
+class _SectionCardState extends State<_SectionCard> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+  bool _isLoading = false;
+  bool _isExpanded = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAudioPlayer();
+  }
+
+  void _setupAudioPlayer() {
+    _audioPlayer.onDurationChanged.listen((duration) {
+      setState(() {
+        _duration = duration;
+      });
+    });
+
+    _audioPlayer.onPositionChanged.listen((position) {
+      setState(() {
+        _position = position;
+      });
+    });
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      setState(() {
+        _isPlaying = state == PlayerState.playing;
+        _isLoading = state == PlayerState.playing && _position == Duration.zero;
+      });
+    });
+
+    _audioPlayer.onPlayerComplete.listen((_) {
+      setState(() {
+        _isPlaying = false;
+        _position = Duration.zero;
+      });
+    });
+  }
+
+  Future<void> _togglePlayPause() async {
+    if (widget.audioUrl == null) return;
+
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        if (_position == Duration.zero) {
+          await _audioPlayer.play(UrlSource(widget.audioUrl!));
+        } else {
+          await _audioPlayer.resume();
+        }
+      }
+    } catch (e) {
+      print('Error playing audio: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to play audio: $e')),
+      );
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${widget.section.sectionNumber}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.section.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.section.knowledgePoint,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    _isExpanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Audio Player
+          if (widget.audioUrl != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Colors.grey.shade50,
+              child: Row(
+                children: [
+                  // Play/Pause Button
+                  IconButton(
+                    icon: _isLoading
+                        ? SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
+                            ),
+                          )
+                        : Icon(
+                            _isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.blue.shade700,
+                          ),
+                    onPressed: _togglePlayPause,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 12),
+                  // Progress Bar
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        LinearProgressIndicator(
+                          value: _duration.inMilliseconds > 0
+                              ? _position.inMilliseconds / _duration.inMilliseconds
+                              : 0,
+                          backgroundColor: Colors.grey.shade300,
+                          valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _formatDuration(_position),
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                            ),
+                            Text(
+                              _duration.inSeconds > 0
+                                  ? _formatDuration(_duration)
+                                  : _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
+                              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          // Transcript (Expandable)
+          if (_isExpanded) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Transcript',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.section.transcript,
+                    style: const TextStyle(fontSize: 13, height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
