@@ -795,180 +795,247 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.swap_horiz, color: Colors.blue.shade700),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Alternative POIs')),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Current POI
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on, size: 16, color: Colors.grey.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Current POI',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            currentPOI,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Available Alternatives:',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              // Backup options list
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: backupOptions.length,
-                  itemBuilder: (context, index) {
-                    final backup = backupOptions[index];
-                    final isCurrentlySelected = isSwapped && _pendingSwaps[poiKey]!.replacementPoi == backup.poi;
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      color: isCurrentlySelected ? Colors.yellow.shade50 : null,
-                      child: InkWell(
-                        onTap: () {
-                          setState(() {
-                            if (isCurrentlySelected) {
-                              // Revert to original
-                              _pendingSwaps.remove(poiKey);
-                            } else {
-                              // Swap to this backup
-                              _pendingSwaps[poiKey] = POISwap(
-                                originalPoi: poi.poi,
-                                replacementPoi: backup.poi,
-                                dayNumber: dayNumber,
-                                poiIndexInDay: poiIndex,
-                              );
-                            }
-                          });
-                          Navigator.of(context).pop();
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      backup.poi,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                  if (isCurrentlySelected)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade100,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(
-                                        'Selected',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.green.shade900,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue.shade100,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      '${(backup.similarityScore * 100).toStringAsFixed(0)}%',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.blue.shade900,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                backup.reason,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              // Revert button if swapped
-              if (isSwapped) ...[
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Revert to Original'),
-                  onPressed: () {
-                    setState(() {
-                      _pendingSwaps.remove(poiKey);
-                    });
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ],
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
+      builder: (context) => _AlternativesDialog(
+        poi: poi,
+        currentPOI: currentPOI,
+        dayNumber: dayNumber,
+        poiIndex: poiIndex,
+        isSwapped: isSwapped,
+        backupOptions: backupOptions,
+        currentSwap: isSwapped ? _pendingSwaps[poiKey] : null,
+        onSave: (POISwap? swap) {
+          setState(() {
+            if (swap != null) {
+              _pendingSwaps[poiKey] = swap;
+            } else {
+              _pendingSwaps.remove(poiKey);
+            }
+          });
+        },
       ),
     );
   }
 }
 
-// Tour Detail Screen
+// Alternatives Dialog
+class _AlternativesDialog extends StatefulWidget {
+  final TourPOI poi;
+  final String currentPOI;
+  final int dayNumber;
+  final int poiIndex;
+  final bool isSwapped;
+  final List<BackupPOI> backupOptions;
+  final POISwap? currentSwap;
+  final Function(POISwap?) onSave;
+
+  const _AlternativesDialog({
+    required this.poi,
+    required this.currentPOI,
+    required this.dayNumber,
+    required this.poiIndex,
+    required this.isSwapped,
+    required this.backupOptions,
+    required this.currentSwap,
+    required this.onSave,
+  });
+
+  @override
+  State<_AlternativesDialog> createState() => _AlternativesDialogState();
+}
+
+class _AlternativesDialogState extends State<_AlternativesDialog> {
+  String? _selectedPOI;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedPOI = widget.currentSwap?.replacementPoi;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasChanges = _selectedPOI != widget.currentSwap?.replacementPoi;
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.swap_horiz, color: Colors.blue.shade700),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Alternative POIs')),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Current POI
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.location_on, size: 16, color: Colors.grey.shade700),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Current POI',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          widget.currentPOI,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Available Alternatives:',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            // Backup options list
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.backupOptions.length,
+                itemBuilder: (context, index) {
+                  final backup = widget.backupOptions[index];
+                  final isSelected = _selectedPOI == backup.poi;
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    color: isSelected ? Colors.yellow.shade50 : null,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            _selectedPOI = null;
+                          } else {
+                            _selectedPOI = backup.poi;
+                          }
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    backup.poi,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Selected',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.green.shade900,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade100,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '${(backup.similarityScore * 100).toStringAsFixed(0)}%',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.blue.shade900,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              backup.reason,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Revert button if swapped
+            if (widget.isSwapped && _selectedPOI != null) ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Revert to Original'),
+                onPressed: () {
+                  setState(() {
+                    _selectedPOI = null;
+                  });
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Close'),
+        ),
+        ElevatedButton(
+          onPressed: hasChanges || _selectedPOI != null
+              ? () {
+                  if (_selectedPOI != null) {
+                    widget.onSave(POISwap(
+                      originalPoi: widget.poi.poi,
+                      replacementPoi: _selectedPOI!,
+                      dayNumber: widget.dayNumber,
+                      poiIndexInDay: widget.poiIndex,
+                    ));
+                  } else {
+                    widget.onSave(null);
+                  }
+                  Navigator.of(context).pop();
+                }
+              : null,
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
 
 // Section Card with Audio Player
 class _SectionCard extends StatefulWidget {
