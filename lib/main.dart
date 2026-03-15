@@ -601,12 +601,129 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     }
   }
 
+  Future<void> _applyChanges() async {
+    if (_pendingSwaps.isEmpty) return;
+
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apply Changes'),
+        content: Text('Apply ${_pendingSwaps.length} POI replacement(s) to this tour?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Applying changes...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Prepare request body
+      final replacements = _pendingSwaps.values.map((swap) {
+        return {
+          'original_poi': swap.originalPoi,
+          'replacement_poi': swap.replacementPoi,
+          'day': swap.dayNumber,
+        };
+      }).toList();
+
+      final requestBody = {
+        'replacements': replacements,
+        'mode': 'simple',
+        'language': _tourDetail?.metadata?.languages?.first ?? 'en',
+      };
+
+      // Call batch replace API
+      await _apiService.batchReplacePOIs(widget.tourId, requestBody);
+
+      // Refresh tour details
+      await _fetchTourDetails();
+
+      // Clear pending swaps
+      setState(() {
+        _pendingSwaps.clear();
+      });
+
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Changes applied successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to apply changes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasPendingChanges = _pendingSwaps.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(_tourDetail?.metadata?.titleDisplay ?? 'New Tour UI'),
+        actions: [
+          if (hasPendingChanges)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.cloud_upload, size: 18),
+                label: Text('Apply ${_pendingSwaps.length}'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _applyChanges,
+              ),
+            ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
