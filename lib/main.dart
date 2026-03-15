@@ -37,6 +37,7 @@ class _MainScreenState extends State<MainScreen> {
     const HomeScreen(),
     const ExploreScreen(),
     const AccountsScreen(),
+    const TourWithTranscriptScreen(tourId: 'rome-tour-20260313-020105-d1b246'),
   ];
 
   @override
@@ -65,6 +66,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Accounts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.headphones),
+            label: 'New UI',
           ),
         ],
       ),
@@ -542,6 +547,234 @@ class AccountsScreen extends StatelessWidget {
         child: Text('Accounts Screen'),
       ),
     );
+  }
+}
+
+// Tour Detail Screen with Inline Transcripts (NEW UI)
+class TourWithTranscriptScreen extends StatefulWidget {
+  final String tourId;
+
+  const TourWithTranscriptScreen({super.key, required this.tourId});
+
+  @override
+  State<TourWithTranscriptScreen> createState() => _TourWithTranscriptScreenState();
+}
+
+class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
+  final ApiService _apiService = ApiService();
+  TourDetail? _tourDetail;
+  bool _loading = true;
+  String? _error;
+
+  Map<String, POISwap> _pendingSwaps = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTourDetails();
+  }
+
+  Future<void> _fetchTourDetails() async {
+    try {
+      final tourDetail = await _apiService.getTourById(widget.tourId);
+      setState(() {
+        _tourDetail = tourDetail;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load tour: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text(_tourDetail?.metadata?.titleDisplay ?? 'New Tour UI'),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+                      const SizedBox(height: 16),
+                      Text('Failed to load tour', style: TextStyle(color: Colors.red.shade600)),
+                      const SizedBox(height: 8),
+                      Text(_error!, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                )
+              : _buildTourContent(),
+    );
+  }
+
+  Widget _buildTourContent() {
+    final itinerary = _tourDetail!.itinerary.toList();
+
+    return ListView.builder(
+      itemCount: itinerary.length,
+      itemBuilder: (context, dayIndex) {
+        final day = itinerary[dayIndex];
+        final dayNumber = day.day;
+        final pois = day.pois.toList();
+
+        return ExpansionTile(
+          initiallyExpanded: dayIndex == 0,
+          title: Text('Day $dayNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
+          children: pois.asMap().entries.map((entry) {
+            final poiIndex = entry.key;
+            final poi = entry.value;
+            final poiKey = '$dayNumber-$poiIndex';
+            final isSwapped = _pendingSwaps.containsKey(poiKey);
+            final currentPOI = isSwapped ? _pendingSwaps[poiKey]!.replacementPoi : poi.poi;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  color: isSwapped ? Colors.yellow.shade50 : null,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Colors.blue.shade100,
+                      child: Text(
+                        '${poiIndex + 1}',
+                        style: TextStyle(
+                          color: Colors.blue.shade900,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      currentPOI,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Row(
+                      children: [
+                        Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text('${poi.estimatedHours.toStringAsFixed(1)} hours'),
+                      ],
+                    ),
+                    trailing: Builder(
+                      builder: (context) {
+                        final hasBackups = _tourDetail!.backupPois != null &&
+                                          _tourDetail!.backupPois!.containsKey(poi.poi);
+
+                        if (!hasBackups) return const SizedBox.shrink();
+
+                        return TextButton.icon(
+                          icon: Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
+                          label: Text(
+                            'Alternatives',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                          onPressed: () {},
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city),
+                if (poiIndex < pois.length - 1)
+                  Divider(height: 1, color: Colors.grey.shade300),
+              ],
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildInlineTranscript(String poiName, String city) {
+    return FutureBuilder<SectionedTranscriptData?>(
+      future: _fetchSectionedTranscript(poiName, city),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          return const SizedBox.shrink();
+        }
+
+        final sectionedData = snapshot.data!;
+        final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.grey.shade50,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.headphones, size: 16, color: Colors.blue.shade700),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Audio Guide (${sectionedData.totalSections} sections • ${(sectionedData.estimatedDurationSeconds / 60).toStringAsFixed(0)} min)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ...sectionedData.sections.map((section) {
+                return _SectionCard(
+                  section: section,
+                  audioUrl: section.audioFile != null
+                      ? _apiService.getAudioUrl(city, poiId, section.audioFile!)
+                      : null,
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
+    try {
+      final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+      final tourId = widget.tourId;
+      String language = 'en';
+      if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
+        language = _tourDetail!.metadata!.languages!.first;
+      }
+
+      final response = await _apiService.fetchSectionedTranscript(city, poiId, tourId, language);
+      return response;
+    } catch (e) {
+      print('Error fetching sectioned transcript: $e');
+      return null;
+    }
   }
 }
 
