@@ -690,7 +690,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                               color: Colors.blue.shade700,
                             ),
                           ),
-                          onPressed: () {},
+                          onPressed: () => _showAlternatives(poi, currentPOI, dayNumber, poiIndex, isSwapped),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             minimumSize: Size.zero,
@@ -787,6 +787,184 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
       print('Error fetching sectioned transcript: $e');
       return null;
     }
+  }
+
+  Future<void> _showAlternatives(TourPOI poi, String currentPOI, int dayNumber, int poiIndex, bool isSwapped) async {
+    final backupOptions = _tourDetail!.backupPois![poi.poi]!.toList();
+    final poiKey = '$dayNumber-$poiIndex';
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.swap_horiz, color: Colors.blue.shade700),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Alternative POIs')),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current POI
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, size: 16, color: Colors.grey.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Current POI',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            currentPOI,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Available Alternatives:',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              // Backup options list
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: backupOptions.length,
+                  itemBuilder: (context, index) {
+                    final backup = backupOptions[index];
+                    final isCurrentlySelected = isSwapped && _pendingSwaps[poiKey]!.replacementPoi == backup.poi;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      color: isCurrentlySelected ? Colors.yellow.shade50 : null,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            if (isCurrentlySelected) {
+                              // Revert to original
+                              _pendingSwaps.remove(poiKey);
+                            } else {
+                              // Swap to this backup
+                              _pendingSwaps[poiKey] = POISwap(
+                                originalPoi: poi.poi,
+                                replacementPoi: backup.poi,
+                                dayNumber: dayNumber,
+                                poiIndexInDay: poiIndex,
+                              );
+                            }
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      backup.poi,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (isCurrentlySelected)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Selected',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.green.shade900,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade100,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '${(backup.similarityScore * 100).toStringAsFixed(0)}%',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.blue.shade900,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                backup.reason,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              // Revert button if swapped
+              if (isSwapped) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  icon: const Icon(Icons.refresh, size: 16),
+                  label: const Text('Revert to Original'),
+                  onPressed: () {
+                    setState(() {
+                      _pendingSwaps.remove(poiKey);
+                    });
+                    Navigator.of(context).pop();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 }
 
