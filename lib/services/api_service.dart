@@ -78,17 +78,73 @@ class ApiService {
   /// Get tour details by ID
   /// For private tours, accessToken is required
   Future<TourDetail?> getTourById(String tourId, {String? accessToken}) async {
-    try {
-      print('Fetching tour detail for: $tourId');
+    print('=====================================');
+    print('🔍 Fetching tour detail for: $tourId');
+    print('=====================================');
 
+    try {
       // Set authorization header if token provided (required for private tours)
       if (accessToken != null) {
         _dio.options.headers['Authorization'] = 'Bearer $accessToken';
       }
 
-      // Try to fetch tour directly first
+      // First, fetch raw JSON to see what the backend actually returns
+      print('📡 Fetching raw JSON response...');
+      final rawResponse = await _dio.get(
+        '/tours/$tourId',
+        queryParameters: {'language': 'en'},
+      );
+
+      print('');
+      print('✅ Raw API Response received:');
+      print('════════════════════════════════════');
+      print('Response Type: ${rawResponse.data.runtimeType}');
+      print('');
+      print('📄 Full JSON Response:');
+      print(rawResponse.data);
+      print('════════════════════════════════════');
+      print('');
+
+      // Check specific fields that might be null
+      final data = rawResponse.data as Map<String, dynamic>;
+
+      print('🔎 Checking key fields:');
+      print('  - metadata: ${data['metadata'] != null ? 'EXISTS ✅' : 'NULL ❌'}');
+      print('  - itinerary: ${data['itinerary'] != null ? 'EXISTS ✅' : 'NULL ❌'}');
+      print('  - input_parameters: ${data['input_parameters'] != null ? 'EXISTS ✅' : 'NULL ❌'}');
+      print('  - backup_pois: ${data['backup_pois'] != null ? 'EXISTS ✅' : 'NULL ❌'}');
+      print('  - optimization_scores: ${data['optimization_scores'] != null ? 'EXISTS ✅' : 'NULL ❌'}');
+      print('');
+
+      if (data['metadata'] != null) {
+        final metadata = data['metadata'] as Map<String, dynamic>;
+        print('📋 Metadata contents:');
+        print('  - tour_id: ${metadata['tour_id']}');
+        print('  - city: ${metadata['city']}');
+        print('  - created_at: ${metadata['created_at']}');
+        print('  - duration_days: ${metadata['duration_days']}');
+        print('  - total_pois: ${metadata['total_pois']}');
+        print('');
+      }
+
+      if (data['input_parameters'] != null) {
+        print('⚙️  Input parameters type: ${data['input_parameters'].runtimeType}');
+        print('⚙️  Input parameters value: ${data['input_parameters']}');
+      } else {
+        print('⚠️  Input parameters is NULL - This will cause deserialization error!');
+      }
+      print('');
+
+      print('🔄 Now attempting to deserialize with generated API client...');
+      print('');
+
+      // Clear the raw request headers and try with the generated client
+      // Try to fetch tour using generated API client
       final response = await _api.getTourToursTourIdGet(tourId: tourId);
-      print('Tour detail fetched successfully');
+
+      print('✅ Tour detail fetched and deserialized successfully!');
+      print('=====================================');
+      print('');
 
       // Clear authorization header after request
       if (accessToken != null) {
@@ -97,7 +153,13 @@ class ApiService {
 
       return response.data;
     } catch (e) {
-      print('Error fetching tour details: $e');
+      print('');
+      print('❌ ERROR during tour fetch/deserialization:');
+      print('════════════════════════════════════');
+      print('Error Type: ${e.runtimeType}');
+      print('Error Message: $e');
+      print('════════════════════════════════════');
+      print('');
 
       // Clear authorization header on error
       if (accessToken != null) {
@@ -109,14 +171,18 @@ class ApiService {
           e.toString().contains('JsonObject') ||
           e.toString().contains('BackupPOI') ||
           e.toString().contains('type \'Null\' is not a subtype')) {
-        print('❌ Deserialization error: API response does not match OpenAPI spec');
-        print('This usually means the backend is returning null in required fields.');
-        print('Backend team should check the API response format for tour: $tourId');
+        print('💡 This is a deserialization error.');
+        print('💡 The backend response does not match the OpenAPI specification.');
+        print('💡 Check the logged API response above to see which fields are null.');
+        print('💡 Backend team needs to either:');
+        print('   1. Return non-null values for required fields, OR');
+        print('   2. Update OpenAPI spec to mark those fields as nullable');
+        print('');
 
         // Rethrow with a user-friendly message
         throw Exception(
-          'Tour data format error. The backend returned data that doesn\'t match the expected format. '
-          'Please contact support or try regenerating the tour.'
+          'Tour data format error. Check console for detailed API response. '
+          'Backend needs to fix null fields in the response.'
         );
       }
 
