@@ -243,6 +243,9 @@ class ApiService {
   }) async {
     try {
       print('Exchanging code for tokens...');
+      print('   Code (first 20 chars): ${code.substring(0, 20)}...');
+      print('   State: $state');
+      print('   Code verifier (first 20 chars): ${codeVerifier.substring(0, 20)}...');
 
       // Use client-specific endpoint: /auth/client/google/callback
       final response = await _dio.get(
@@ -272,6 +275,11 @@ class ApiService {
       return authResponse;
     } catch (e) {
       print('Error exchanging code for tokens: $e');
+      if (e is DioException) {
+        print('   Status code: ${e.response?.statusCode}');
+        print('   Response data: ${e.response?.data}');
+        print('   Response headers: ${e.response?.headers}');
+      }
       rethrow;
     }
   }

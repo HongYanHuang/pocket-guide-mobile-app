@@ -35,11 +35,15 @@ class StorageService {
 
   // PKCE Code Verifier
   Future<void> saveCodeVerifier(String verifier) async {
+    print('🔵 StorageService: Saving code verifier: ${verifier.substring(0, 20)}...');
     await _storage.write(key: _codeVerifierKey, value: verifier);
+    print('✅ StorageService: Code verifier saved');
   }
 
   Future<String?> getCodeVerifier() async {
-    return await _storage.read(key: _codeVerifierKey);
+    final verifier = await _storage.read(key: _codeVerifierKey);
+    print('🔵 StorageService: Retrieved code verifier: ${verifier != null ? "${verifier.substring(0, 20)}..." : "null"}');
+    return verifier;
   }
 
   Future<void> deleteCodeVerifier() async {
