@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
+import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -20,7 +21,13 @@ class PocketGuideApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const AuthCheckScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const AuthCheckScreen(),
+        '/auth/callback': (context) => const AuthCallbackScreen(),
+        '/login': (context) => const LoginScreen(),
+        '/home': (context) => const MainScreen(),
+      },
     );
   }
 }

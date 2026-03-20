@@ -6,6 +6,8 @@ import 'package:pocket_guide_mobile/services/storage_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/models/user_model.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class AuthService {
   final StorageService _storageService = StorageService();
@@ -37,31 +39,84 @@ class AuthService {
     return base64UrlEncode(values).replaceAll('=', '');
   }
 
+  // Handle OAuth callback from web (called by AuthCallbackScreen)
+  Future<bool> handleWebCallback(String code, String state) async {
+    try {
+      print('🔵 AuthService.handleWebCallback: Starting');
+      print('   code: ${code.substring(0, 20)}...');
+      print('   state: $state');
+
+      // 1. Validate state to prevent CSRF
+      final savedState = await _storageService.getOAuthState();
+      print('🔵 AuthService.handleWebCallback: Validating state');
+      print('   saved state: $savedState');
+      print('   returned state: $state');
+
+      if (savedState != state) {
+        print('❌ AuthService.handleWebCallback: State mismatch!');
+        throw Exception('Invalid state parameter - possible CSRF attack');
+      }
+
+      print('✅ AuthService.handleWebCallback: State validated');
+
+      // 2. Get code verifier
+      final codeVerifier = await _storageService.getCodeVerifier();
+      print('🔵 AuthService.handleWebCallback: Got code verifier: ${codeVerifier?.substring(0, 20)}...');
+
+      if (codeVerifier == null) {
+        print('❌ AuthService.handleWebCallback: No code verifier found');
+        throw Exception('Missing PKCE code verifier');
+      }
+
+      // 3. Exchange code for tokens
+      print('🔵 AuthService.handleWebCallback: Exchanging code for tokens...');
+      await _handleCallback(code, state, codeVerifier);
+
+      // 4. Clean up temporary storage
+      print('🔵 AuthService.handleWebCallback: Cleaning up');
+      await _storageService.deleteCodeVerifier();
+      await _storageService.deleteOAuthState();
+
+      print('✅ AuthService.handleWebCallback: Success!');
+      return true;
+    } catch (e, stackTrace) {
+      print('❌ AuthService.handleWebCallback: Error: $e');
+      print('   Stack trace: $stackTrace');
+
+      // Clean up on error
+      await _storageService.deleteCodeVerifier();
+      await _storageService.deleteOAuthState();
+      return false;
+    }
+  }
+
   // Initiate Google OAuth login
   Future<bool> login() async {
     try {
-      print('Starting OAuth login...');
+      print('🔵 AuthService.login: Starting OAuth login...');
 
       // 1. Generate PKCE parameters
+      print('🔵 AuthService.login: Step 1 - Generating PKCE');
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);
       final state = _generateState();
-
-      print('Generated PKCE challenge');
+      print('✅ Generated PKCE challenge: ${codeChallenge.substring(0, 20)}...');
+      print('✅ Generated state: $state');
 
       // 2. Store code verifier and state for callback
+      print('🔵 AuthService.login: Step 2 - Storing verifier and state');
       await _storageService.saveCodeVerifier(codeVerifier);
       await _storageService.saveOAuthState(state);
-
-      print('Saved code verifier and state');
+      print('✅ Saved code verifier and state');
 
       // 3. Get Google OAuth URL from backend
+      print('🔵 AuthService.login: Step 3 - Getting OAuth URL from backend');
       // For web: use http://localhost:<port>/auth/callback
       // For mobile: use custom URL scheme pocketguide://auth/callback
       final redirectUri = _isWebMode
           ? '${Uri.base.origin}/auth/callback'  // Web mode
           : '$_callbackUrlScheme://auth/callback';  // Mobile mode
-      print('Calling backend with redirectUri: $redirectUri');
+      print('   Redirect URI: $redirectUri');
 
       final response = await _apiService.initiateGoogleLogin(
         redirectUri: redirectUri,
@@ -69,63 +124,70 @@ class AuthService {
       );
 
       if (response == null || response['auth_url'] == null) {
+        print('❌ No auth URL in response');
         throw Exception('Failed to get authorization URL from backend');
       }
 
       final authUrl = response['auth_url'] as String;
-      print('Got auth URL from backend: ${authUrl.substring(0, 50)}...');
+      print('✅ Got auth URL from backend: ${authUrl.substring(0, 60)}...');
 
-      // 4. Open browser for OAuth
-      print('Opening browser for OAuth...');
+      // 4. Redirect to Google OAuth
+      print('🔵 AuthService.login: Step 4 - Redirecting to Google');
+      print('   NOTE: After Google login, you\'ll be redirected to /auth/callback');
+      print('   Watch the console logs on that page!');
 
-      final String result;
       if (_isWebMode) {
-        // For web: redirect to Google OAuth, then handle callback on return
-        result = await FlutterWebAuth2.authenticate(
-          url: authUrl,
-          callbackUrlScheme: 'http',  // Web uses http/https callback
-        );
+        // For web: use window.location to redirect
+        // The page will reload at /auth/callback after Google OAuth
+        html.window.location.href = authUrl;
+
+        // Return true immediately - the callback will be handled by AuthCallbackScreen
+        return true;
       } else {
-        // For mobile: use custom URL scheme
-        result = await FlutterWebAuth2.authenticate(
+        // For mobile: use FlutterWebAuth2
+        print('🔵 AuthService.login: Using FlutterWebAuth2 for mobile');
+        final result = await FlutterWebAuth2.authenticate(
           url: authUrl,
           callbackUrlScheme: _callbackUrlScheme,
         );
+
+        print('✅ OAuth callback received: $result');
+
+        // 5. Extract code and state from callback URL
+        final uri = Uri.parse(result);
+        final code = uri.queryParameters['code'];
+        final returnedState = uri.queryParameters['state'];
+
+        if (code == null || returnedState == null) {
+          print('❌ Missing code or state in callback');
+          throw Exception('Missing authorization code or state in callback');
+        }
+
+        // 6. Validate state to prevent CSRF
+        final savedState = await _storageService.getOAuthState();
+        if (savedState != returnedState) {
+          print('❌ State mismatch!');
+          throw Exception('Invalid state parameter - possible CSRF attack');
+        }
+
+        print('✅ State validated successfully');
+
+        // 7. Exchange code for tokens
+        final savedVerifier = await _storageService.getCodeVerifier();
+        if (savedVerifier == null) {
+          print('❌ No code verifier found');
+          throw Exception('Missing PKCE code verifier');
+        }
+
+        await _handleCallback(code, returnedState, savedVerifier);
+
+        // 8. Clean up temporary storage
+        await _storageService.deleteCodeVerifier();
+        await _storageService.deleteOAuthState();
+
+        print('✅ Login completed successfully');
+        return true;
       }
-
-      print('OAuth callback received: $result');
-
-      // 5. Extract code and state from callback URL
-      final uri = Uri.parse(result);
-      final code = uri.queryParameters['code'];
-      final returnedState = uri.queryParameters['state'];
-
-      if (code == null || returnedState == null) {
-        throw Exception('Missing authorization code or state in callback');
-      }
-
-      // 6. Validate state to prevent CSRF
-      final savedState = await _storageService.getOAuthState();
-      if (savedState != returnedState) {
-        throw Exception('Invalid state parameter - possible CSRF attack');
-      }
-
-      print('State validated successfully');
-
-      // 7. Exchange code for tokens
-      final savedVerifier = await _storageService.getCodeVerifier();
-      if (savedVerifier == null) {
-        throw Exception('Missing PKCE code verifier');
-      }
-
-      await _handleCallback(code, returnedState, savedVerifier);
-
-      // 8. Clean up temporary storage
-      await _storageService.deleteCodeVerifier();
-      await _storageService.deleteOAuthState();
-
-      print('Login completed successfully');
-      return true;
     } catch (e) {
       print('Login error: $e');
       // Clean up on error
