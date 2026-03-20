@@ -42,47 +42,28 @@ class AuthService {
   // Handle OAuth callback from web (called by AuthCallbackScreen)
   Future<bool> handleWebCallback(String code, String state) async {
     try {
-      print('🔵 AuthService.handleWebCallback: Starting');
-      print('   code: ${code.substring(0, 20)}...');
-      print('   state: $state');
-
-      // 1. Validate state to prevent CSRF
+      // Validate state to prevent CSRF
       final savedState = await _storageService.getOAuthState();
-      print('🔵 AuthService.handleWebCallback: Validating state');
-      print('   saved state: $savedState');
-      print('   returned state: $state');
-
       if (savedState != state) {
-        print('❌ AuthService.handleWebCallback: State mismatch!');
         throw Exception('Invalid state parameter - possible CSRF attack');
       }
 
-      print('✅ AuthService.handleWebCallback: State validated');
-
-      // 2. Get code verifier
+      // Get code verifier
       final codeVerifier = await _storageService.getCodeVerifier();
-      print('🔵 AuthService.handleWebCallback: Got code verifier: ${codeVerifier?.substring(0, 20)}...');
-
       if (codeVerifier == null) {
-        print('❌ AuthService.handleWebCallback: No code verifier found');
         throw Exception('Missing PKCE code verifier');
       }
 
-      // 3. Exchange code for tokens
-      print('🔵 AuthService.handleWebCallback: Exchanging code for tokens...');
+      // Exchange code for tokens
       await _handleCallback(code, state, codeVerifier);
 
-      // 4. Clean up temporary storage
-      print('🔵 AuthService.handleWebCallback: Cleaning up');
+      // Clean up temporary storage
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
 
-      print('✅ AuthService.handleWebCallback: Success!');
       return true;
-    } catch (e, stackTrace) {
-      print('❌ AuthService.handleWebCallback: Error: $e');
-      print('   Stack trace: $stackTrace');
-
+    } catch (e) {
+      print('Login error: $e');
       // Clean up on error
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
@@ -93,27 +74,19 @@ class AuthService {
   // Initiate Google OAuth login
   Future<bool> login() async {
     try {
-      print('🔵 AuthService.login: Starting OAuth login...');
-
-      // 1. Generate PKCE parameters
-      print('🔵 AuthService.login: Step 1 - Generating PKCE');
+      // Generate PKCE parameters
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);
-      print('✅ Generated PKCE challenge: ${codeChallenge.substring(0, 20)}...');
 
-      // 2. Store code verifier for callback
-      print('🔵 AuthService.login: Step 2 - Storing code verifier');
+      // Store code verifier for callback
       await _storageService.saveCodeVerifier(codeVerifier);
-      print('✅ Saved code verifier');
 
-      // 3. Get Google OAuth URL from backend
-      print('🔵 AuthService.login: Step 3 - Getting OAuth URL from backend');
+      // Get Google OAuth URL from backend
       // For web: use http://localhost:<port>/auth/callback
       // For mobile: use custom URL scheme pocketguide://auth/callback
       final redirectUri = _isWebMode
           ? '${Uri.base.origin}/auth/callback'  // Web mode
           : '$_callbackUrlScheme://auth/callback';  // Mobile mode
-      print('   Redirect URI: $redirectUri');
 
       final response = await _apiService.initiateGoogleLogin(
         redirectUri: redirectUri,
@@ -121,24 +94,14 @@ class AuthService {
       );
 
       if (response == null || response['auth_url'] == null || response['state'] == null) {
-        print('❌ No auth URL or state in response');
         throw Exception('Failed to get authorization URL from backend');
       }
 
       final authUrl = response['auth_url'] as String;
       final state = response['state'] as String;
-      print('✅ Got auth URL from backend: ${authUrl.substring(0, 60)}...');
-      print('✅ Got state from backend: $state');
 
-      // 4. Store state from backend for callback validation
-      print('🔵 AuthService.login: Step 4 - Storing state from backend');
+      // Store state from backend for callback validation
       await _storageService.saveOAuthState(state);
-      print('✅ Saved state from backend');
-
-      // 5. Redirect to Google OAuth
-      print('🔵 AuthService.login: Step 5 - Redirecting to Google');
-      print('   NOTE: After Google login, you\'ll be redirected to /auth/callback');
-      print('   Watch the console logs on that page!');
 
       if (_isWebMode) {
         // For web: use window.location to redirect
@@ -149,47 +112,38 @@ class AuthService {
         return true;
       } else {
         // For mobile: use FlutterWebAuth2
-        print('🔵 AuthService.login: Using FlutterWebAuth2 for mobile');
         final result = await FlutterWebAuth2.authenticate(
           url: authUrl,
           callbackUrlScheme: _callbackUrlScheme,
         );
 
-        print('✅ OAuth callback received: $result');
-
-        // 5. Extract code and state from callback URL
+        // Extract code and state from callback URL
         final uri = Uri.parse(result);
         final code = uri.queryParameters['code'];
         final returnedState = uri.queryParameters['state'];
 
         if (code == null || returnedState == null) {
-          print('❌ Missing code or state in callback');
           throw Exception('Missing authorization code or state in callback');
         }
 
-        // 6. Validate state to prevent CSRF
+        // Validate state to prevent CSRF
         final savedState = await _storageService.getOAuthState();
         if (savedState != returnedState) {
-          print('❌ State mismatch!');
           throw Exception('Invalid state parameter - possible CSRF attack');
         }
 
-        print('✅ State validated successfully');
-
-        // 7. Exchange code for tokens
+        // Exchange code for tokens
         final savedVerifier = await _storageService.getCodeVerifier();
         if (savedVerifier == null) {
-          print('❌ No code verifier found');
           throw Exception('Missing PKCE code verifier');
         }
 
         await _handleCallback(code, returnedState, savedVerifier);
 
-        // 8. Clean up temporary storage
+        // Clean up temporary storage
         await _storageService.deleteCodeVerifier();
         await _storageService.deleteOAuthState();
 
-        print('✅ Login completed successfully');
         return true;
       }
     } catch (e) {
@@ -204,8 +158,6 @@ class AuthService {
   // Handle OAuth callback and exchange code for tokens
   Future<void> _handleCallback(String code, String state, String codeVerifier) async {
     try {
-      print('Exchanging authorization code for tokens...');
-
       final tokenResponse = await _apiService.exchangeCodeForTokens(
         code: code,
         state: state,
@@ -219,8 +171,6 @@ class AuthService {
       // Save tokens securely
       await _storageService.saveAccessToken(tokenResponse.accessToken);
       await _storageService.saveRefreshToken(tokenResponse.refreshToken);
-
-      print('Tokens saved successfully');
     } catch (e) {
       print('Error handling callback: $e');
       rethrow;
@@ -230,7 +180,6 @@ class AuthService {
   // Refresh access token
   Future<bool> refreshAccessToken() async {
     try {
-      print('Refreshing access token...');
 
       final refreshToken = await _storageService.getRefreshToken();
       if (refreshToken == null) {
@@ -248,7 +197,6 @@ class AuthService {
       await _storageService.saveAccessToken(tokenResponse.accessToken);
       // Note: refresh token stays the same
 
-      print('Access token refreshed successfully');
       return true;
     } catch (e) {
       print('Error refreshing token: $e');
@@ -310,8 +258,6 @@ class AuthService {
   // Logout
   Future<void> logout() async {
     try {
-      print('Logging out...');
-
       final accessToken = await _storageService.getAccessToken();
       final refreshToken = await _storageService.getRefreshToken();
 
@@ -324,7 +270,6 @@ class AuthService {
     } finally {
       // Always clear local tokens
       await _storageService.clearTokens();
-      print('Logged out successfully');
     }
   }
 }

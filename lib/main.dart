@@ -17,17 +17,11 @@ class PocketGuideApp extends StatelessWidget {
   Widget build(BuildContext context) {
     // Check current URL to handle OAuth callback
     final uri = Uri.base;
-    print('🔵 PocketGuideApp: Current URL path: ${uri.path}');
-    print('🔵 PocketGuideApp: Query params: ${uri.queryParameters}');
-
     String initialRoute = '/';
 
     // If we're at /auth/callback, go directly there
     if (uri.path == '/auth/callback') {
-      print('✅ PocketGuideApp: Detected callback URL, routing to /auth/callback');
       initialRoute = '/auth/callback';
-    } else {
-      print('🔵 PocketGuideApp: Normal app start, routing to /');
     }
 
     return MaterialApp(

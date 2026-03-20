@@ -213,8 +213,6 @@ class ApiService {
     required String codeChallenge,
   }) async {
     try {
-      print('Initiating Google login with redirect URI: $redirectUri');
-
       // Use client-specific endpoint: /auth/client/google/login
       final response = await _dio.get(
         '/auth/client/google/login',
@@ -242,11 +240,6 @@ class ApiService {
     required String codeVerifier,
   }) async {
     try {
-      print('Exchanging code for tokens...');
-      print('   Code (first 20 chars): ${code.substring(0, 20)}...');
-      print('   State: $state');
-      print('   Code verifier (first 20 chars): ${codeVerifier.substring(0, 20)}...');
-
       // Use client-specific endpoint: /auth/client/google/callback
       final response = await _dio.get(
         '/auth/client/google/callback',
@@ -271,15 +264,9 @@ class ApiService {
           ..expiresIn = tokenData['expires_in'],
       );
 
-      print('Token exchange response received');
       return authResponse;
     } catch (e) {
       print('Error exchanging code for tokens: $e');
-      if (e is DioException) {
-        print('   Status code: ${e.response?.statusCode}');
-        print('   Response data: ${e.response?.data}');
-        print('   Response headers: ${e.response?.headers}');
-      }
       rethrow;
     }
   }
