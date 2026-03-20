@@ -255,6 +255,11 @@ class AuthService {
     }
   }
 
+  // Get access token
+  Future<String?> getAccessToken() async {
+    return await _storageService.getAccessToken();
+  }
+
   // Logout
   Future<void> logout() async {
     try {

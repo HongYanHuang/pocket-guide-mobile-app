@@ -3,6 +3,7 @@ import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
+import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -120,7 +121,6 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const ExploreScreen(),
     const AccountsScreen(),
   ];
 
@@ -131,27 +131,65 @@ class _MainScreenState extends State<MainScreen> {
         index: _currentIndex,
         children: _screens,
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreateTourScreen(),
+            ),
+          );
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.explore),
-            label: 'Explore',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Accounts',
-          ),
-        ],
+        elevation: 4,
+        child: const Icon(Icons.add, size: 32),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      bottomNavigationBar: BottomAppBar(
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.home, 'Home', 0),
+            const SizedBox(width: 48), // Space for FAB
+            _buildNavItem(Icons.person, 'Account', 1),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final isSelected = _currentIndex == index;
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -449,7 +487,7 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
   }
 }
 
-// Tours List Widget
+// Tours List Widget with Tabs
 class ToursList extends StatefulWidget {
   final String city;
 
@@ -459,53 +497,128 @@ class ToursList extends StatefulWidget {
   State<ToursList> createState() => _ToursListState();
 }
 
-class _ToursListState extends State<ToursList> {
+class _ToursListState extends State<ToursList> with SingleTickerProviderStateMixin {
   final ApiService _apiService = ApiService();
-  List<TourSummary> _tours = [];
-  bool _loading = true;
-  String? _error;
+  final AuthService _authService = AuthService();
+
+  late TabController _tabController;
+  List<dynamic> _myTours = [];
+  List<TourSummary> _publicTours = [];
+  bool _loadingMyTours = true;
+  bool _loadingPublicTours = true;
+  String? _errorMyTours;
+  String? _errorPublicTours;
 
   @override
   void initState() {
     super.initState();
-    _loadTours();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadAllTours();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
   void didUpdateWidget(ToursList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.city != oldWidget.city) {
-      _loadTours();
+      _loadAllTours();
     }
   }
 
-  Future<void> _loadTours() async {
+  Future<void> _loadAllTours() async {
+    _loadMyTours();
+    _loadPublicTours();
+  }
+
+  Future<void> _loadMyTours() async {
     setState(() {
-      _loading = true;
-      _error = null;
+      _loadingMyTours = true;
+      _errorMyTours = null;
+    });
+
+    try {
+      final accessToken = await _authService.getAccessToken();
+      if (accessToken != null) {
+        final allMyTours = await _apiService.getMyTours(accessToken);
+        // Filter by selected city
+        final filteredTours = allMyTours.where((tour) {
+          final tourCity = tour['city'] as String?;
+          return tourCity?.toLowerCase() == widget.city.toLowerCase();
+        }).toList();
+
+        setState(() {
+          _myTours = filteredTours;
+          _loadingMyTours = false;
+        });
+      } else {
+        setState(() {
+          _myTours = [];
+          _loadingMyTours = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMyTours = e.toString();
+        _loadingMyTours = false;
+      });
+    }
+  }
+
+  Future<void> _loadPublicTours() async {
+    setState(() {
+      _loadingPublicTours = true;
+      _errorPublicTours = null;
     });
 
     try {
       final tours = await _apiService.getToursByCity(widget.city);
       setState(() {
-        _tours = tours;
-        _loading = false;
+        _publicTours = tours;
+        _loadingPublicTours = false;
       });
     } catch (e) {
       setState(() {
-        _error = e.toString();
-        _loading = false;
+        _errorPublicTours = e.toString();
+        _loadingPublicTours = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'My Tours'),
+            Tab(text: 'Public Tours'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildMyToursTab(),
+              _buildPublicToursTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMyToursTab() {
+    if (_loadingMyTours) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null) {
+    if (_errorMyTours != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -514,10 +627,10 @@ class _ToursListState extends State<ToursList> {
             const SizedBox(height: 16),
             Text('Failed to load tours', style: TextStyle(color: Colors.red.shade600)),
             const SizedBox(height: 8),
-            Text(_error!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            Text(_errorMyTours!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loadTours,
+              onPressed: _loadMyTours,
               child: const Text('Retry'),
             ),
           ],
@@ -525,7 +638,7 @@ class _ToursListState extends State<ToursList> {
       );
     }
 
-    if (_tours.isEmpty) {
+    if (_myTours.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -533,7 +646,70 @@ class _ToursListState extends State<ToursList> {
             Icon(Icons.tour_outlined, size: 80, color: Colors.grey.shade300),
             const SizedBox(height: 16),
             Text(
-              'No tours available for ${widget.city}',
+              'No tours created yet',
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap the + button to create your first tour',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _myTours.length,
+      itemBuilder: (context, index) {
+        final tour = _myTours[index] as Map<String, dynamic>;
+        return _buildTourCard(
+          context,
+          tourId: tour['tour_id'] as String,
+          title: tour['title_display'] as String? ?? tour['tour_id'] as String,
+          days: tour['duration_days'] as int,
+          city: tour['city'] as String,
+          totalPois: tour['total_pois'] as int,
+        );
+      },
+    );
+  }
+
+  Widget _buildPublicToursTab() {
+    if (_loadingPublicTours) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorPublicTours != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
+            const SizedBox(height: 16),
+            Text('Failed to load tours', style: TextStyle(color: Colors.red.shade600)),
+            const SizedBox(height: 8),
+            Text(_errorPublicTours!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadPublicTours,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_publicTours.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.tour_outlined, size: 80, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text(
+              'No public tours available for ${widget.city}',
               style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
           ],
@@ -543,53 +719,71 @@ class _ToursListState extends State<ToursList> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _tours.length,
+      itemCount: _publicTours.length,
       itemBuilder: (context, index) {
-        final tour = _tours[index];
-        return Card(
-          margin: const EdgeInsets.only(bottom: 16),
-          child: InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TourWithTranscriptScreen(tourId: tour.tourId),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    tour.titleDisplay ?? tour.tourId,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text('${tour.durationDays} days'),
-                      const SizedBox(width: 16),
-                      Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text(tour.city),
-                      const Spacer(),
-                      Icon(Icons.place, size: 16, color: Colors.grey.shade600),
-                      const SizedBox(width: 4),
-                      Text('${tour.totalPois} POIs'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
+        final tour = _publicTours[index];
+        return _buildTourCard(
+          context,
+          tourId: tour.tourId,
+          title: tour.titleDisplay ?? tour.tourId,
+          days: tour.durationDays,
+          city: tour.city,
+          totalPois: tour.totalPois,
         );
       },
+    );
+  }
+
+  Widget _buildTourCard(
+    BuildContext context, {
+    required String tourId,
+    required String title,
+    required int days,
+    required String city,
+    required int totalPois,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TourWithTranscriptScreen(tourId: tourId),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text('$days days'),
+                  const SizedBox(width: 16),
+                  Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text(city),
+                  const Spacer(),
+                  Icon(Icons.place, size: 16, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Text('$totalPois POIs'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

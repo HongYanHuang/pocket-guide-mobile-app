@@ -310,6 +310,65 @@ class ApiService {
     }
   }
 
+  /// Generate a personalized tour
+  Future<Map<String, dynamic>> generateTour({
+    required String accessToken,
+    required String city,
+    required int days,
+    List<String>? interests,
+    List<String>? mustSee,
+    String? pace,
+    String? walking,
+    String? language,
+    String? startLocation,
+    String? endLocation,
+    String? startDate,
+  }) async {
+    try {
+      // Set authorization header
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+
+      final response = await _dio.post(
+        '/client/tours/generate',
+        data: {
+          'city': city,
+          'days': days,
+          if (interests != null && interests.isNotEmpty) 'interests': interests,
+          if (mustSee != null && mustSee.isNotEmpty) 'must_see': mustSee,
+          'pace': pace ?? 'normal',
+          'walking': walking ?? 'moderate',
+          'language': language ?? 'en',
+          'mode': 'ilp', // Use ILP mode for optimal results
+          if (startLocation != null) 'start_location': startLocation,
+          if (endLocation != null) 'end_location': endLocation,
+          if (startDate != null) 'start_date': startDate,
+          'provider': 'anthropic',
+        },
+      );
+
+      return response.data as Map<String, dynamic>;
+    } catch (e) {
+      print('Error generating tour: $e');
+      rethrow;
+    }
+  }
+
+  /// Get user's private tours
+  Future<List<dynamic>> getMyTours(String accessToken) async {
+    try {
+      // Set authorization header
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+
+      final response = await _dio.get('/client/tours/my-tours');
+
+      final data = response.data as Map<String, dynamic>;
+      return data['tours'] as List<dynamic>;
+    } catch (e) {
+      print('Error getting my tours: $e');
+      rethrow;
+    }
+  }
+
   /// Logout user
   Future<void> logout(String accessToken, String refreshToken) async {
     try {
