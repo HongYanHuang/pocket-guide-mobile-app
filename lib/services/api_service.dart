@@ -4,6 +4,7 @@ import 'package:pocket_guide_api/pocket_guide_api.dart';
 
 class ApiService {
   late final DefaultApi _api;
+  late final AuthenticationApi _authApi;
   late final Dio _dio;
 
   static const String baseUrl = 'http://localhost:8000';
@@ -17,6 +18,7 @@ class ApiService {
 
     final serializers = standardSerializers;
     _api = DefaultApi(_dio, serializers);
+    _authApi = AuthenticationApi(_dio, serializers);
   }
 
   /// Get list of all cities
@@ -201,5 +203,122 @@ class ApiService {
   /// Get audio file URL for a POI section
   String getAudioUrl(String city, String poiId, String audioFile) {
     return '$baseUrl/pois/$city/$poiId/audio/$audioFile';
+  }
+
+  // ==================== Authentication Methods ====================
+
+  /// Initiate Google OAuth login
+  Future<Map<String, dynamic>?> initiateGoogleLogin({
+    required String redirectUri,
+    required String codeChallenge,
+  }) async {
+    try {
+      print('Initiating Google login with redirect URI: $redirectUri');
+
+      final response = await _authApi.googleLoginAuthGoogleLoginGet(
+        redirectUri: redirectUri,
+        codeChallenge: codeChallenge,
+      );
+
+      if (response.data == null) {
+        throw Exception('No data returned from login initiation');
+      }
+
+      // The response is a JsonObject, convert to Map
+      return response.data!.value as Map<String, dynamic>;
+    } catch (e) {
+      print('Error initiating Google login: $e');
+      rethrow;
+    }
+  }
+
+  /// Exchange authorization code for tokens
+  Future<AuthTokenResponse?> exchangeCodeForTokens({
+    required String code,
+    required String state,
+    required String codeVerifier,
+  }) async {
+    try {
+      print('Exchanging code for tokens...');
+
+      final response = await _authApi.googleCallbackAuthGoogleCallbackGet(
+        code: code,
+        state: state,
+        codeVerifier: codeVerifier,
+      );
+
+      print('Token exchange response received');
+      return response.data;
+    } catch (e) {
+      print('Error exchanging code for tokens: $e');
+      rethrow;
+    }
+  }
+
+  /// Refresh access token
+  Future<AuthTokenResponse?> refreshToken(String refreshToken) async {
+    try {
+      print('Refreshing access token...');
+
+      final request = RefreshTokenRequest(
+        (b) => b..refreshToken = refreshToken,
+      );
+
+      final response = await _authApi.refreshTokenAuthRefreshPost(
+        refreshTokenRequest: request,
+      );
+
+      print('Token refreshed successfully');
+      return response.data;
+    } catch (e) {
+      print('Error refreshing token: $e');
+      rethrow;
+    }
+  }
+
+  /// Get current user info
+  Future<UserInfo?> getCurrentUser(String accessToken) async {
+    try {
+      print('Fetching current user info...');
+
+      // Set authorization header
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+
+      final response = await _authApi.getMeAuthMeGet();
+
+      print('User info retrieved successfully');
+      return response.data;
+    } catch (e) {
+      print('Error getting current user: $e');
+      rethrow;
+    }
+  }
+
+  /// Logout user
+  Future<void> logout(String accessToken, String refreshToken) async {
+    try {
+      print('Logging out user...');
+
+      // Set authorization header
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+
+      final request = RefreshTokenRequest(
+        (b) => b..refreshToken = refreshToken,
+      );
+
+      await _authApi.logoutAuthLogoutPost(
+        refreshTokenRequest: request,
+      );
+
+      // Clear authorization header
+      _dio.options.headers.remove('Authorization');
+
+      print('Logout successful');
+    } catch (e) {
+      print('Error during logout: $e');
+      // Clear header even on error
+      _dio.options.headers.remove('Authorization');
+      rethrow;
+    }
   }
 }
