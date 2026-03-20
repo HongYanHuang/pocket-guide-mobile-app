@@ -907,6 +907,7 @@ class TourWithTranscriptScreen extends StatefulWidget {
 
 class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   final ApiService _apiService = ApiService();
+  final AuthService _authService = AuthService();
   TourDetail? _tourDetail;
   bool _loading = true;
   String? _error;
@@ -921,7 +922,15 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
   Future<void> _fetchTourDetails() async {
     try {
-      final tourDetail = await _apiService.getTourById(widget.tourId);
+      // Get access token for private tours
+      final accessToken = await _authService.getAccessToken();
+
+      // Fetch tour details with auth token (required for private tours)
+      final tourDetail = await _apiService.getTourById(
+        widget.tourId,
+        accessToken: accessToken,
+      );
+
       setState(() {
         _tourDetail = tourDetail;
         _loading = false;

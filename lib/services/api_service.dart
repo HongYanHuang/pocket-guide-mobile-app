@@ -76,16 +76,33 @@ class ApiService {
   }
 
   /// Get tour details by ID
-  Future<TourDetail?> getTourById(String tourId) async {
+  /// For private tours, accessToken is required
+  Future<TourDetail?> getTourById(String tourId, {String? accessToken}) async {
     try {
       print('Fetching tour detail for: $tourId');
+
+      // Set authorization header if token provided (required for private tours)
+      if (accessToken != null) {
+        _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+      }
 
       // Try to fetch tour directly first
       final response = await _api.getTourToursTourIdGet(tourId: tourId);
       print('Tour detail fetched successfully');
+
+      // Clear authorization header after request
+      if (accessToken != null) {
+        _dio.options.headers.remove('Authorization');
+      }
+
       return response.data;
     } catch (e) {
       print('Error fetching tour details: $e');
+
+      // Clear authorization header on error
+      if (accessToken != null) {
+        _dio.options.headers.remove('Authorization');
+      }
 
       // If it's a deserialization error, try fetching raw data
       if (e.toString().contains('BackupPOI')) {
