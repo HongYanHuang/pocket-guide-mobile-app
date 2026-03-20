@@ -99,15 +99,12 @@ class AuthService {
       print('🔵 AuthService.login: Step 1 - Generating PKCE');
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);
-      final state = _generateState();
       print('✅ Generated PKCE challenge: ${codeChallenge.substring(0, 20)}...');
-      print('✅ Generated state: $state');
 
-      // 2. Store code verifier and state for callback
-      print('🔵 AuthService.login: Step 2 - Storing verifier and state');
+      // 2. Store code verifier for callback
+      print('🔵 AuthService.login: Step 2 - Storing code verifier');
       await _storageService.saveCodeVerifier(codeVerifier);
-      await _storageService.saveOAuthState(state);
-      print('✅ Saved code verifier and state');
+      print('✅ Saved code verifier');
 
       // 3. Get Google OAuth URL from backend
       print('🔵 AuthService.login: Step 3 - Getting OAuth URL from backend');
@@ -123,16 +120,23 @@ class AuthService {
         codeChallenge: codeChallenge,
       );
 
-      if (response == null || response['auth_url'] == null) {
-        print('❌ No auth URL in response');
+      if (response == null || response['auth_url'] == null || response['state'] == null) {
+        print('❌ No auth URL or state in response');
         throw Exception('Failed to get authorization URL from backend');
       }
 
       final authUrl = response['auth_url'] as String;
+      final state = response['state'] as String;
       print('✅ Got auth URL from backend: ${authUrl.substring(0, 60)}...');
+      print('✅ Got state from backend: $state');
 
-      // 4. Redirect to Google OAuth
-      print('🔵 AuthService.login: Step 4 - Redirecting to Google');
+      // 4. Store state from backend for callback validation
+      print('🔵 AuthService.login: Step 4 - Storing state from backend');
+      await _storageService.saveOAuthState(state);
+      print('✅ Saved state from backend');
+
+      // 5. Redirect to Google OAuth
+      print('🔵 AuthService.login: Step 5 - Redirecting to Google');
       print('   NOTE: After Google login, you\'ll be redirected to /auth/callback');
       print('   Watch the console logs on that page!');
 
