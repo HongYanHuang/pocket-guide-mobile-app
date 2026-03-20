@@ -11,6 +11,9 @@ class AuthService {
   final StorageService _storageService = StorageService();
   final ApiService _apiService = ApiService();
 
+  // For web mode: use http://localhost redirect
+  // For mobile: use custom URL scheme (pocketguide://)
+  static const bool _isWebMode = true; // Set to false for mobile testing
   static const String _callbackUrlScheme = 'pocketguide';
 
   // PKCE: Generate random code verifier
@@ -53,7 +56,11 @@ class AuthService {
       print('Saved code verifier and state');
 
       // 3. Get Google OAuth URL from backend
-      final redirectUri = '$_callbackUrlScheme://auth/callback';
+      // For web: use http://localhost:<port>/auth/callback
+      // For mobile: use custom URL scheme pocketguide://auth/callback
+      final redirectUri = _isWebMode
+          ? '${Uri.base.origin}/auth/callback'  // Web mode
+          : '$_callbackUrlScheme://auth/callback';  // Mobile mode
       print('Calling backend with redirectUri: $redirectUri');
 
       final response = await _apiService.initiateGoogleLogin(
@@ -70,10 +77,21 @@ class AuthService {
 
       // 4. Open browser for OAuth
       print('Opening browser for OAuth...');
-      final result = await FlutterWebAuth2.authenticate(
-        url: authUrl,
-        callbackUrlScheme: _callbackUrlScheme,
-      );
+
+      final String result;
+      if (_isWebMode) {
+        // For web: redirect to Google OAuth, then handle callback on return
+        result = await FlutterWebAuth2.authenticate(
+          url: authUrl,
+          callbackUrlScheme: 'http',  // Web uses http/https callback
+        );
+      } else {
+        // For mobile: use custom URL scheme
+        result = await FlutterWebAuth2.authenticate(
+          url: authUrl,
+          callbackUrlScheme: _callbackUrlScheme,
+        );
+      }
 
       print('OAuth callback received: $result');
 

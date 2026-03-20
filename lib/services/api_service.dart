@@ -207,7 +207,7 @@ class ApiService {
 
   // ==================== Authentication Methods ====================
 
-  /// Initiate Google OAuth login
+  /// Initiate Google OAuth login (client-specific endpoint)
   Future<Map<String, dynamic>?> initiateGoogleLogin({
     required String redirectUri,
     required String codeChallenge,
@@ -215,24 +215,27 @@ class ApiService {
     try {
       print('Initiating Google login with redirect URI: $redirectUri');
 
-      final response = await _authApi.googleLoginAuthGoogleLoginGet(
-        redirectUri: redirectUri,
-        codeChallenge: codeChallenge,
+      // Use client-specific endpoint: /auth/client/google/login
+      final response = await _dio.get(
+        '/auth/client/google/login',
+        queryParameters: {
+          'redirect_uri': redirectUri,
+          'code_challenge': codeChallenge,
+        },
       );
 
       if (response.data == null) {
         throw Exception('No data returned from login initiation');
       }
 
-      // The response is a JsonObject, convert to Map
-      return response.data!.value as Map<String, dynamic>;
+      return response.data as Map<String, dynamic>;
     } catch (e) {
       print('Error initiating Google login: $e');
       rethrow;
     }
   }
 
-  /// Exchange authorization code for tokens
+  /// Exchange authorization code for tokens (client-specific endpoint)
   Future<AuthTokenResponse?> exchangeCodeForTokens({
     required String code,
     required String state,
@@ -241,14 +244,32 @@ class ApiService {
     try {
       print('Exchanging code for tokens...');
 
-      final response = await _authApi.googleCallbackAuthGoogleCallbackGet(
-        code: code,
-        state: state,
-        codeVerifier: codeVerifier,
+      // Use client-specific endpoint: /auth/client/google/callback
+      final response = await _dio.get(
+        '/auth/client/google/callback',
+        queryParameters: {
+          'code': code,
+          'state': state,
+          'code_verifier': codeVerifier,
+        },
+      );
+
+      if (response.data == null) {
+        throw Exception('No data returned from token exchange');
+      }
+
+      // Parse response as AuthTokenResponse
+      final tokenData = response.data as Map<String, dynamic>;
+      final authResponse = AuthTokenResponse(
+        (b) => b
+          ..accessToken = tokenData['access_token']
+          ..refreshToken = tokenData['refresh_token']
+          ..tokenType = tokenData['token_type']
+          ..expiresIn = tokenData['expires_in'],
       );
 
       print('Token exchange response received');
-      return response.data;
+      return authResponse;
     } catch (e) {
       print('Error exchanging code for tokens: $e');
       rethrow;
