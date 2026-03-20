@@ -3,18 +3,18 @@
 ## Status
 - Branch: `feature/login-system`
 - API Spec: ✅ Fetched (auth endpoints available in api-spec/openapi.json)
-- API Client: ⚠️ Needs regeneration (requires Java installation)
+- API Client: ✅ Generated (AuthenticationApi with all auth endpoints)
 
 ## Overview
 Implement Google OAuth 2.0 authentication with PKCE for the Pocket Guide mobile app.
 
 ## API Endpoints Available
-Based on CLIENT_AUTH_API.md:
-1. `GET /auth/google/login` - Initiate OAuth flow
-2. `GET /auth/google/callback` - Exchange code for tokens
-3. `POST /auth/refresh` - Refresh access token
-4. `GET /auth/me` - Get current user info
-5. `POST /auth/logout` - Logout and revoke tokens
+Generated in `AuthenticationApi` class:
+1. `googleLoginAuthGoogleLoginGet(redirectUri, codeChallenge)` - Initiate OAuth flow
+2. `googleCallbackAuthGoogleCallbackGet(code, state, codeVerifier)` - Exchange code for tokens
+3. `refreshTokenAuthRefreshPost(refreshTokenRequest)` - Refresh access token
+4. `getMeAuthMeGet()` - Get current user info (requires Bearer token)
+5. `logoutAuthLogoutPost(refreshTokenRequest)` - Logout and revoke tokens (requires Bearer token)
 
 ## Token Strategy
 - **Access Token**: JWT, 15 min expiry, stored in memory/secure storage
@@ -24,8 +24,8 @@ Based on CLIENT_AUTH_API.md:
 ## Implementation Steps
 
 ### 1. Prerequisites
-- [ ] Install Java (required for API client generation)
-- [ ] Run `npm run update-api` to regenerate API client with auth endpoints
+- [x] ~~Install Java (required for API client generation)~~ ✅ Done
+- [x] ~~Run `npm run update-api` to regenerate API client with auth endpoints~~ ✅ Done
 - [ ] Add Flutter dependencies for OAuth and secure storage
 
 ### 2. Flutter Dependencies (pubspec.yaml)
