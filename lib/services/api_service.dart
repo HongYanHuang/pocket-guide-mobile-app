@@ -99,26 +99,101 @@ class ApiService {
     } catch (e) {
       print('Error fetching tour details: $e');
 
-      // Clear authorization header on error
-      if (accessToken != null) {
-        _dio.options.headers.remove('Authorization');
-      }
+      // If it's a deserialization error (common with generated API clients)
+      if (e.toString().contains('Deserializing') ||
+          e.toString().contains('JsonObject') ||
+          e.toString().contains('BackupPOI')) {
+        print('Deserialization error detected, fetching raw JSON...');
 
-      // If it's a deserialization error, try fetching raw data
-      if (e.toString().contains('BackupPOI')) {
-        print('BackupPOI deserialization error detected, fetching raw data...');
         try {
-          // Fetch raw JSON and parse manually without backup_pois
-          final rawResponse = await _dio.get('/tours/$tourId');
-          print('Raw response received, attempting manual parse');
+          // Fetch raw JSON directly
+          final rawResponse = await _dio.get(
+            '/tours/$tourId',
+            queryParameters: {'language': 'en'},
+          );
 
-          // For now, return null and show a helpful message
-          // TODO: Parse raw JSON manually to create TourDetail without backup_pois
-          return null;
+          print('Raw response received, parsing manually...');
+
+          // Parse the raw JSON into TourDetail manually
+          // This allows us to handle null values gracefully
+          final data = rawResponse.data as Map<String, dynamic>;
+
+          // Build TourDetail from raw JSON
+          // Use the builder pattern that built_value expects
+          final tourDetail = TourDetail((b) {
+            b.tourId = data['tour_id'] as String;
+            b.city = data['city'] as String;
+            b.durationDays = data['duration_days'] as int;
+            b.totalPois = data['total_pois'] as int;
+
+            if (data['title_display'] != null) {
+              b.titleDisplay = data['title_display'] as String;
+            }
+
+            if (data['summary'] != null) {
+              b.summary = data['summary'] as String;
+            }
+
+            // Parse itinerary
+            if (data['itinerary'] != null) {
+              final itineraryList = data['itinerary'] as List<dynamic>;
+              b.itinerary.addAll(itineraryList.map((dayData) {
+                return DayItinerary((db) {
+                  db.day = dayData['day'] as int;
+
+                  if (dayData['date'] != null) {
+                    db.date = dayData['date'] as String;
+                  }
+
+                  // Parse POI stops
+                  if (dayData['pois'] != null) {
+                    final poisList = dayData['pois'] as List<dynamic>;
+                    db.pois.addAll(poisList.map((poiData) {
+                      return POIStop((pb) {
+                        pb.poi = poiData['poi'] as String;
+
+                        if (poiData['arrival_time'] != null) {
+                          pb.arrivalTime = poiData['arrival_time'] as String;
+                        }
+                        if (poiData['departure_time'] != null) {
+                          pb.departureTime = poiData['departure_time'] as String;
+                        }
+                        if (poiData['visit_duration_minutes'] != null) {
+                          pb.visitDurationMinutes = poiData['visit_duration_minutes'] as int;
+                        }
+                        if (poiData['notes'] != null) {
+                          pb.notes = poiData['notes'] as String;
+                        }
+                      });
+                    }));
+                  }
+                });
+              }));
+            }
+          });
+
+          // Clear authorization header
+          if (accessToken != null) {
+            _dio.options.headers.remove('Authorization');
+          }
+
+          print('Tour detail parsed successfully from raw JSON');
+          return tourDetail;
         } catch (rawError) {
-          print('Error fetching raw data: $rawError');
+          print('Error parsing raw JSON: $rawError');
+
+          // Clear authorization header on error
+          if (accessToken != null) {
+            _dio.options.headers.remove('Authorization');
+          }
+
           return null;
         }
+      }
+
+      // Clear authorization header on non-deserialization errors
+      if (accessToken != null) {
+        _dio.options.headers.remove('Authorization');
       }
 
       return null;
