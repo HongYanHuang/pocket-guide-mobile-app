@@ -58,24 +58,21 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
 
       if (success) {
         print('✅ AuthCallback: Token exchange successful!');
-        setState(() {
-          _status = 'Login successful! Redirecting...';
-        });
 
-        // Wait a bit to show success message
-        await Future.delayed(const Duration(milliseconds: 500));
-
-        // Navigate to home
+        // Navigate immediately - don't wait or use setState
+        // The widget might unmount during delays
         print('🏠 AuthCallback: Navigating to /home...');
-        if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            '/home',
-            (route) => false,
-          );
-          print('✅ AuthCallback: Navigation to /home completed');
-        } else {
-          print('❌ AuthCallback: Widget not mounted, cannot navigate');
+        if (!mounted) {
+          print('❌ AuthCallback: Widget not mounted before navigation');
+          return;
         }
+
+        // Use Navigator immediately while we're still mounted
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/home',
+          (route) => false,
+        );
+        print('✅ AuthCallback: Navigation to /home completed');
       } else {
         print('❌ AuthCallback: Token exchange failed');
         setState(() {
