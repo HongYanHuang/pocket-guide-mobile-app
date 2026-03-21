@@ -384,10 +384,15 @@ class ApiService {
 
       final response = await _authApi.getMeAuthMeGet();
 
+      // Clean up authorization header
+      _dio.options.headers.remove('Authorization');
+
       print('User info retrieved successfully');
       return response.data;
     } catch (e) {
       print('Error getting current user: $e');
+      // Clean up authorization header on error
+      _dio.options.headers.remove('Authorization');
       rethrow;
     }
   }
@@ -438,15 +443,24 @@ class ApiService {
   /// Get user's private tours
   Future<List<dynamic>> getMyTours(String accessToken) async {
     try {
+      print('🔑 getMyTours: Access token (first 20 chars): ${accessToken.substring(0, accessToken.length > 20 ? 20 : accessToken.length)}...');
+
       // Set authorization header
       _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+      print('🔑 Authorization header set for /client/tours/my-tours');
 
       final response = await _dio.get('/client/tours/my-tours');
+
+      // Clean up authorization header
+      _dio.options.headers.remove('Authorization');
+      print('✅ getMyTours: Successfully retrieved ${(response.data as Map<String, dynamic>)['tours'].length} tours');
 
       final data = response.data as Map<String, dynamic>;
       return data['tours'] as List<dynamic>;
     } catch (e) {
-      print('Error getting my tours: $e');
+      print('❌ Error getting my tours: $e');
+      // Clean up authorization header on error
+      _dio.options.headers.remove('Authorization');
       rethrow;
     }
   }

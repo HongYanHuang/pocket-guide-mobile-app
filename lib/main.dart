@@ -544,7 +544,9 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
 
     try {
       final accessToken = await _authService.getAccessToken();
+      print('🔑 _loadMyTours: Access token retrieved: ${accessToken != null ? "EXISTS (${accessToken.substring(0, accessToken.length > 20 ? 20 : accessToken.length)}...)" : "NULL"}');
       if (accessToken != null) {
+        print('📡 _loadMyTours: Calling getMyTours with token...');
         final allMyTours = await _apiService.getMyTours(accessToken);
         // Filter by selected city
         final filteredTours = allMyTours.where((tour) {
