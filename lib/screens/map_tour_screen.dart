@@ -4,6 +4,10 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/location_service.dart';
+import 'package:pocket_guide_mobile/services/tour_progress_service.dart';
+import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
+import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
 
 class MapTourScreen extends StatefulWidget {
   final TourDetail tourDetail;
@@ -22,9 +26,15 @@ class MapTourScreen extends StatefulWidget {
 class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   final LocationService _locationService = LocationService();
+  final AuthService _authService = AuthService();
+
+  late TourProgressService _progressService;
+  TrailUploadManager? _trailManager;
+
   int _selectedDay = 1;
   Position? _userPosition;
   bool _permissionDenied = false;
+  List<TrailPoint> _trailPoints = []; // Trail points to display on map
 
   @override
   void initState() {
@@ -34,10 +44,19 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     // Initialize with first day
     _selectedDay = 1;
 
+    // Initialize services
+    _initializeServices();
+
     // Request permissions and start GPS tracking if in active mode
     if (widget.isActiveMode) {
       _initializeGPS();
+      _loadExistingTrail();
     }
+  }
+
+  Future<void> _initializeServices() async {
+    final accessToken = await _authService.getAccessToken();
+    _progressService = TourProgressService(jwtToken: accessToken);
   }
 
   Future<void> _initializeGPS() async {
@@ -57,10 +76,29 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       }
     }
 
+    // Initialize trail upload manager
+    _trailManager = TrailUploadManager(
+      progressService: _progressService,
+      tourId: widget.tourDetail.metadata.tourId,
+    );
+    _trailManager!.start();
+
     // Set up location update callback
     _locationService.onLocationUpdate = (Position position) {
       setState(() {
         _userPosition = position;
+      });
+
+      // Record trail point
+      _trailManager?.addPoint(position);
+
+      // Add to display trail (convert Position to TrailPoint for display)
+      setState(() {
+        _trailPoints.add(TrailPoint(
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timestamp: DateTime.now(),
+        ));
       });
     };
 
@@ -72,6 +110,26 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       _showLocationServiceDisabledDialog();
     } else {
       print('✅ GPS tracking started');
+    }
+  }
+
+  // Load existing trail from backend
+  Future<void> _loadExistingTrail() async {
+    try {
+      print('📥 Loading existing trail for tour: ${widget.tourDetail.metadata.tourId}');
+
+      final trail = await _progressService.getTrail(
+        tourId: widget.tourDetail.metadata.tourId,
+      );
+
+      setState(() {
+        _trailPoints = trail.points;
+      });
+
+      print('✅ Loaded ${trail.points.length} trail points');
+    } catch (e) {
+      print('⚠️  Could not load existing trail: $e');
+      // It's OK if there's no trail yet - user may be starting fresh
     }
   }
 
@@ -306,22 +364,38 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
   // Build polyline connecting POIs
   List<Polyline> _buildPolylines() {
+    final polylines = <Polyline>[];
+
+    // POI route line (planned route)
     final pois = _getPoisForDay(_selectedDay);
-    final points = pois
+    final poiPoints = pois
         .map((poi) => _getPoiLocation(poi))
         .where((loc) => loc != null)
         .cast<LatLng>()
         .toList();
 
-    if (points.length < 2) return [];
+    if (poiPoints.length >= 2) {
+      polylines.add(
+        Polyline(
+          points: poiPoints,
+          color: Colors.blue.shade600.withValues(alpha: 0.5),
+          strokeWidth: 3.0,
+        ),
+      );
+    }
 
-    return [
-      Polyline(
-        points: points,
-        color: Colors.blue.shade600,
-        strokeWidth: 3.0,
-      ),
-    ];
+    // GPS trail line (actual path taken) - only in active mode
+    if (widget.isActiveMode && _trailPoints.length >= 2) {
+      polylines.add(
+        Polyline(
+          points: _trailPoints.map((tp) => tp.toLatLng()).toList(),
+          color: Colors.green.shade600,
+          strokeWidth: 4.0,
+        ),
+      );
+    }
+
+    return polylines;
   }
 
   // Handle POI marker tap
@@ -369,7 +443,6 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
               MarkerLayer(
                 markers: _buildMarkers(),
               ),
-              // TODO Phase 4: Add GPS trail polyline in active mode
             ],
           ),
 
@@ -471,6 +544,36 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                       ),
                     ),
                   ),
+                if (widget.isActiveMode && _trailPoints.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade600,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.timeline,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_trailPoints.length} points',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -543,6 +646,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _locationService.dispose();
+    _trailManager?.dispose();
     _mapController.dispose();
     super.dispose();
   }
