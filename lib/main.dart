@@ -1563,8 +1563,17 @@ class _SectionCardState extends State<_SectionCard> {
 
     try {
       if (_isPlaying) {
+        // Update UI immediately for better responsiveness
+        setState(() {
+          _isPlaying = false;
+        });
         await _audioPlayer.pause();
       } else {
+        // Update UI immediately for better responsiveness
+        setState(() {
+          _isPlaying = true;
+          _isLoading = _position == Duration.zero;
+        });
         if (_position == Duration.zero) {
           await _audioPlayer.play(UrlSource(widget.audioUrl!));
         } else {
@@ -1573,6 +1582,11 @@ class _SectionCardState extends State<_SectionCard> {
       }
     } catch (e) {
       print('Error playing audio: $e');
+      // Revert state on error
+      setState(() {
+        _isPlaying = false;
+        _isLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to play audio: $e')),
       );
