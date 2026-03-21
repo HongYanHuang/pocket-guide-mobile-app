@@ -1160,13 +1160,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     ),
                   ),
                 ),
-                // POI-level audio player (if available)
-                if (poi.audioAvailable == true && poi.audioUrl != null)
-                  _POIAudioPlayer(
-                    poiName: currentPOI,
-                    audioUrl: '${ApiService.baseUrl}${poi.audioUrl}',
-                  ),
-                _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city),
+                _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city, poi),
                 if (poiIndex < pois.length - 1)
                   Divider(height: 1, color: Colors.grey.shade300),
               ],
@@ -1177,7 +1171,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     );
   }
 
-  Widget _buildInlineTranscript(String poiName, String city) {
+  Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
     return FutureBuilder<SectionedTranscriptData?>(
       future: _fetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
@@ -1222,6 +1216,14 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                 ],
               ),
               const SizedBox(height: 12),
+              // POI-level audio player (if available)
+              if (poi.audioAvailable == true && poi.audioUrl != null) ...[
+                _POIAudioPlayer(
+                  poiName: poiName,
+                  audioUrl: '${ApiService.baseUrl}${poi.audioUrl}',
+                ),
+                const SizedBox(height: 12),
+              ],
               ...sectionedData.sections.map((section) {
                 return _SectionCard(
                   section: section,
@@ -1860,106 +1862,78 @@ class _POIAudioPlayerState extends State<_POIAudioPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Icon(Icons.headphones, size: 20, color: Colors.blue.shade700),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Audio Guide',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade900,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: 1,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            // Play/Pause Button
+            IconButton(
+              icon: _isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
+                      ),
+                    )
+                  : Icon(
+                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.blue.shade700,
+                      size: 28,
+                    ),
+              onPressed: _togglePlayPause,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            const SizedBox(width: 12),
+            // Progress Bar and Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Full POI Audio',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade900,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: _duration.inMilliseconds > 0
+                        ? _position.inMilliseconds / _duration.inMilliseconds
+                        : 0,
+                    backgroundColor: Colors.grey.shade300,
+                    valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
+                    minHeight: 3,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(_position),
+                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                      ),
+                      Text(
+                        _duration.inSeconds > 0
+                            ? _formatDuration(_duration)
+                            : '--:--',
+                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          // Audio Player Controls
-          Row(
-            children: [
-              // Play/Pause Button
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade700,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  icon: _isLoading
-                      ? SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: const AlwaysStoppedAnimation(Colors.white),
-                          ),
-                        )
-                      : Icon(
-                          _isPlaying ? Icons.pause : Icons.play_arrow,
-                          color: Colors.white,
-                        ),
-                  onPressed: _togglePlayPause,
-                  padding: const EdgeInsets.all(8),
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Progress Bar
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LinearProgressIndicator(
-                      value: _duration.inMilliseconds > 0
-                          ? _position.inMilliseconds / _duration.inMilliseconds
-                          : 0,
-                      backgroundColor: Colors.blue.shade200,
-                      valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
-                      minHeight: 6,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _formatDuration(_position),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue.shade900,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          _duration.inSeconds > 0
-                              ? _formatDuration(_duration)
-                              : '--:--',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue.shade900,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
