@@ -34,6 +34,8 @@ class ProgressManager {
   Future<TourProgress?> loadProgress({String language = 'en'}) async {
     try {
       print('📊 Loading tour progress from backend...');
+      print('   Tour ID: $_tourId');
+      print('   Language: $language');
 
       _currentProgress = await _progressService.getTourProgress(
         tourId: _tourId,
@@ -41,15 +43,25 @@ class ProgressManager {
       );
 
       print('✅ Progress loaded: ${_currentProgress!.completedCount}/${_currentProgress!.totalPois} POIs completed');
+      print('   POIs in progress:');
+      for (final completion in _currentProgress!.completions) {
+        print('     - ${completion.poiId} (day ${completion.day}): ${completion.completed}');
+      }
 
       // Process offline queue if any
       if (_offlineQueue.isNotEmpty) {
+        print('📤 Processing ${_offlineQueue.length} offline updates...');
         await _syncOfflineQueue();
       }
 
       return _currentProgress;
     } catch (e) {
       print('❌ Error loading progress: $e');
+      print('   This could be due to:');
+      print('   - Invalid or expired JWT token');
+      print('   - Network connectivity issues');
+      print('   - Tour does not exist');
+      print('   - User does not have access to this tour');
       return null;
     }
   }

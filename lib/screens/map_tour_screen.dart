@@ -46,18 +46,33 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     // Initialize with first day
     _selectedDay = 1;
 
-    // Initialize services
-    _initializeServices();
+    // Initialize everything in proper order
+    _initializeMap();
+  }
 
-    // Request permissions and start GPS tracking if in active mode
+  Future<void> _initializeMap() async {
+    // Initialize services first (this loads progress)
+    await _initializeServices();
+
+    // Then initialize GPS and trail if in active mode
     if (widget.isActiveMode) {
-      _initializeGPS();
-      _loadExistingTrail();
+      await _initializeGPS();
+      await _loadExistingTrail();
     }
   }
 
   Future<void> _initializeServices() async {
-    final accessToken = await _authService.getAccessToken();
+    print('🔧 Initializing services for map tour...');
+
+    var accessToken = await _authService.getAccessToken();
+    print('🔑 Access token: ${accessToken?.substring(0, 20)}...');
+
+    // Try to refresh token if it seems expired (you can add more logic here)
+    if (accessToken == null) {
+      print('❌ No access token found, cannot initialize services');
+      return;
+    }
+
     _progressService = TourProgressService(jwtToken: accessToken);
 
     // Initialize progress manager
@@ -67,12 +82,63 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     );
 
     // Load progress for both active and preview mode
-    await _progressManager!.loadProgress();
+    print('📊 Loading progress...');
+    final progressLoaded = await _progressManager!.loadProgress();
+
+    if (progressLoaded != null) {
+      print('✅ Progress loaded successfully: ${progressLoaded.completedCount}/${progressLoaded.totalPois}');
+    } else {
+      print('⚠️  Progress load failed or returned null');
+
+      // Try to refresh token and retry
+      print('🔄 Attempting to refresh access token...');
+      final refreshed = await _authService.refreshAccessToken();
+
+      if (refreshed) {
+        print('✅ Token refreshed, retrying progress load...');
+        accessToken = await _authService.getAccessToken();
+
+        // Update token in service
+        _progressService.setToken(accessToken!);
+
+        // Retry loading progress
+        final retryProgress = await _progressManager!.loadProgress();
+        if (retryProgress != null) {
+          print('✅ Progress loaded successfully after token refresh');
+        } else {
+          print('❌ Progress load still failed after token refresh');
+          _showTokenExpiredDialog();
+        }
+      } else {
+        print('❌ Token refresh failed');
+        _showTokenExpiredDialog();
+      }
+    }
 
     // Trigger rebuild to update marker colors
     if (mounted) {
       setState(() {});
     }
+  }
+
+  void _showTokenExpiredDialog() {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Session Expired'),
+        content: const Text(
+          'Your session has expired. Please log out and log in again to continue using map features.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _initializeGPS() async {
@@ -92,7 +158,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       }
     }
 
-    // Initialize trail upload manager
+    // Initialize trail upload manager (services are already initialized)
     _trailManager = TrailUploadManager(
       progressService: _progressService,
       tourId: widget.tourDetail.metadata.tourId,
