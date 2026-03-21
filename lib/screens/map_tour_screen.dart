@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
+import 'package:pocket_guide_mobile/services/location_service.dart';
 
 class MapTourScreen extends StatefulWidget {
   final TourDetail tourDetail;
@@ -17,15 +19,114 @@ class MapTourScreen extends StatefulWidget {
   State<MapTourScreen> createState() => _MapTourScreenState();
 }
 
-class _MapTourScreenState extends State<MapTourScreen> {
+class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
+  final LocationService _locationService = LocationService();
   int _selectedDay = 1;
+  Position? _userPosition;
+  bool _permissionDenied = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     // Initialize with first day
     _selectedDay = 1;
+
+    // Request permissions and start GPS tracking if in active mode
+    if (widget.isActiveMode) {
+      _initializeGPS();
+    }
+  }
+
+  Future<void> _initializeGPS() async {
+    print('📍 Initializing GPS for active mode...');
+
+    // Request location permission
+    final hasPermission = await _locationService.hasPermission();
+    if (!hasPermission) {
+      final granted = await _locationService.requestPermission();
+
+      if (!granted) {
+        setState(() {
+          _permissionDenied = true;
+        });
+        _showPermissionDeniedDialog();
+        return;
+      }
+    }
+
+    // Set up location update callback
+    _locationService.onLocationUpdate = (Position position) {
+      setState(() {
+        _userPosition = position;
+      });
+    };
+
+    // Start tracking
+    final started = await _locationService.startTracking(isBackground: false);
+
+    if (!started) {
+      print('❌ Failed to start GPS tracking');
+      _showLocationServiceDisabledDialog();
+    } else {
+      print('✅ GPS tracking started');
+    }
+  }
+
+  void _showPermissionDeniedDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Permission Required'),
+        content: const Text(
+          'This app needs location access to track your position during the tour. '
+          'Please grant location permission in your device settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLocationServiceDisabledDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Location Service Disabled'),
+        content: const Text(
+          'Please enable location services in your device settings to use active tour mode.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.isActiveMode) return;
+
+    if (state == AppLifecycleState.paused) {
+      // App goes to background - switch to 30s intervals
+      print('📱 App going to background, switching to 30s GPS intervals');
+      _locationService.stopTracking();
+      _locationService.startTracking(isBackground: true);
+    } else if (state == AppLifecycleState.resumed) {
+      // App comes to foreground - switch to 5s intervals
+      print('📱 App resuming, switching to 5s GPS intervals');
+      _locationService.stopTracking();
+      _locationService.startTracking(isBackground: false);
+    }
   }
 
   // Extract lat/lng from POI coordinates
@@ -133,7 +234,44 @@ class _MapTourScreenState extends State<MapTourScreen> {
       );
     }
 
+    // Add user location marker if in active mode and have position
+    if (widget.isActiveMode && _userPosition != null) {
+      markers.add(
+        Marker(
+          point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+          width: 30,
+          height: 30,
+          child: _buildUserLocationMarker(),
+        ),
+      );
+    }
+
     return markers;
+  }
+
+  // Build user location marker (blue dot)
+  Widget _buildUserLocationMarker() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.blue.shade600,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.shade600.withValues(alpha: 0.3),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.my_location,
+          color: Colors.white,
+          size: 16,
+        ),
+      ),
+    );
   }
 
   // Build marker widget with number
@@ -227,48 +365,143 @@ class _MapTourScreenState extends State<MapTourScreen> {
               PolylineLayer(
                 polylines: _buildPolylines(),
               ),
-              // POI markers
+              // POI markers (includes user location if in active mode)
               MarkerLayer(
                 markers: _buildMarkers(),
               ),
-              // TODO: Add user location marker in active mode
-              // TODO: Add GPS trail polyline in active mode
+              // TODO Phase 4: Add GPS trail polyline in active mode
             ],
           ),
 
-          // Mode indicator
-          Positioned(
-            top: 16,
-            left: 16,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: widget.isActiveMode ? Colors.green.shade600 : Colors.grey.shade600,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    widget.isActiveMode ? Icons.navigation : Icons.visibility,
-                    color: Colors.white,
-                    size: 16,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.isActiveMode ? 'Active' : 'Preview',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
+          // Permission denied warning
+          if (widget.isActiveMode && _permissionDenied)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.location_off, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Location permission denied. Tour tracking disabled.',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
+
+          // Mode indicator
+          Positioned(
+            top: _permissionDenied ? 72 : 16,
+            left: 16,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: widget.isActiveMode ? Colors.green.shade600 : Colors.grey.shade600,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.isActiveMode ? Icons.navigation : Icons.visibility,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.isActiveMode ? 'Active' : 'Preview',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (widget.isActiveMode && _locationService.isTracking)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade600,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'GPS Active',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
+
+          // Center on user location button (active mode only)
+          if (widget.isActiveMode && _userPosition != null && !_permissionDenied)
+            Positioned(
+              bottom: 24,
+              right: 16,
+              child: FloatingActionButton(
+                mini: true,
+                backgroundColor: Colors.white,
+                onPressed: _centerOnUserLocation,
+                child: Icon(
+                  Icons.my_location,
+                  color: Colors.blue.shade600,
+                ),
+              ),
+            ),
         ],
       ),
+    );
+  }
+
+  // Center map on user's current location
+  void _centerOnUserLocation() {
+    if (_userPosition == null) return;
+
+    _mapController.move(
+      LatLng(_userPosition!.latitude, _userPosition!.longitude),
+      16.0, // Zoom level for user location
     );
   }
 
@@ -308,6 +541,8 @@ class _MapTourScreenState extends State<MapTourScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _locationService.dispose();
     _mapController.dispose();
     super.dispose();
   }
