@@ -119,18 +119,31 @@ class ProgressManager {
 
   /// Check if a POI is completed
   bool isPOICompleted(String poiId, int day) {
-    if (_currentProgress == null) return false;
+    if (_currentProgress == null) {
+      print('⚠️  isPOICompleted: No progress loaded yet');
+      return false;
+    }
+
+    print('🔍 Checking completion for POI: $poiId (day $day)');
+    print('   Available POIs in progress:');
+    for (final c in _currentProgress!.completions) {
+      print('     - ${c.poiId} (day ${c.day}): ${c.completed}');
+    }
 
     final completion = _currentProgress!.completions.firstWhere(
       (c) => c.poiId == poiId && c.day == day,
-      orElse: () => POICompletionStatus(
-        poiId: poiId,
-        poiName: '',
-        day: day,
-        completed: false,
-      ),
+      orElse: () {
+        print('   ❌ POI not found in progress data, defaulting to incomplete');
+        return POICompletionStatus(
+          poiId: poiId,
+          poiName: '',
+          day: day,
+          completed: false,
+        );
+      },
     );
 
+    print('   ✅ Result: ${completion.completed}');
     return completion.completed;
   }
 
