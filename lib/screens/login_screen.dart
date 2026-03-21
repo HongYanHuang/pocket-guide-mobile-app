@@ -23,7 +23,13 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final success = await _authService.login();
 
+      // In web mode, login() returns false because the page will redirect to Google
+      // We should keep showing loading state and let the redirect happen
+      // The page will reload at /auth/callback after Google OAuth
+      // So we don't need to handle success/failure here for web mode
+
       if (success) {
+        // This only happens in mobile mode
         // Navigate to main app
         if (mounted) {
           Navigator.of(context).pushReplacement(
@@ -31,10 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } else {
-        setState(() {
-          _errorMessage = 'Login failed. Please try again.';
-          _isLoading = false;
-        });
+        // In web mode, this is expected - keep loading state and let redirect happen
+        // The page will redirect to Google OAuth, so we won't see this state
+        print('🔐 Login initiated, waiting for redirect...');
+        // Don't clear loading state - let the redirect happen
       }
     } catch (e) {
       setState(() {

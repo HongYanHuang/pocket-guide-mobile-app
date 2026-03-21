@@ -53,9 +53,11 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       });
 
       // Exchange code for tokens
+      print('🔐 AuthCallback: Exchanging code for tokens...');
       final success = await _authService.handleWebCallback(code, state);
 
       if (success) {
+        print('✅ AuthCallback: Token exchange successful!');
         setState(() {
           _status = 'Login successful! Redirecting...';
         });
@@ -64,13 +66,18 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
         await Future.delayed(const Duration(milliseconds: 500));
 
         // Navigate to home
+        print('🏠 AuthCallback: Navigating to /home...');
         if (mounted) {
           Navigator.of(context).pushNamedAndRemoveUntil(
             '/home',
             (route) => false,
           );
+          print('✅ AuthCallback: Navigation to /home completed');
+        } else {
+          print('❌ AuthCallback: Widget not mounted, cannot navigate');
         }
       } else {
+        print('❌ AuthCallback: Token exchange failed');
         setState(() {
           _status = 'Login failed';
           _hasError = true;

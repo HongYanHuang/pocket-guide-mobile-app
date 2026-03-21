@@ -42,28 +42,41 @@ class AuthService {
   // Handle OAuth callback from web (called by AuthCallbackScreen)
   Future<bool> handleWebCallback(String code, String state) async {
     try {
+      print('🔐 handleWebCallback: Starting callback processing');
+      print('   Code: ${code.substring(0, 10)}...');
+      print('   State: ${state.substring(0, 10)}...');
+
       // Validate state to prevent CSRF
       final savedState = await _storageService.getOAuthState();
+      print('   Saved state: ${savedState?.substring(0, 10)}...');
+
       if (savedState != state) {
+        print('❌ State mismatch! Saved: $savedState, Received: $state');
         throw Exception('Invalid state parameter - possible CSRF attack');
       }
+      print('✅ State validation passed');
 
       // Get code verifier
       final codeVerifier = await _storageService.getCodeVerifier();
       if (codeVerifier == null) {
+        print('❌ No code verifier found in storage');
         throw Exception('Missing PKCE code verifier');
       }
+      print('✅ Code verifier retrieved');
 
       // Exchange code for tokens
+      print('🔐 Exchanging code for tokens...');
       await _handleCallback(code, state, codeVerifier);
+      print('✅ Token exchange successful');
 
       // Clean up temporary storage
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
+      print('✅ Temporary storage cleaned up');
 
       return true;
     } catch (e) {
-      print('Login error: $e');
+      print('❌ Login error in handleWebCallback: $e');
       // Clean up on error
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
@@ -106,10 +119,12 @@ class AuthService {
       if (_isWebMode) {
         // For web: use window.location to redirect
         // The page will reload at /auth/callback after Google OAuth
+        print('🔐 Redirecting to Google OAuth: $authUrl');
         html.window.location.href = authUrl;
 
-        // Return true immediately - the callback will be handled by AuthCallbackScreen
-        return true;
+        // Return false because the page will redirect away
+        // The callback will be handled by AuthCallbackScreen after Google auth
+        return false;
       } else {
         // For mobile: use FlutterWebAuth2
         final result = await FlutterWebAuth2.authenticate(
