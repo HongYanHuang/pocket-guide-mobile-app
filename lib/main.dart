@@ -1667,21 +1667,23 @@ class _SectionCardState extends State<_SectionCard> {
                       ],
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                  // Only show estimated duration badge if no audio player
+                  if (widget.audioUrl == null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade900,
+                        ),
                       ),
                     ),
-                  ),
                   const SizedBox(width: 8),
                   Icon(
                     _isExpanded ? Icons.expand_less : Icons.expand_more,
@@ -1741,7 +1743,7 @@ class _SectionCardState extends State<_SectionCard> {
                             Text(
                               _duration.inSeconds > 0
                                   ? _formatDuration(_duration)
-                                  : _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
+                                  : '--:--',
                               style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
                             ),
                           ],
