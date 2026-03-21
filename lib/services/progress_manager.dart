@@ -56,12 +56,25 @@ class ProgressManager {
 
       return _currentProgress;
     } catch (e) {
+      final errorMessage = e.toString();
       print('❌ Error loading progress: $e');
+
+      // Handle 404 - no progress data exists yet for this tour
+      if (errorMessage.contains('Tour not found') || errorMessage.contains('404')) {
+        print('ℹ️  No progress data exists yet - this is expected for new tours');
+        print('ℹ️  Backend will create progress data when you mark first POI as complete');
+        print('ℹ️  Treating all POIs as incomplete for now');
+
+        // Create empty progress (will be populated after first POI update)
+        _currentProgress = null; // Keep null until first update creates it
+
+        return null; // Returning null is OK - markers will show as grey (incomplete)
+      }
+
       print('   This could be due to:');
-      print('   - Invalid or expired JWT token');
+      print('   - Invalid or expired JWT token (if 401)');
       print('   - Network connectivity issues');
-      print('   - Tour does not exist');
-      print('   - User does not have access to this tour');
+      print('   - User does not have access to this tour (if 403)');
       return null;
     }
   }
@@ -72,6 +85,8 @@ class ProgressManager {
     required int day,
     required bool completed,
   }) async {
+    final wasProgressNull = _currentProgress == null;
+
     // Update local state immediately for responsive UI
     if (_currentProgress != null) {
       final index = _currentProgress!.completions.indexWhere(
@@ -114,6 +129,13 @@ class ProgressManager {
       );
 
       print('✅ POI progress updated successfully');
+
+      // If this was the first update (progress was null), reload progress to get full data
+      if (wasProgressNull) {
+        print('ℹ️  First POI update - reloading progress from backend...');
+        await loadProgress();
+      }
+
       return true;
     } catch (e) {
       print('❌ Failed to update progress, adding to offline queue: $e');

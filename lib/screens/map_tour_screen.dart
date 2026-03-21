@@ -88,31 +88,12 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     if (progressLoaded != null) {
       print('✅ Progress loaded successfully: ${progressLoaded.completedCount}/${progressLoaded.totalPois}');
     } else {
-      print('⚠️  Progress load failed or returned null');
+      print('⚠️  Progress load returned null (might be 404 - no progress data yet)');
+      print('ℹ️  This is normal for tours where no POI has been marked complete yet');
+      print('ℹ️  Progress will be created when you mark the first POI as complete');
 
-      // Try to refresh token and retry
-      print('🔄 Attempting to refresh access token...');
-      final refreshed = await _authService.refreshAccessToken();
-
-      if (refreshed) {
-        print('✅ Token refreshed, retrying progress load...');
-        accessToken = await _authService.getAccessToken();
-
-        // Update token in service
-        _progressService.setToken(accessToken!);
-
-        // Retry loading progress
-        final retryProgress = await _progressManager!.loadProgress();
-        if (retryProgress != null) {
-          print('✅ Progress loaded successfully after token refresh');
-        } else {
-          print('❌ Progress load still failed after token refresh');
-          _showTokenExpiredDialog();
-        }
-      } else {
-        print('❌ Token refresh failed');
-        _showTokenExpiredDialog();
-      }
+      // Don't show error dialog for 404 - it's expected for new tours
+      // The backend will create progress data on the first POST /progress call
     }
 
     // Trigger rebuild to update marker colors
