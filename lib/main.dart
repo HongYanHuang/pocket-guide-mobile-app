@@ -1216,20 +1216,18 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // POI-level audio player (if available)
-              if (poi.audioAvailable == true && poi.audioUrl != null) ...[
-                _POIAudioPlayer(
-                  poiName: poiName,
-                  audioUrl: '${ApiService.baseUrl}${poi.audioUrl}',
-                ),
-                const SizedBox(height: 12),
-              ],
               ...sectionedData.sections.map((section) {
+                // Use POI audio URL for "Full Narrative" section if available
+                String? audioUrl;
+                if (section.title == 'Full Narrative' && poi.audioAvailable == true && poi.audioUrl != null) {
+                  audioUrl = '${ApiService.baseUrl}${poi.audioUrl}';
+                } else if (section.audioFile != null) {
+                  audioUrl = _apiService.getAudioUrl(city, poiId, section.audioFile!);
+                }
+
                 return _SectionCard(
                   section: section,
-                  audioUrl: section.audioFile != null
-                      ? _apiService.getAudioUrl(city, poiId, section.audioFile!)
-                      : null,
+                  audioUrl: audioUrl,
                 );
               }).toList(),
             ],
@@ -1772,169 +1770,3 @@ class _SectionCardState extends State<_SectionCard> {
   }
 }
 
-// POI Audio Player Widget
-class _POIAudioPlayer extends StatefulWidget {
-  final String poiName;
-  final String audioUrl;
-
-  const _POIAudioPlayer({
-    required this.poiName,
-    required this.audioUrl,
-  });
-
-  @override
-  State<_POIAudioPlayer> createState() => _POIAudioPlayerState();
-}
-
-class _POIAudioPlayerState extends State<_POIAudioPlayer> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  bool _isPlaying = false;
-  bool _isLoading = false;
-  Duration _duration = Duration.zero;
-  Duration _position = Duration.zero;
-
-  @override
-  void initState() {
-    super.initState();
-    _setupAudioPlayer();
-  }
-
-  void _setupAudioPlayer() {
-    _audioPlayer.onDurationChanged.listen((duration) {
-      setState(() {
-        _duration = duration;
-      });
-    });
-
-    _audioPlayer.onPositionChanged.listen((position) {
-      setState(() {
-        _position = position;
-      });
-    });
-
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      setState(() {
-        _isPlaying = state == PlayerState.playing;
-        _isLoading = state == PlayerState.playing && _position == Duration.zero;
-      });
-    });
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      setState(() {
-        _isPlaying = false;
-        _position = Duration.zero;
-      });
-    });
-  }
-
-  Future<void> _togglePlayPause() async {
-    try {
-      if (_isPlaying) {
-        await _audioPlayer.pause();
-      } else {
-        if (_position == Duration.zero) {
-          await _audioPlayer.play(UrlSource(widget.audioUrl));
-        } else {
-          await _audioPlayer.resume();
-        }
-      }
-    } catch (e) {
-      print('Error playing audio: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to play audio: $e')),
-        );
-      }
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 1,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            // Play/Pause Button
-            IconButton(
-              icon: _isLoading
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
-                      ),
-                    )
-                  : Icon(
-                      _isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: Colors.blue.shade700,
-                      size: 28,
-                    ),
-              onPressed: _togglePlayPause,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 12),
-            // Progress Bar and Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Full POI Audio',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  LinearProgressIndicator(
-                    value: _duration.inMilliseconds > 0
-                        ? _position.inMilliseconds / _duration.inMilliseconds
-                        : 0,
-                    backgroundColor: Colors.grey.shade300,
-                    valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
-                    minHeight: 3,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDuration(_position),
-                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                      ),
-                      Text(
-                        _duration.inSeconds > 0
-                            ? _formatDuration(_duration)
-                            : '--:--',
-                        style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
