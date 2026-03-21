@@ -4,6 +4,7 @@ import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
+import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -1046,6 +1047,36 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     }
   }
 
+  // Open map in preview mode (no GPS tracking)
+  void _openMapPreview() {
+    if (_tourDetail == null) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MapTourScreen(
+          tourDetail: _tourDetail!,
+          isActiveMode: false, // Preview mode
+        ),
+      ),
+    );
+  }
+
+  // Start tour in active mode (with GPS tracking)
+  void _startTour() {
+    if (_tourDetail == null) return;
+
+    // TODO: Request location permission before navigation
+    // For now, just navigate to active mode
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => MapTourScreen(
+          tourDetail: _tourDetail!,
+          isActiveMode: true, // Active mode with GPS
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasPendingChanges = _pendingSwaps.isNotEmpty;
@@ -1068,6 +1099,39 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                 onPressed: _applyChanges,
               ),
             ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.map),
+            tooltip: 'Map View',
+            onSelected: (value) {
+              if (value == 'preview') {
+                _openMapPreview();
+              } else if (value == 'active') {
+                _startTour();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'preview',
+                child: Row(
+                  children: [
+                    Icon(Icons.visibility, size: 20),
+                    SizedBox(width: 8),
+                    Text('Preview in Map'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'active',
+                child: Row(
+                  children: [
+                    Icon(Icons.navigation, size: 20),
+                    SizedBox(width: 8),
+                    Text('Start Tour'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: _loading
