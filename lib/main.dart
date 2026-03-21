@@ -1160,6 +1160,12 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     ),
                   ),
                 ),
+                // POI-level audio player (if available)
+                if (poi.audioAvailable == true && poi.audioUrl != null)
+                  _POIAudioPlayer(
+                    poiName: currentPOI,
+                    audioUrl: '${ApiService.baseUrl}${poi.audioUrl}',
+                  ),
                 _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city),
                 if (poiIndex < pois.length - 1)
                   Divider(height: 1, color: Colors.grey.shade300),
@@ -1758,6 +1764,201 @@ class _SectionCardState extends State<_SectionCard> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// POI Audio Player Widget
+class _POIAudioPlayer extends StatefulWidget {
+  final String poiName;
+  final String audioUrl;
+
+  const _POIAudioPlayer({
+    required this.poiName,
+    required this.audioUrl,
+  });
+
+  @override
+  State<_POIAudioPlayer> createState() => _POIAudioPlayerState();
+}
+
+class _POIAudioPlayerState extends State<_POIAudioPlayer> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isPlaying = false;
+  bool _isLoading = false;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAudioPlayer();
+  }
+
+  void _setupAudioPlayer() {
+    _audioPlayer.onDurationChanged.listen((duration) {
+      setState(() {
+        _duration = duration;
+      });
+    });
+
+    _audioPlayer.onPositionChanged.listen((position) {
+      setState(() {
+        _position = position;
+      });
+    });
+
+    _audioPlayer.onPlayerStateChanged.listen((state) {
+      setState(() {
+        _isPlaying = state == PlayerState.playing;
+        _isLoading = state == PlayerState.playing && _position == Duration.zero;
+      });
+    });
+
+    _audioPlayer.onPlayerComplete.listen((_) {
+      setState(() {
+        _isPlaying = false;
+        _position = Duration.zero;
+      });
+    });
+  }
+
+  Future<void> _togglePlayPause() async {
+    try {
+      if (_isPlaying) {
+        await _audioPlayer.pause();
+      } else {
+        if (_position == Duration.zero) {
+          await _audioPlayer.play(UrlSource(widget.audioUrl));
+        } else {
+          await _audioPlayer.resume();
+        }
+      }
+    } catch (e) {
+      print('Error playing audio: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: $e')),
+        );
+      }
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Icon(Icons.headphones, size: 20, color: Colors.blue.shade700),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Audio Guide',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Audio Player Controls
+          Row(
+            children: [
+              // Play/Pause Button
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade700,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: _isLoading
+                      ? SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: const AlwaysStoppedAnimation(Colors.white),
+                          ),
+                        )
+                      : Icon(
+                          _isPlaying ? Icons.pause : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                  onPressed: _togglePlayPause,
+                  padding: const EdgeInsets.all(8),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Progress Bar
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    LinearProgressIndicator(
+                      value: _duration.inMilliseconds > 0
+                          ? _position.inMilliseconds / _duration.inMilliseconds
+                          : 0,
+                      backgroundColor: Colors.blue.shade200,
+                      valueColor: AlwaysStoppedAnimation(Colors.blue.shade700),
+                      minHeight: 6,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(_position),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          _duration.inSeconds > 0
+                              ? _formatDuration(_duration)
+                              : '--:--',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
