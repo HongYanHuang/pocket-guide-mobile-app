@@ -1540,13 +1540,20 @@ class _SectionCardState extends State<_SectionCard> {
     _audioPlayer.onPositionChanged.listen((position) {
       setState(() {
         _position = position;
+        // Clear loading state once playback starts
+        if (position > Duration.zero && _isLoading) {
+          _isLoading = false;
+        }
       });
     });
 
     _audioPlayer.onPlayerStateChanged.listen((state) {
       setState(() {
         _isPlaying = state == PlayerState.playing;
-        _isLoading = state == PlayerState.playing && _position == Duration.zero;
+        // Only show loading at the very beginning, not during playback
+        if (state != PlayerState.playing) {
+          _isLoading = false;
+        }
       });
     });
 
@@ -1572,10 +1579,15 @@ class _SectionCardState extends State<_SectionCard> {
         // Update UI immediately for better responsiveness
         setState(() {
           _isPlaying = true;
+          // Only show loading briefly when starting from beginning
           _isLoading = _position == Duration.zero;
         });
         if (_position == Duration.zero) {
           await _audioPlayer.play(UrlSource(widget.audioUrl!));
+          // Clear loading state after starting playback
+          setState(() {
+            _isLoading = false;
+          });
         } else {
           await _audioPlayer.resume();
         }
