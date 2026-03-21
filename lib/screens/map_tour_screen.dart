@@ -6,6 +6,7 @@ import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/location_service.dart';
 import 'package:pocket_guide_mobile/services/tour_progress_service.dart';
 import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
+import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
 
@@ -30,6 +31,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
   late TourProgressService _progressService;
   TrailUploadManager? _trailManager;
+  ProgressManager? _progressManager;
 
   int _selectedDay = 1;
   Position? _userPosition;
@@ -57,6 +59,20 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   Future<void> _initializeServices() async {
     final accessToken = await _authService.getAccessToken();
     _progressService = TourProgressService(jwtToken: accessToken);
+
+    // Initialize progress manager
+    _progressManager = ProgressManager(
+      progressService: _progressService,
+      tourId: widget.tourDetail.metadata.tourId,
+    );
+
+    // Load progress for both active and preview mode
+    await _progressManager!.loadProgress();
+
+    // Trigger rebuild to update marker colors
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _initializeGPS() async {
@@ -279,14 +295,18 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
       if (location == null) continue;
 
+      // Check completion status
+      final poiId = _poiNameToId(poi.poi);
+      final completed = _progressManager?.isPOICompleted(poiId, _selectedDay) ?? false;
+
       markers.add(
         Marker(
           point: location,
           width: 40,
           height: 40,
           child: GestureDetector(
-            onTap: () => _onPoiTap(poi, i + 1),
-            child: _buildMarkerWidget(i + 1, false), // TODO: Add completion status
+            onTap: () => _onPoiTap(poi, i + 1, poiId),
+            child: _buildMarkerWidget(i + 1, completed),
           ),
         ),
       );
@@ -305,6 +325,15 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     }
 
     return markers;
+  }
+
+  // Convert POI name to kebab-case ID
+  String _poiNameToId(String name) {
+    return name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^\w\s-]'), '') // Remove special chars
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '-'); // Replace spaces with hyphens
   }
 
   // Build user location marker (blue dot)
@@ -399,9 +428,128 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   }
 
   // Handle POI marker tap
-  void _onPoiTap(TourPOI poi, int number) {
+  void _onPoiTap(TourPOI poi, int number, String poiId) {
     print('🗺️ POI tapped: ${poi.poi} (Day $_selectedDay, #$number)');
-    // TODO: Show bottom sheet with POI details
+
+    final completed = _progressManager?.isPOICompleted(poiId, _selectedDay) ?? false;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: completed ? Colors.green.shade600 : Colors.grey.shade400,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$number',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    poi.poi,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              poi.reason,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
+                const SizedBox(width: 4),
+                Text(
+                  '${poi.estimatedHours} hours',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  await _togglePOICompletion(poiId, !completed);
+                },
+                icon: Icon(completed ? Icons.check_circle : Icons.check_circle_outline),
+                label: Text(completed ? 'Mark as Incomplete' : 'Mark as Complete'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: completed ? Colors.grey.shade600 : Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Toggle POI completion status
+  Future<void> _togglePOICompletion(String poiId, bool completed) async {
+    final success = await _progressManager?.updatePOICompletion(
+      poiId: poiId,
+      day: _selectedDay,
+      completed: completed,
+    );
+
+    if (success == true) {
+      setState(() {}); // Rebuild to update marker color
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(completed ? 'POI marked as complete' : 'POI marked as incomplete'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: completed ? Colors.green.shade600 : Colors.grey.shade600,
+        ),
+      );
+    } else {
+      // Failed to sync, but local update succeeded
+      setState(() {}); // Rebuild to update marker color
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            completed
+                ? 'POI marked as complete (will sync when online)'
+                : 'POI marked as incomplete (will sync when online)',
+          ),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.orange.shade600,
+        ),
+      );
+    }
   }
 
   @override
@@ -574,6 +722,36 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                       ),
                     ),
                   ),
+                if (_progressManager?.currentProgress != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade600,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_progressManager!.currentProgress!.completedCount}/${_progressManager!.currentProgress!.totalPois} POIs (${_progressManager!.getCompletionPercentage().toStringAsFixed(0)}%)',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -647,6 +825,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     WidgetsBinding.instance.removeObserver(this);
     _locationService.dispose();
     _trailManager?.dispose();
+    _progressManager?.dispose();
     _mapController.dispose();
     super.dispose();
   }
