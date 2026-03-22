@@ -9,6 +9,7 @@ import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
+import 'package:pocket_guide_mobile/widgets/poi_map_bottom_sheet.dart';
 
 class MapTourScreen extends StatefulWidget {
   final TourDetail tourDetail;
@@ -488,153 +489,18 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: completed ? Colors.green.shade600 : Colors.grey.shade400,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Center(
-                    child: Text(
-                      '$number',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    poi.poi,
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              poi.reason,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
-                const SizedBox(width: 4),
-                Text(
-                  '${poi.estimatedHours} hours',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Primary: Audio Play Button
-            if (poi.audioAvailable == true && poi.audioUrl != null)
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Play audio
-                    Navigator.of(context).pop();
-                    _playPOIAudio(poi);
-                  },
-                  icon: const Icon(Icons.play_arrow, size: 28),
-                  label: const Text(
-                    'Play Audio Guide',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue.shade600,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-            if (poi.audioAvailable == true && poi.audioUrl != null) const SizedBox(height: 12),
-
-            // Secondary: View Transcript Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _viewTranscript(poi);
-                },
-                icon: const Icon(Icons.article_outlined),
-                label: const Text('View Transcript'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Tertiary: Mark Complete (smaller)
-            SizedBox(
-              width: double.infinity,
-              child: TextButton.icon(
-                onPressed: () async {
-                  Navigator.of(context).pop();
-                  await _togglePOICompletion(poiId, !completed);
-                },
-                icon: Icon(
-                  completed ? Icons.check_circle : Icons.check_circle_outline,
-                  size: 18,
-                ),
-                label: Text(completed ? 'Mark as Incomplete' : 'Mark as Complete'),
-                style: TextButton.styleFrom(
-                  foregroundColor: completed ? Colors.grey.shade700 : Colors.green.shade700,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Play POI audio
-  void _playPOIAudio(TourPOI poi) {
-    print('🎵 Playing audio for: ${poi.poi}');
-    // TODO: Integrate with audio player
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Audio player integration coming in Phase 6'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  // View POI transcript
-  void _viewTranscript(TourPOI poi) {
-    print('📄 Viewing transcript for: ${poi.poi}');
-    // Navigate back to tour detail screen with POI selected
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Transcript view: Navigate to tour detail page'),
-        duration: Duration(seconds: 2),
+      backgroundColor: Colors.transparent,
+      builder: (context) => POIMapBottomSheet(
+        poi: poi,
+        poiNumber: number,
+        poiId: poiId,
+        day: _selectedDay,
+        tourId: widget.tourDetail.metadata.tourId,
+        completed: completed,
+        isActiveMode: widget.isActiveMode,
+        onToggleCompletion: (newCompleted) async {
+          await _togglePOICompletion(poiId, newCompleted);
+        },
       ),
     );
   }
