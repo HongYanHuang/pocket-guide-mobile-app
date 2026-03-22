@@ -490,6 +490,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isDismissible: true, // Allow dismissing by tapping outside
+      enableDrag: true, // Allow dragging to dismiss
       builder: (context) => POIMapBottomSheet(
         poi: poi,
         poiNumber: number,

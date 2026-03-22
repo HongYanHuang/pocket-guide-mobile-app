@@ -33,6 +33,8 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
   final ApiService _apiService = ApiService();
   SectionedTranscriptData? _sectionedData;
   bool _loading = true;
+  bool _showListView = false; // false = single section view, true = list view
+  int _currentSectionIndex = 0; // Current section being displayed
 
   @override
   void initState() {
@@ -55,6 +57,8 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
       setState(() {
         _sectionedData = data;
         _loading = false;
+        // Start with first section (index 0) - could be enhanced to find first uncompleted
+        _currentSectionIndex = 0;
       });
     } catch (e) {
       print('Error loading sectioned transcript: $e');
@@ -62,6 +66,37 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
         _loading = false;
       });
     }
+  }
+
+  void _goToPreviousSection() {
+    if (_currentSectionIndex > 0) {
+      setState(() {
+        _currentSectionIndex--;
+        _showListView = false;
+      });
+    }
+  }
+
+  void _goToNextSection() {
+    if (_sectionedData != null && _currentSectionIndex < _sectionedData!.sections.length - 1) {
+      setState(() {
+        _currentSectionIndex++;
+        _showListView = false;
+      });
+    }
+  }
+
+  void _toggleListView() {
+    setState(() {
+      _showListView = !_showListView;
+    });
+  }
+
+  void _selectSection(int index) {
+    setState(() {
+      _currentSectionIndex = index;
+      _showListView = false;
+    });
   }
 
   @override
@@ -133,67 +168,95 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
                 child: _loading
                     ? const Center(child: CircularProgressIndicator())
                     : _sectionedData != null && _sectionedData!.sections.isNotEmpty
-                        ? ListView.builder(
-                            controller: scrollController,
-                            padding: const EdgeInsets.symmetric(horizontal: 24),
-                            itemCount: _sectionedData!.sections.length + 2, // +2 for reason and completion button
-                            itemBuilder: (context, index) {
-                              if (index == 0) {
-                                // POI reason
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 16),
-                                  child: Text(
-                                    widget.poi.reason,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade700,
+                        ? Column(
+                            children: [
+                              // POI Reason
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                child: Text(
+                                  widget.poi.reason,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+
+                              // Navigation Buttons
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                child: Row(
+                                  children: [
+                                    // Previous Button
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _currentSectionIndex > 0 ? _goToPreviousSection : null,
+                                        icon: const Icon(Icons.chevron_left, size: 20),
+                                        label: const Text('Previous'),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // List Button
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: _toggleListView,
+                                        icon: Icon(_showListView ? Icons.grid_view : Icons.list, size: 20),
+                                        label: Text(_showListView ? 'Focus' : 'List'),
+                                        style: ElevatedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Next Button
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: _currentSectionIndex < _sectionedData!.sections.length - 1
+                                            ? _goToNextSection
+                                            : null,
+                                        label: const Text('Next'),
+                                        icon: const Icon(Icons.chevron_right, size: 20),
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              // Content Area (Single Section or List)
+                              Expanded(
+                                child: _showListView ? _buildListView(scrollController) : _buildSingleSectionView(),
+                              ),
+
+                              // Completion Button (only in active mode)
+                              if (widget.isActiveMode)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: TextButton.icon(
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                        widget.onToggleCompletion(!widget.completed);
+                                      },
+                                      icon: Icon(
+                                        widget.completed ? Icons.check_circle : Icons.check_circle_outline,
+                                        size: 18,
+                                      ),
+                                      label: Text(widget.completed ? 'Mark as Incomplete' : 'Mark as Complete'),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: widget.completed ? Colors.grey.shade700 : Colors.green.shade700,
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                      ),
                                     ),
                                   ),
-                                );
-                              } else if (index == _sectionedData!.sections.length + 1) {
-                                // Completion button (only in active mode)
-                                if (!widget.isActiveMode) return const SizedBox.shrink();
-
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 16, bottom: 24),
-                                  child: TextButton.icon(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                      widget.onToggleCompletion(!widget.completed);
-                                    },
-                                    icon: Icon(
-                                      widget.completed ? Icons.check_circle : Icons.check_circle_outline,
-                                      size: 18,
-                                    ),
-                                    label: Text(widget.completed ? 'Mark as Incomplete' : 'Mark as Complete'),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: widget.completed ? Colors.grey.shade700 : Colors.green.shade700,
-                                    ),
-                                  ),
-                                );
-                              } else {
-                                // Audio sections
-                                final section = _sectionedData!.sections[index - 1];
-                                String? audioUrl;
-
-                                // Use POI audio URL for "Full Narrative" section if available
-                                if (section.title == 'Full Narrative' &&
-                                    widget.poi.audioAvailable == true &&
-                                    widget.poi.audioUrl != null) {
-                                  audioUrl = '${ApiService.baseUrl}${widget.poi.audioUrl}';
-                                } else if (section.audioFile != null) {
-                                  // Extract city from tourId
-                                  final city = widget.tourId.split('-').first;
-                                  audioUrl = _apiService.getAudioUrl(city, widget.poiId, section.audioFile!);
-                                }
-
-                                return _AudioSectionCard(
-                                  section: section,
-                                  audioUrl: audioUrl,
-                                  isExpanded: index == 1, // Expand first section by default
-                                );
-                              }
-                            },
+                                ),
+                            ],
                           )
                         : Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -235,6 +298,75 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
       },
     );
   }
+
+  // Build single section view (shows one section at a time)
+  Widget _buildSingleSectionView() {
+    if (_sectionedData == null || _sectionedData!.sections.isEmpty) {
+      return const Center(child: Text('No sections available'));
+    }
+
+    final section = _sectionedData!.sections[_currentSectionIndex];
+    String? audioUrl;
+
+    // Use POI audio URL for "Full Narrative" section if available
+    if (section.title == 'Full Narrative' &&
+        widget.poi.audioAvailable == true &&
+        widget.poi.audioUrl != null) {
+      audioUrl = '${ApiService.baseUrl}${widget.poi.audioUrl}';
+    } else if (section.audioFile != null) {
+      // Extract city from tourId
+      final city = widget.tourId.split('-').first;
+      audioUrl = _apiService.getAudioUrl(city, widget.poiId, section.audioFile!);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: _AudioSectionCard(
+        section: section,
+        audioUrl: audioUrl,
+        isExpanded: true, // Always expanded in single view
+        key: ValueKey('section_${section.sectionNumber}'), // Force rebuild when section changes
+      ),
+    );
+  }
+
+  // Build list view (shows all sections)
+  Widget _buildListView(ScrollController scrollController) {
+    if (_sectionedData == null || _sectionedData!.sections.isEmpty) {
+      return const Center(child: Text('No sections available'));
+    }
+
+    return ListView.builder(
+      controller: scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      itemCount: _sectionedData!.sections.length,
+      itemBuilder: (context, index) {
+        final section = _sectionedData!.sections[index];
+        String? audioUrl;
+
+        // Use POI audio URL for "Full Narrative" section if available
+        if (section.title == 'Full Narrative' &&
+            widget.poi.audioAvailable == true &&
+            widget.poi.audioUrl != null) {
+          audioUrl = '${ApiService.baseUrl}${widget.poi.audioUrl}';
+        } else if (section.audioFile != null) {
+          // Extract city from tourId
+          final city = widget.tourId.split('-').first;
+          audioUrl = _apiService.getAudioUrl(city, widget.poiId, section.audioFile!);
+        }
+
+        return GestureDetector(
+          onTap: () => _selectSection(index),
+          child: _AudioSectionCard(
+            section: section,
+            audioUrl: audioUrl,
+            isExpanded: false, // Collapsed in list view
+            showSelectButton: true,
+          ),
+        );
+      },
+    );
+  }
 }
 
 // Audio Section Card Widget
@@ -242,11 +374,14 @@ class _AudioSectionCard extends StatefulWidget {
   final TranscriptSection section;
   final String? audioUrl;
   final bool isExpanded;
+  final bool showSelectButton;
 
   const _AudioSectionCard({
+    super.key,
     required this.section,
     this.audioUrl,
     this.isExpanded = false,
+    this.showSelectButton = false,
   });
 
   @override
@@ -503,6 +638,23 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
                   fontSize: 13,
                   color: Colors.grey.shade800,
                   height: 1.5,
+                ),
+              ),
+            ),
+
+          // Select button (shown in list view)
+          if (widget.showSelectButton)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {}, // Parent handles tap on whole card
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue.shade600,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Select & Focus'),
                 ),
               ),
             ),
