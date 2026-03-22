@@ -324,7 +324,6 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
       child: _AudioSectionCard(
         section: section,
         audioUrl: audioUrl,
-        isExpanded: true, // Always expanded in single view
         key: ValueKey('section_${section.sectionNumber}'), // Force rebuild when section changes
       ),
     );
@@ -360,7 +359,6 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
           child: _AudioSectionCard(
             section: section,
             audioUrl: audioUrl,
-            isExpanded: false, // Collapsed in list view
             showSelectButton: true,
           ),
         );
@@ -373,14 +371,12 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
 class _AudioSectionCard extends StatefulWidget {
   final TranscriptSection section;
   final String? audioUrl;
-  final bool isExpanded;
   final bool showSelectButton;
 
   const _AudioSectionCard({
     super.key,
     required this.section,
     this.audioUrl,
-    this.isExpanded = false,
     this.showSelectButton = false,
   });
 
@@ -392,14 +388,13 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   bool _isLoading = false;
-  late bool _isExpanded;
+  bool _isExpanded = false; // Default collapsed
   Duration _duration = Duration.zero;
   Duration _position = Duration.zero;
 
   @override
   void initState() {
     super.initState();
-    _isExpanded = widget.isExpanded;
     _setupAudioPlayer();
   }
 
@@ -496,169 +491,169 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          InkWell(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${widget.section.sectionNumber}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
-                        ),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section number badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Section ${widget.section.sectionNumber}',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Title (like song name)
+            Text(
+              widget.section.title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // Knowledge point (like artist name)
+            Text(
+              widget.section.knowledgePoint,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Audio player controls
+            if (widget.audioUrl != null) ...[
+              // Progress bar
+              if (_duration > Duration.zero)
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                  ),
+                  child: Slider(
+                    value: _position.inSeconds.toDouble().clamp(0, _duration.inSeconds.toDouble()),
+                    max: _duration.inSeconds.toDouble(),
+                    activeColor: Colors.blue.shade600,
+                    inactiveColor: Colors.grey.shade300,
+                    onChanged: (value) async {
+                      final newPosition = Duration(seconds: value.toInt());
+                      await _audioPlayer.seek(newPosition);
+                    },
+                  ),
+                ),
+
+              // Time indicators
+              if (_duration > Duration.zero)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(_position),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.section.title,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.section.knowledgePoint,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey.shade600,
-                            fontStyle: FontStyle.italic,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Audio controls
-                  if (widget.audioUrl != null) ...[
-                    const SizedBox(width: 8),
-                    if (_duration > Duration.zero)
                       Text(
                         _formatDuration(_duration),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.grey.shade600,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                       ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: Icon(
-                        _isLoading
-                            ? Icons.hourglass_empty
-                            : _isPlaying
-                                ? Icons.pause_circle
-                                : Icons.play_circle,
-                        color: Colors.blue.shade600,
-                        size: 32,
-                      ),
-                      onPressed: _togglePlayPause,
-                    ),
-                  ],
-                  Icon(
-                    _isExpanded ? Icons.expand_less : Icons.expand_more,
-                    color: Colors.grey.shade600,
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ),
+                ),
+              const SizedBox(height: 12),
 
-          // Audio progress bar
-          if (widget.audioUrl != null && _duration > Duration.zero)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Column(
-                children: [
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 2,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    ),
-                    child: Slider(
-                      value: _position.inSeconds.toDouble(),
-                      max: _duration.inSeconds.toDouble(),
-                      onChanged: (value) async {
-                        final newPosition = Duration(seconds: value.toInt());
-                        await _audioPlayer.seek(newPosition);
-                      },
-                    ),
+              // Play/Pause button (centered, large)
+              Center(
+                child: IconButton(
+                  icon: Icon(
+                    _isLoading
+                        ? Icons.hourglass_empty
+                        : _isPlaying
+                            ? Icons.pause_circle_filled
+                            : Icons.play_circle_filled,
+                    color: Colors.blue.shade600,
+                    size: 64,
                   ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12, right: 12, bottom: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _formatDuration(_position),
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                        ),
-                        Text(
-                          _formatDuration(_duration),
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  onPressed: _togglePlayPause,
+                ),
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
 
-          // Transcript content
-          if (_isExpanded)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                widget.section.transcript,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey.shade800,
-                  height: 1.5,
+            // Transcript toggle button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+                icon: Icon(
+                  _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 20,
+                ),
+                label: Text(_isExpanded ? 'Hide Transcript' : 'Show Transcript'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
 
-          // Select button (shown in list view)
-          if (widget.showSelectButton)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: SizedBox(
+            // Transcript content (collapsed by default)
+            if (_isExpanded) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  widget.section.transcript,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade800,
+                    height: 1.6,
+                  ),
+                ),
+              ),
+            ],
+
+            // Select button (shown in list view)
+            if (widget.showSelectButton) ...[
+              const SizedBox(height: 12),
+              SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {}, // Parent handles tap on whole card
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue.shade600,
                     foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Select & Focus'),
+                  child: const Text('Select & Focus on This Section'),
                 ),
               ),
-            ),
-        ],
+            ],
+          ],
+        ),
       ),
     );
   }
