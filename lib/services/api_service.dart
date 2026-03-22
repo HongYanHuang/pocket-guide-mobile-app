@@ -262,10 +262,17 @@ class ApiService {
     String city,
     String poiId,
     String tourId,
-    String language,
-  ) async {
+    String language, {
+    String? accessToken, // Optional for private/personalized tours
+  }) async {
     try {
       print('Fetching sectioned transcript for: $city/$poiId (tour: $tourId, language: $language)');
+
+      // Set authorization header if token provided (for private tours)
+      if (accessToken != null) {
+        _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+        print('🔑 Using authenticated request for tour-specific content');
+      }
 
       final response = await _api.getSectionedTranscriptPoisCityPoiIdSectionedTranscriptGet(
         city: city,
@@ -274,9 +281,18 @@ class ApiService {
         tourId: tourId,
       );
 
+      // Clear authorization header after request
+      if (accessToken != null) {
+        _dio.options.headers.remove('Authorization');
+      }
+
       return response.data;
     } catch (e) {
       print('Error fetching sectioned transcript: $e');
+      // Clear authorization header on error
+      if (accessToken != null) {
+        _dio.options.headers.remove('Authorization');
+      }
       // Return null to allow fallback to regular transcript
       return null;
     }

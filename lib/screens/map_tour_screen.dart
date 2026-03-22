@@ -478,7 +478,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   }
 
   // Handle POI marker tap
-  void _onPoiTap(TourPOI poi, int number, String poiId) {
+  Future<void> _onPoiTap(TourPOI poi, int number, String poiId) async {
     print('🗺️ POI tapped: ${poi.poi} (Day $_selectedDay, #$number)');
     print('   POI ID: $poiId');
     print('   POI object poiId field: ${poi.poiId}');
@@ -486,25 +486,42 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     final completed = _progressManager?.isPOICompleted(poiId, _selectedDay) ?? false;
     print('   Completion status: $completed');
 
+    // Get tour language (default to 'en' if not specified)
+    String language = 'en';
+    if (widget.tourDetail.metadata.languages != null &&
+        widget.tourDetail.metadata.languages!.isNotEmpty) {
+      language = widget.tourDetail.metadata.languages!.first;
+    }
+
+    // Get access token for authenticated API calls (private tours)
+    final accessToken = await _authService.getAccessToken();
+
+    print('📱 Opening POI bottom sheet (tap outside the white area to close)');
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       isDismissible: true, // Allow dismissing by tapping outside
       enableDrag: true, // Allow dragging to dismiss
+      barrierColor: Colors.black54, // Make barrier visible and tappable
       builder: (context) => POIMapBottomSheet(
         poi: poi,
         poiNumber: number,
         poiId: poiId,
         day: _selectedDay,
         tourId: widget.tourDetail.metadata.tourId,
+        language: language,
+        accessToken: accessToken,
         completed: completed,
         isActiveMode: widget.isActiveMode,
         onToggleCompletion: (newCompleted) async {
           await _togglePOICompletion(poiId, newCompleted);
         },
       ),
-    );
+    ).then((_) {
+      print('✅ Bottom sheet dismissed');
+    });
   }
 
   // Toggle POI completion status

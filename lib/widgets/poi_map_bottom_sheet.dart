@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
+import 'package:pocket_guide_mobile/screens/section_list_screen.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class POIMapBottomSheet extends StatefulWidget {
@@ -9,6 +10,8 @@ class POIMapBottomSheet extends StatefulWidget {
   final String poiId;
   final int day;
   final String tourId;
+  final String language; // Language for fetching transcript
+  final String? accessToken; // Optional for private/personalized tours
   final bool completed;
   final bool isActiveMode; // true = show complete button, false = hide it
   final Function(bool) onToggleCompletion;
@@ -20,6 +23,8 @@ class POIMapBottomSheet extends StatefulWidget {
     required this.poiId,
     required this.day,
     required this.tourId,
+    required this.language,
+    this.accessToken,
     required this.completed,
     required this.isActiveMode,
     required this.onToggleCompletion,
@@ -33,8 +38,8 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
   final ApiService _apiService = ApiService();
   SectionedTranscriptData? _sectionedData;
   bool _loading = true;
-  bool _showListView = false; // false = single section view, true = list view
   int _currentSectionIndex = 0; // Current section being displayed
+  Map<int, String?> _audioUrls = {}; // Cache audio URLs
 
   @override
   void initState() {
@@ -47,19 +52,44 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
       // Extract city from tourId (format: rome-tour-...)
       final city = widget.tourId.split('-').first;
 
+      print('📡 Fetching sectioned transcript for tour-specific POI:');
+      print('   City: $city');
+      print('   POI ID: ${widget.poiId}');
+      print('   Tour ID: ${widget.tourId}');
+      print('   Language: ${widget.language}');
+      print('   Authenticated: ${widget.accessToken != null}');
+
       final data = await _apiService.fetchSectionedTranscript(
         city,
         widget.poiId,
         widget.tourId,
-        'en',
+        widget.language,
+        accessToken: widget.accessToken,
       );
 
       setState(() {
         _sectionedData = data;
         _loading = false;
-        // Start with first section (index 0) - could be enhanced to find first uncompleted
+        // Start with first section (index 0)
         _currentSectionIndex = 0;
       });
+
+      // Prepare audio URLs for all sections
+      if (data != null) {
+        final urls = <int, String?>{};
+        for (var section in data.sections) {
+          if (section.title == 'Full Narrative' &&
+              widget.poi.audioAvailable == true &&
+              widget.poi.audioUrl != null) {
+            urls[section.sectionNumber] = '${ApiService.baseUrl}${widget.poi.audioUrl}';
+          } else if (section.audioFile != null) {
+            urls[section.sectionNumber] = _apiService.getAudioUrl(city, widget.poiId, section.audioFile!);
+          }
+        }
+        setState(() {
+          _audioUrls = urls;
+        });
+      }
     } catch (e) {
       print('Error loading sectioned transcript: $e');
       setState(() {
@@ -72,7 +102,6 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
     if (_currentSectionIndex > 0) {
       setState(() {
         _currentSectionIndex--;
-        _showListView = false;
       });
     }
   }
@@ -81,37 +110,50 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
     if (_sectionedData != null && _currentSectionIndex < _sectionedData!.sections.length - 1) {
       setState(() {
         _currentSectionIndex++;
-        _showListView = false;
       });
     }
   }
 
-  void _toggleListView() {
-    setState(() {
-      _showListView = !_showListView;
-    });
-  }
+  void _openSectionList() {
+    if (_sectionedData == null) return;
 
-  void _selectSection(int index) {
-    setState(() {
-      _currentSectionIndex = index;
-      _showListView = false;
-    });
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => SectionListScreen(
+          tourId: widget.tourId,
+          poiId: widget.poiId,
+          poiName: widget.poi.poi,
+          sections: _sectionedData!.sections.toList(),
+          audioUrls: _audioUrls,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.6,
-      minChildSize: 0.3,
-      maxChildSize: 0.9,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: Column(
+    return GestureDetector(
+      onTap: () {
+        print('🔍 Tapped on barrier area (outside bottom sheet)');
+        Navigator.of(context).pop();
+      },
+      behavior: HitTestBehavior.opaque,
+      child: DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) {
+          return GestureDetector(
+            onTap: () {
+              print('🔍 Tapped inside bottom sheet content area');
+              // Prevent taps inside the sheet from closing it
+            },
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
             children: [
               // Handle bar
               Container(
@@ -199,15 +241,13 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    // List Button
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: _toggleListView,
-                                        icon: Icon(_showListView ? Icons.grid_view : Icons.list, size: 20),
-                                        label: Text(_showListView ? 'Focus' : 'List'),
-                                        style: ElevatedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(vertical: 12),
-                                        ),
+                                    // List Icon Button
+                                    IconButton(
+                                      onPressed: _openSectionList,
+                                      icon: const Icon(Icons.list, size: 28),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.blue.shade50,
+                                        foregroundColor: Colors.blue.shade700,
                                       ),
                                     ),
                                     const SizedBox(width: 8),
@@ -228,9 +268,9 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
                                 ),
                               ),
 
-                              // Content Area (Single Section or List)
+                              // Content Area (Single Section)
                               Expanded(
-                                child: _showListView ? _buildListView(scrollController) : _buildSingleSectionView(),
+                                child: _buildSingleSectionView(),
                               ),
 
                               // Completion Button (only in active mode)
@@ -294,8 +334,10 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
               ),
             ],
           ),
-        );
-      },
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -329,42 +371,6 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
     );
   }
 
-  // Build list view (shows all sections)
-  Widget _buildListView(ScrollController scrollController) {
-    if (_sectionedData == null || _sectionedData!.sections.isEmpty) {
-      return const Center(child: Text('No sections available'));
-    }
-
-    return ListView.builder(
-      controller: scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      itemCount: _sectionedData!.sections.length,
-      itemBuilder: (context, index) {
-        final section = _sectionedData!.sections[index];
-        String? audioUrl;
-
-        // Use POI audio URL for "Full Narrative" section if available
-        if (section.title == 'Full Narrative' &&
-            widget.poi.audioAvailable == true &&
-            widget.poi.audioUrl != null) {
-          audioUrl = '${ApiService.baseUrl}${widget.poi.audioUrl}';
-        } else if (section.audioFile != null) {
-          // Extract city from tourId
-          final city = widget.tourId.split('-').first;
-          audioUrl = _apiService.getAudioUrl(city, widget.poiId, section.audioFile!);
-        }
-
-        return GestureDetector(
-          onTap: () => _selectSection(index),
-          child: _AudioSectionCard(
-            section: section,
-            audioUrl: audioUrl,
-            showSelectButton: true,
-          ),
-        );
-      },
-    );
-  }
 }
 
 // Audio Section Card Widget
@@ -440,37 +446,41 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
   }
 
   Future<void> _togglePlayPause() async {
-    if (widget.audioUrl == null) return;
+    if (widget.audioUrl == null) {
+      print('❌ No audio URL available');
+      return;
+    }
 
     try {
       if (_isPlaying) {
-        setState(() {
-          _isPlaying = false;
-        });
+        // Currently playing, so pause
+        print('⏸️ Pausing audio');
         await _audioPlayer.pause();
       } else {
-        setState(() {
-          _isPlaying = true;
-          _isLoading = _position == Duration.zero;
-        });
+        // Not playing, so start or resume
         if (_position == Duration.zero) {
+          // First time playing this track
+          print('🎵 Playing audio from URL: ${widget.audioUrl}');
+          setState(() {
+            _isLoading = true;
+          });
           await _audioPlayer.play(UrlSource(widget.audioUrl!));
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-            });
-          }
         } else {
+          // Resume from paused position
+          print('▶️ Resuming audio');
           await _audioPlayer.resume();
         }
       }
     } catch (e) {
-      print('Error playing audio: $e');
+      print('❌ Error playing audio: $e');
       if (mounted) {
         setState(() {
           _isPlaying = false;
           _isLoading = false;
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: $e')),
+        );
       }
     }
   }
@@ -492,48 +502,83 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section number badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Section ${widget.section.sectionNumber}',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade900,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            // Header row: Play button + Section info
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Play/Pause button (fixed position at top left)
+                if (widget.audioUrl != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: IconButton(
+                      icon: Icon(
+                        _isLoading
+                            ? Icons.hourglass_empty
+                            : _isPlaying
+                                ? Icons.pause_circle_filled
+                                : Icons.play_circle_filled,
+                        color: Colors.blue.shade600,
+                        size: 56,
+                      ),
+                      onPressed: _togglePlayPause,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ),
+
+                // Section info (badge, title, knowledge point)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Section number badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Section ${widget.section.sectionNumber}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Title (like song name)
+                      Text(
+                        widget.section.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Knowledge point (like artist name)
+                      Text(
+                        widget.section.knowledgePoint,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(height: 12),
-
-            // Title (like song name)
-            Text(
-              widget.section.title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-
-            // Knowledge point (like artist name)
-            Text(
-              widget.section.knowledgePoint,
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
             // Audio player controls
             if (widget.audioUrl != null) ...[
@@ -560,7 +605,7 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
               // Time indicators
               if (_duration > Duration.zero)
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -575,24 +620,7 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
                     ],
                   ),
                 ),
-              const SizedBox(height: 12),
-
-              // Play/Pause button (centered, large)
-              Center(
-                child: IconButton(
-                  icon: Icon(
-                    _isLoading
-                        ? Icons.hourglass_empty
-                        : _isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_filled,
-                    color: Colors.blue.shade600,
-                    size: 64,
-                  ),
-                  onPressed: _togglePlayPause,
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
             ],
 
             // Transcript toggle button
@@ -654,6 +682,7 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
             ],
           ],
         ),
+      ),
       ),
     );
   }
