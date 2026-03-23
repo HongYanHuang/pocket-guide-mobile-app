@@ -119,40 +119,74 @@ class AuthService {
         throw Exception('Web authentication not supported in mobile build');
       } else {
         // For mobile: use FlutterWebAuth2
-        print('🔐 Opening OAuth flow: $authUrl');
-        final result = await FlutterWebAuth2.authenticate(
-          url: authUrl,
-          callbackUrlScheme: _callbackUrlScheme,
-        );
+        print('🔐 ===== MOBILE OAUTH DEBUG =====');
+        print('   Auth URL: $authUrl');
+        print('   Redirect URI sent to backend: $redirectUri');
+        print('   Callback URL Scheme: $_callbackUrlScheme');
+        print('   State: $state');
+        print('🔐 Opening browser for OAuth...');
 
-        // Extract code and state from callback URL
-        final uri = Uri.parse(result);
-        final code = uri.queryParameters['code'];
-        final returnedState = uri.queryParameters['state'];
+        try {
+          final result = await FlutterWebAuth2.authenticate(
+            url: authUrl,
+            callbackUrlScheme: _callbackUrlScheme,
+          );
 
-        if (code == null || returnedState == null) {
-          throw Exception('Missing authorization code or state in callback');
+          print('✅ OAuth callback received!');
+          print('   Callback URL: $result');
+
+          // Extract code and state from callback URL
+          final uri = Uri.parse(result);
+          print('   Parsed URI scheme: ${uri.scheme}');
+          print('   Parsed URI host: ${uri.host}');
+          print('   Parsed URI path: ${uri.path}');
+          print('   Query parameters: ${uri.queryParameters}');
+
+          final code = uri.queryParameters['code'];
+          final returnedState = uri.queryParameters['state'];
+
+          if (code == null || returnedState == null) {
+            print('❌ Missing code or state in callback');
+            print('   Code present: ${code != null}');
+            print('   State present: ${returnedState != null}');
+            throw Exception('Missing authorization code or state in callback');
+          }
+
+          print('✅ Code and state extracted successfully');
+          print('   Code: ${code.substring(0, 10)}...');
+          print('   Returned state: ${returnedState.substring(0, 10)}...');
+
+          // Validate state to prevent CSRF
+          final savedState = await _storageService.getOAuthState();
+          print('   Saved state: ${savedState?.substring(0, 10)}...');
+
+          if (savedState != returnedState) {
+            print('❌ State mismatch!');
+            throw Exception('Invalid state parameter - possible CSRF attack');
+          }
+
+          print('✅ State validation passed');
+
+          // Exchange code for tokens
+          final savedVerifier = await _storageService.getCodeVerifier();
+          if (savedVerifier == null) {
+            print('❌ No code verifier found');
+            throw Exception('Missing PKCE code verifier');
+          }
+
+          print('🔐 Exchanging code for tokens...');
+          await _handleCallback(code, returnedState, savedVerifier);
+
+          // Clean up temporary storage
+          await _storageService.deleteCodeVerifier();
+          await _storageService.deleteOAuthState();
+
+          print('✅ Mobile OAuth login successful!');
+          return true;
+        } on Exception catch (e) {
+          print('❌ FlutterWebAuth2 error: $e');
+          rethrow;
         }
-
-        // Validate state to prevent CSRF
-        final savedState = await _storageService.getOAuthState();
-        if (savedState != returnedState) {
-          throw Exception('Invalid state parameter - possible CSRF attack');
-        }
-
-        // Exchange code for tokens
-        final savedVerifier = await _storageService.getCodeVerifier();
-        if (savedVerifier == null) {
-          throw Exception('Missing PKCE code verifier');
-        }
-
-        await _handleCallback(code, returnedState, savedVerifier);
-
-        // Clean up temporary storage
-        await _storageService.deleteCodeVerifier();
-        await _storageService.deleteOAuthState();
-
-        return true;
       }
     } catch (e) {
       print('Login error: $e');
