@@ -6,8 +6,7 @@ import 'package:pocket_guide_mobile/services/storage_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/models/user_model.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final StorageService _storageService = StorageService();
@@ -15,7 +14,6 @@ class AuthService {
 
   // For web mode: use http://localhost redirect
   // For mobile: use custom URL scheme (pocketguide://)
-  static const bool _isWebMode = true; // Set to false for mobile testing
   static const String _callbackUrlScheme = 'pocketguide';
 
   // PKCE: Generate random code verifier
@@ -97,7 +95,7 @@ class AuthService {
       // Get Google OAuth URL from backend
       // For web: use http://localhost:<port>/auth/callback
       // For mobile: use custom URL scheme pocketguide://auth/callback
-      final redirectUri = _isWebMode
+      final redirectUri = kIsWeb
           ? '${Uri.base.origin}/auth/callback'  // Web mode
           : '$_callbackUrlScheme://auth/callback';  // Mobile mode
 
@@ -116,17 +114,12 @@ class AuthService {
       // Store state from backend for callback validation
       await _storageService.saveOAuthState(state);
 
-      if (_isWebMode) {
-        // For web: use window.location to redirect
-        // The page will reload at /auth/callback after Google OAuth
-        print('🔐 Redirecting to Google OAuth: $authUrl');
-        html.window.location.href = authUrl;
-
-        // Return false because the page will redirect away
-        // The callback will be handled by AuthCallbackScreen after Google auth
-        return false;
+      if (kIsWeb) {
+        // For web: This shouldn't happen on mobile build
+        throw Exception('Web authentication not supported in mobile build');
       } else {
         // For mobile: use FlutterWebAuth2
+        print('🔐 Opening OAuth flow: $authUrl');
         final result = await FlutterWebAuth2.authenticate(
           url: authUrl,
           callbackUrlScheme: _callbackUrlScheme,

@@ -7,7 +7,8 @@ class ApiService {
   late final AuthenticationApi _authApi;
   late final Dio _dio;
 
-  static const String baseUrl = 'http://localhost:8000';
+  // Cloudflare Tunnel URL for testing on physical device
+  static const String baseUrl = 'https://saved-mba-photographers-contains.trycloudflare.com';
 
   ApiService() {
     _dio = Dio(BaseOptions(
