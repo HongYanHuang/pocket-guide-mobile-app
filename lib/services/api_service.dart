@@ -1,16 +1,31 @@
 import 'package:dio/dio.dart';
 import 'package:built_collection/built_collection.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiService {
   late final DefaultApi _api;
   late final AuthenticationApi _authApi;
   late final Dio _dio;
 
-  // Cloudflare Tunnel URL for testing on physical device
-  static const String baseUrl = 'https://binding-extras-significant-musician.trycloudflare.com';
+  // Base URL configuration based on platform
+  // Web (Chrome debug): Use localhost backend
+  // Mobile (iOS/Android): Use Cloudflare Tunnel for remote testing
+  static String get baseUrl {
+    if (kIsWeb) {
+      // For web development, connect to local backend
+      return 'http://localhost:8000';
+    } else {
+      // For mobile apps, use Cloudflare Tunnel
+      return 'https://binding-extras-significant-musician.trycloudflare.com';
+    }
+  }
 
   ApiService() {
+    print('🌐 API Service initialized');
+    print('   Platform: ${kIsWeb ? "Web (Chrome)" : "Mobile (iOS/Android)"}');
+    print('   Base URL: $baseUrl');
+
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
       connectTimeout: const Duration(seconds: 10),
