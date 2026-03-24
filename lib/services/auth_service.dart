@@ -15,6 +15,7 @@ class AuthService {
   final ApiService _apiService = ApiService();
 
   // Google Sign-In for mobile (native SDK)
+  // On iOS, reads configuration from GoogleService-Info.plist automatically
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile', 'openid'],
   );
