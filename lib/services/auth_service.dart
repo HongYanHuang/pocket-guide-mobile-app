@@ -130,6 +130,7 @@ class AuthService {
           final result = await FlutterWebAuth2.authenticate(
             url: authUrl,
             callbackUrlScheme: _callbackUrlScheme,
+            preferEphemeral: true, // Force system browser on iOS (prevents WebView blocking)
           );
 
           print('✅ OAuth callback received!');
