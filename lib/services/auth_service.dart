@@ -9,6 +9,7 @@ import 'package:pocket_guide_mobile/models/user_model.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthService {
   final StorageService _storageService = StorageService();
@@ -160,10 +161,65 @@ class AuthService {
     }
   }
 
-  // Web login using OAuth flow (FlutterWebAuth2)
+  // Web login using OAuth flow (for web platform)
   Future<bool> _loginWeb() async {
-    // This is for web platform - keep existing web OAuth flow
-    throw Exception('Web login not implemented in mobile build');
+    try {
+      print('🔐 ===== WEB GOOGLE OAUTH =====');
+      print('   Starting web OAuth flow...');
+
+      // Generate PKCE code verifier and challenge
+      final codeVerifier = _generateCodeVerifier();
+      final codeChallenge = _generateCodeChallenge(codeVerifier);
+      final state = _generateState();
+
+      print('✅ Generated PKCE and state');
+
+      // Save for later verification
+      await _storageService.saveCodeVerifier(codeVerifier);
+      await _storageService.saveOAuthState(state);
+
+      print('✅ Saved to storage');
+
+      // Get redirect URI (current origin + /auth/callback)
+      final redirectUri = '${Uri.base.origin}/auth/callback';
+      print('   Redirect URI: $redirectUri');
+
+      // Call backend to initiate OAuth and get Google auth URL
+      final loginData = await _apiService.initiateGoogleLogin(
+        redirectUri: redirectUri,
+        codeChallenge: codeChallenge,
+      );
+
+      if (loginData == null || loginData['auth_url'] == null) {
+        throw Exception('Failed to get auth URL from backend');
+      }
+
+      final authUrl = loginData['auth_url'] as String;
+      print('✅ Got auth URL from backend');
+      print('   Redirecting to Google...');
+
+      // For web: Redirect the entire page to Google OAuth
+      // Google will redirect back to /auth/callback after authentication
+      final uri = Uri.parse(authUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          webOnlyWindowName: '_self', // Redirect in same tab
+        );
+      } else {
+        throw Exception('Could not launch auth URL');
+      }
+
+      // Note: This code won't execute because the page redirects
+      // The AuthCallbackScreen will handle the callback when Google redirects back
+      return true;
+    } catch (e) {
+      print('❌ Web login error: $e');
+      // Clean up on error
+      await _storageService.deleteCodeVerifier();
+      await _storageService.deleteOAuthState();
+      return false;
+    }
   }
 
   // Verify Google ID token with backend
