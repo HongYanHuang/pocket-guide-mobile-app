@@ -8,7 +8,7 @@ class ApiService {
   late final Dio _dio;
 
   // Cloudflare Tunnel URL for testing on physical device
-  static const String baseUrl = 'https://sat-industry-downloading-small.trycloudflare.com';
+  static const String baseUrl = 'https://binding-extras-significant-musician.trycloudflare.com';
 
   ApiService() {
     _dio = Dio(BaseOptions(
