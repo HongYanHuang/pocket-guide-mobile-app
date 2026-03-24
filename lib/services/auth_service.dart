@@ -1,16 +1,23 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:pocket_guide_mobile/services/storage_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/models/user_model.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final StorageService _storageService = StorageService();
   final ApiService _apiService = ApiService();
+
+  // Google Sign-In for mobile (native SDK)
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile', 'openid'],
+  );
 
   // For web mode: use http://localhost redirect
   // For mobile: use custom URL scheme (pocketguide://)
@@ -85,117 +92,105 @@ class AuthService {
   // Initiate Google OAuth login
   Future<bool> login() async {
     try {
-      // Generate PKCE parameters
-      final codeVerifier = _generateCodeVerifier();
-      final codeChallenge = _generateCodeChallenge(codeVerifier);
-
-      // Store code verifier for callback
-      await _storageService.saveCodeVerifier(codeVerifier);
-
-      // Get Google OAuth URL from backend
-      // For web: use http://localhost:<port>/auth/callback
-      // For mobile: use custom URL scheme pocketguide://auth/callback
-      final redirectUri = kIsWeb
-          ? '${Uri.base.origin}/auth/callback'  // Web mode
-          : '$_callbackUrlScheme://auth/callback';  // Mobile mode
-
-      final response = await _apiService.initiateGoogleLogin(
-        redirectUri: redirectUri,
-        codeChallenge: codeChallenge,
-      );
-
-      if (response == null || response['auth_url'] == null || response['state'] == null) {
-        throw Exception('Failed to get authorization URL from backend');
-      }
-
-      final authUrl = response['auth_url'] as String;
-      final state = response['state'] as String;
-
-      // Store state from backend for callback validation
-      await _storageService.saveOAuthState(state);
-
       if (kIsWeb) {
-        // For web: This shouldn't happen on mobile build
-        throw Exception('Web authentication not supported in mobile build');
+        // For web: use OAuth flow with FlutterWebAuth2
+        return await _loginWeb();
       } else {
-        // For mobile: use FlutterWebAuth2
-        print('🔐 ===== MOBILE OAUTH DEBUG =====');
-        print('   Auth URL: $authUrl');
-        print('   Redirect URI sent to backend: $redirectUri');
-        print('   Callback URL Scheme: $_callbackUrlScheme');
-        print('   State: $state');
-        print('🔐 Opening browser for OAuth...');
-
-        try {
-          // FlutterWebAuth2 uses ASWebAuthenticationSession on iOS by default
-          // which is the system browser (complies with Google's OAuth policy)
-          final result = await FlutterWebAuth2.authenticate(
-            url: authUrl,
-            callbackUrlScheme: _callbackUrlScheme,
-          );
-
-          print('✅ OAuth callback received!');
-          print('   Callback URL: $result');
-
-          // Extract code and state from callback URL
-          final uri = Uri.parse(result);
-          print('   Parsed URI scheme: ${uri.scheme}');
-          print('   Parsed URI host: ${uri.host}');
-          print('   Parsed URI path: ${uri.path}');
-          print('   Query parameters: ${uri.queryParameters}');
-
-          final code = uri.queryParameters['code'];
-          final returnedState = uri.queryParameters['state'];
-
-          if (code == null || returnedState == null) {
-            print('❌ Missing code or state in callback');
-            print('   Code present: ${code != null}');
-            print('   State present: ${returnedState != null}');
-            throw Exception('Missing authorization code or state in callback');
-          }
-
-          print('✅ Code and state extracted successfully');
-          print('   Code: ${code.substring(0, 10)}...');
-          print('   Returned state: ${returnedState.substring(0, 10)}...');
-
-          // Validate state to prevent CSRF
-          final savedState = await _storageService.getOAuthState();
-          print('   Saved state: ${savedState?.substring(0, 10)}...');
-
-          if (savedState != returnedState) {
-            print('❌ State mismatch!');
-            throw Exception('Invalid state parameter - possible CSRF attack');
-          }
-
-          print('✅ State validation passed');
-
-          // Exchange code for tokens
-          final savedVerifier = await _storageService.getCodeVerifier();
-          if (savedVerifier == null) {
-            print('❌ No code verifier found');
-            throw Exception('Missing PKCE code verifier');
-          }
-
-          print('🔐 Exchanging code for tokens...');
-          await _handleCallback(code, returnedState, savedVerifier);
-
-          // Clean up temporary storage
-          await _storageService.deleteCodeVerifier();
-          await _storageService.deleteOAuthState();
-
-          print('✅ Mobile OAuth login successful!');
-          return true;
-        } on Exception catch (e) {
-          print('❌ FlutterWebAuth2 error: $e');
-          rethrow;
-        }
+        // For mobile: use native Google Sign-In
+        return await _loginMobile();
       }
     } catch (e) {
       print('Login error: $e');
-      // Clean up on error
-      await _storageService.deleteCodeVerifier();
-      await _storageService.deleteOAuthState();
       return false;
+    }
+  }
+
+  // Mobile login using Google Sign-In SDK
+  Future<bool> _loginMobile() async {
+    try {
+      print('🔐 ===== MOBILE GOOGLE SIGN-IN =====');
+      print('   Starting native Google Sign-In...');
+
+      // Sign in with Google (native UI)
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        print('❌ User cancelled Google Sign-In');
+        return false;
+      }
+
+      print('✅ Google Sign-In successful');
+      print('   User: ${googleUser.email}');
+
+      // Get authentication tokens
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        print('❌ Failed to get ID token from Google');
+        throw Exception('Failed to get ID token');
+      }
+
+      print('✅ Got ID token from Google');
+      print('   ID Token (first 20 chars): ${idToken.substring(0, 20)}...');
+
+      // Send ID token to backend for verification and to get our app's tokens
+      print('🔐 Sending ID token to backend...');
+      final tokenResponse = await _verifyGoogleIdToken(idToken);
+
+      if (tokenResponse == null) {
+        print('❌ Backend failed to verify ID token');
+        throw Exception('Failed to verify ID token with backend');
+      }
+
+      print('✅ Backend verified ID token successfully');
+
+      // Save tokens securely
+      await _storageService.saveAccessToken(tokenResponse.accessToken);
+      await _storageService.saveRefreshToken(tokenResponse.refreshToken);
+
+      print('✅ Mobile login successful!');
+      return true;
+    } catch (e) {
+      print('❌ Mobile login error: $e');
+      // Sign out from Google on error
+      await _googleSignIn.signOut();
+      return false;
+    }
+  }
+
+  // Web login using OAuth flow (FlutterWebAuth2)
+  Future<bool> _loginWeb() async {
+    // This is for web platform - keep existing web OAuth flow
+    throw Exception('Web login not implemented in mobile build');
+  }
+
+  // Verify Google ID token with backend
+  Future<AuthTokenResponse?> _verifyGoogleIdToken(String idToken) async {
+    try {
+      // Call backend endpoint to verify ID token and get our app's tokens
+      final dio = Dio(BaseOptions(baseUrl: ApiService.baseUrl));
+      final response = await dio.post(
+        '/auth/client/google/verify-token',
+        data: {'id_token': idToken},
+      );
+
+      if (response.data == null) {
+        return null;
+      }
+
+      // Parse response as AuthTokenResponse
+      final tokenData = response.data as Map<String, dynamic>;
+      return AuthTokenResponse(
+        (b) => b
+          ..accessToken = tokenData['access_token']
+          ..refreshToken = tokenData['refresh_token']
+          ..tokenType = tokenData['token_type']
+          ..expiresIn = tokenData['expires_in'],
+      );
+    } catch (e) {
+      print('Error verifying ID token: $e');
+      return null;
     }
   }
 
@@ -313,6 +308,11 @@ class AuthService {
       if (accessToken != null && refreshToken != null) {
         // Call backend logout endpoint
         await _apiService.logout(accessToken, refreshToken);
+      }
+
+      // Sign out from Google Sign-In on mobile
+      if (!kIsWeb) {
+        await _googleSignIn.signOut();
       }
     } catch (e) {
       print('Error during logout: $e');
