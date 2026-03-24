@@ -38,6 +38,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   Position? _userPosition;
   bool _permissionDenied = false;
   List<TrailPoint> _trailPoints = []; // Trail points to display on map
+  bool _autoFollowUser = true; // Auto-follow user location (like Google Maps navigation)
 
   @override
   void initState() {
@@ -152,6 +153,14 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       setState(() {
         _userPosition = position;
       });
+
+      // Auto-follow user location (like Google Maps navigation)
+      if (_autoFollowUser) {
+        _mapController.move(
+          LatLng(position.latitude, position.longitude),
+          _mapController.camera.zoom,
+        );
+      }
 
       // Record trail point
       _trailManager?.addPoint(position);
@@ -386,26 +395,31 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
         .replaceAll(RegExp(r'\s+'), '-'); // Replace spaces with hyphens
   }
 
-  // Build user location marker (blue dot)
+  // Build user location marker with heading arrow (like Google Maps)
   Widget _buildUserLocationMarker() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.blue.shade600,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.shade600.withValues(alpha: 0.3),
-            blurRadius: 8,
-            spreadRadius: 2,
+    final heading = _userPosition?.heading ?? 0.0;
+
+    return Transform.rotate(
+      angle: heading * 3.14159 / 180, // Convert degrees to radians
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.blue.shade600,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade600.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: const Center(
+          child: Icon(
+            Icons.navigation,
+            color: Colors.white,
+            size: 20,
           ),
-        ],
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.my_location,
-          color: Colors.white,
-          size: 16,
         ),
       ),
     );
@@ -592,6 +606,14 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
               initialZoom: _calculateZoom(),
               minZoom: 10.0,
               maxZoom: 18.0,
+              onPositionChanged: (position, hasGesture) {
+                // Disable auto-follow when user manually pans the map
+                if (hasGesture && _autoFollowUser) {
+                  setState(() {
+                    _autoFollowUser = false;
+                  });
+                }
+              },
             ),
             children: [
               TileLayer(
@@ -610,7 +632,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
             ],
           ),
 
-          // Permission denied warning
+          // Permission denied warning (only show critical errors)
           if (widget.isActiveMode && _permissionDenied)
             Positioned(
               top: 16,
@@ -642,138 +664,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
               ),
             ),
 
-          // Mode indicator
-          Positioned(
-            top: _permissionDenied ? 72 : 16,
-            left: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: widget.isActiveMode ? Colors.green.shade600 : Colors.grey.shade600,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        widget.isActiveMode ? Icons.navigation : Icons.visibility,
-                        color: Colors.white,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.isActiveMode ? 'Active' : 'Preview',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (widget.isActiveMode && _locationService.isTracking)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade600,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'GPS Active',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (widget.isActiveMode && _trailPoints.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.green.shade600,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.timeline,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Trail: ${_trailPoints.length} pts',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                if (_progressManager?.currentProgress != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.shade600,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.check_circle,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${_progressManager!.currentProgress!.completedCount}/${_progressManager!.currentProgress!.totalPois} POIs (${_progressManager!.getCompletionPercentage().toStringAsFixed(0)}%)',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // Center on user location button (active mode only)
-          if (widget.isActiveMode && _userPosition != null && !_permissionDenied)
+          // Re-center button (only show when not auto-following)
+          if (widget.isActiveMode && _userPosition != null && !_permissionDenied && !_autoFollowUser)
             Positioned(
               bottom: 24,
               right: 16,
@@ -792,9 +684,13 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     );
   }
 
-  // Center map on user's current location
+  // Center map on user's current location and enable auto-follow
   void _centerOnUserLocation() {
     if (_userPosition == null) return;
+
+    setState(() {
+      _autoFollowUser = true;
+    });
 
     _mapController.move(
       LatLng(_userPosition!.latitude, _userPosition!.longitude),
