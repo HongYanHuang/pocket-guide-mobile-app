@@ -127,10 +127,11 @@ class AuthService {
         print('🔐 Opening browser for OAuth...');
 
         try {
+          // FlutterWebAuth2 uses ASWebAuthenticationSession on iOS by default
+          // which is the system browser (complies with Google's OAuth policy)
           final result = await FlutterWebAuth2.authenticate(
             url: authUrl,
             callbackUrlScheme: _callbackUrlScheme,
-            preferEphemeral: true, // Force system browser on iOS (prevents WebView blocking)
           );
 
           print('✅ OAuth callback received!');
