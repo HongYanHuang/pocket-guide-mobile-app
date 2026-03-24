@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class LocationService {
   StreamSubscription<Position>? _positionSubscription;
@@ -16,23 +15,25 @@ class LocationService {
 
   /// Check if location permissions are granted
   Future<bool> hasPermission() async {
-    final status = await Permission.location.status;
-    return status.isGranted;
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always ||
+           permission == LocationPermission.whileInUse;
   }
 
   /// Request location permissions
   Future<bool> requestPermission() async {
     print('📍 Requesting location permission...');
 
-    final status = await Permission.location.request();
+    final permission = await Geolocator.requestPermission();
 
-    if (status.isGranted) {
-      print('✅ Location permission granted');
+    if (permission == LocationPermission.always ||
+        permission == LocationPermission.whileInUse) {
+      print('✅ Location permission granted: $permission');
       return true;
-    } else if (status.isDenied) {
+    } else if (permission == LocationPermission.denied) {
       print('❌ Location permission denied');
       return false;
-    } else if (status.isPermanentlyDenied) {
+    } else if (permission == LocationPermission.deniedForever) {
       print('❌ Location permission permanently denied');
       // User needs to enable in settings
       return false;
