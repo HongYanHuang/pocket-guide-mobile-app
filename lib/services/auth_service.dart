@@ -189,6 +189,10 @@ class AuthService {
       print('   Redirect URI: $redirectUri');
       print('   ⚠️  Make sure this URL is whitelisted in Google OAuth Web Client!');
 
+      print('📤 Sending to backend:');
+      print('   redirect_uri: $redirectUri');
+      print('   code_challenge: ${codeChallenge.substring(0, 20)}...');
+
       // Call backend to initiate OAuth and get Google auth URL
       final loginData = await _apiService.initiateGoogleLogin(
         redirectUri: redirectUri,
@@ -201,6 +205,14 @@ class AuthService {
 
       final authUrl = loginData['auth_url'] as String;
       print('✅ Got auth URL from backend');
+      print('📥 Google OAuth URL:');
+      print('   $authUrl');
+      print('');
+      print('🔍 Check this URL for:');
+      print('   - client_id: Should be Web OAuth client ID (not iOS client ID)');
+      print('   - redirect_uri: Should be http://localhost:3000/auth/callback');
+      print('   - response_type: Should be "code"');
+      print('');
       print('   Redirecting to Google...');
 
       // For web: Redirect the entire page to Google OAuth
