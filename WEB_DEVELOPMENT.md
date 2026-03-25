@@ -4,13 +4,10 @@
 
 To enable Google OAuth login on Chrome, you **must** run Flutter web on a **fixed port** (not a random port).
 
-### Commands
+### Command
 
 ```bash
-# Run Flutter web on fixed port 8080
-flutter run -d chrome --web-port=8080
-
-# Or port 3000 if you prefer
+# Run Flutter web on fixed port 3000
 flutter run -d chrome --web-port=3000
 ```
 
@@ -19,6 +16,7 @@ flutter run -d chrome --web-port=3000
 - Flutter web dev server normally uses **random ports** (like localhost:65263)
 - Google OAuth requires **exact redirect URIs** to be whitelisted
 - We can't whitelist random ports, so we need a **fixed port**
+- **This project uses port 3000** for web development
 
 ## Google OAuth Web Client Configuration
 
@@ -32,12 +30,12 @@ Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Servi
 
 **Authorized JavaScript origins:**
 ```
-http://localhost:8080
+http://localhost:3000
 ```
 
 **Authorized redirect URIs:**
 ```
-http://localhost:8080/auth/callback
+http://localhost:3000/auth/callback
 ```
 
 ### 3. Give Credentials to Backend
@@ -51,7 +49,7 @@ Backend needs to use:
 ## Testing Web Login
 
 1. Make sure backend is running on `http://localhost:8000`
-2. Run Flutter web: `flutter run -d chrome --web-port=8080`
+2. Run Flutter web: `flutter run -d chrome --web-port=3000`
 3. Open browser, click "Login with Google"
 4. Check console output:
    ```
@@ -59,7 +57,7 @@ Backend needs to use:
       Starting web OAuth flow...
    ✅ Generated PKCE and state
    ✅ Saved to storage
-      Redirect URI: http://localhost:8080/auth/callback
+      Redirect URI: http://localhost:3000/auth/callback
       ⚠️  Make sure this URL is whitelisted in Google OAuth Web Client!
    ```
 5. Should redirect to Google and back successfully
@@ -70,7 +68,7 @@ Backend needs to use:
 
 **Cause:** Google OAuth web client doesn't have the redirect URI whitelisted.
 
-**Fix:** Add `http://localhost:8080/auth/callback` to Google OAuth Web Client authorized redirect URIs.
+**Fix:** Add `http://localhost:3000/auth/callback` to Google OAuth Web Client authorized redirect URIs.
 
 ### CORS Error
 
@@ -78,11 +76,11 @@ Backend needs to use:
 
 **Fix:** Backend needs CORS configuration:
 ```python
-allow_origins=["http://localhost:8080", "http://localhost:3000"]
+allow_origins=["http://localhost:3000"]
 ```
 
 ### Wrong Port
 
 If you see "Redirect URI: http://localhost:65263/auth/callback" (random port), you forgot to use `--web-port` flag.
 
-**Fix:** Restart with: `flutter run -d chrome --web-port=8080`
+**Fix:** Restart with: `flutter run -d chrome --web-port=3000`

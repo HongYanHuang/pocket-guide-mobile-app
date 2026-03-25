@@ -182,9 +182,9 @@ class AuthService {
 
       // Get redirect URI (current origin + /auth/callback)
       // IMPORTANT: For web OAuth to work, you must:
-      // 1. Run Flutter web on fixed port: flutter run -d chrome --web-port=8080
+      // 1. Run Flutter web on fixed port: flutter run -d chrome --web-port=3000
       // 2. Add this URL to Google OAuth Web Client authorized redirect URIs:
-      //    http://localhost:8080/auth/callback
+      //    http://localhost:3000/auth/callback
       final redirectUri = '${Uri.base.origin}/auth/callback';
       print('   Redirect URI: $redirectUri');
       print('   ⚠️  Make sure this URL is whitelisted in Google OAuth Web Client!');

@@ -25,7 +25,7 @@
 	- Use Flutter's hot reload for fast development iteration
 
 - Platform-Specific Development
-	- Web (Chrome): Run with fixed port for OAuth: `flutter run -d chrome --web-port=8080`
+	- Web (Chrome): Always run with fixed port 3000 for OAuth: `flutter run -d chrome --web-port=3000`
 	- iOS: Run on physical device via Xcode or `flutter run`
 	- Backend API URL auto-switches: localhost for web, Cloudflare tunnel for mobile
 	- See WEB_DEVELOPMENT.md for web OAuth setup details
