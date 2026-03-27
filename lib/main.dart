@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:pocket_guide_mobile/services/background_audio_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
-import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const PocketGuideApp());
@@ -1584,7 +1584,7 @@ class _SectionCard extends StatefulWidget {
 }
 
 class _SectionCardState extends State<_SectionCard> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final _audioService = BackgroundAudioService.instance;
   bool _isPlaying = false;
   bool _isLoading = false;
   bool _isExpanded = false;
@@ -1594,41 +1594,39 @@ class _SectionCardState extends State<_SectionCard> {
   @override
   void initState() {
     super.initState();
-    _setupAudioPlayer();
+    _setupAudioListeners();
   }
 
-  void _setupAudioPlayer() {
-    _audioPlayer.onDurationChanged.listen((duration) {
-      setState(() {
-        _duration = duration;
-      });
+  void _setupAudioListeners() {
+    // Listen to playback state changes
+    _audioService.playbackStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlaybackState.playing;
+          _isLoading = state == PlaybackState.buffering;
+          if (state == PlaybackState.completed) {
+            _position = Duration.zero;
+          }
+        });
+      }
     });
 
-    _audioPlayer.onPositionChanged.listen((position) {
-      setState(() {
-        _position = position;
-        // Clear loading state once playback starts
-        if (position > Duration.zero && _isLoading) {
-          _isLoading = false;
-        }
-      });
+    // Listen to position changes
+    _audioService.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _position = position;
+        });
+      }
     });
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      setState(() {
-        _isPlaying = state == PlayerState.playing;
-        // Only show loading at the very beginning, not during playback
-        if (state != PlayerState.playing) {
-          _isLoading = false;
-        }
-      });
-    });
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      setState(() {
-        _isPlaying = false;
-        _position = Duration.zero;
-      });
+    // Listen to duration changes
+    _audioService.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _duration = duration;
+        });
+      }
     });
   }
 
@@ -1637,38 +1635,32 @@ class _SectionCardState extends State<_SectionCard> {
 
     try {
       if (_isPlaying) {
-        // Update UI immediately for better responsiveness
-        setState(() {
-          _isPlaying = false;
-        });
-        await _audioPlayer.pause();
+        await _audioService.pause();
       } else {
-        // Update UI immediately for better responsiveness
-        setState(() {
-          _isPlaying = true;
-          // Only show loading briefly when starting from beginning
-          _isLoading = _position == Duration.zero;
-        });
         if (_position == Duration.zero) {
-          await _audioPlayer.play(UrlSource(widget.audioUrl!));
-          // Clear loading state after starting playback
           setState(() {
-            _isLoading = false;
+            _isLoading = true;
           });
+          await _audioService.play(
+            url: widget.audioUrl!,
+            title: widget.title,
+            subtitle: 'Section ${widget.sectionNumber}',
+          );
         } else {
-          await _audioPlayer.resume();
+          await _audioService.resume();
         }
       }
     } catch (e) {
       print('Error playing audio: $e');
-      // Revert state on error
-      setState(() {
-        _isPlaying = false;
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to play audio: $e')),
-      );
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: $e')),
+        );
+      }
     }
   }
 
@@ -1676,12 +1668,6 @@ class _SectionCardState extends State<_SectionCard> {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override

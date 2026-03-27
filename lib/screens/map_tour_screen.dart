@@ -248,15 +248,16 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     if (!widget.isActiveMode) return;
 
     if (state == AppLifecycleState.paused) {
-      // App goes to background - switch to 30s intervals
-      print('📱 App going to background, switching to 30s GPS intervals');
-      _locationService.stopTracking();
-      _locationService.startTracking(isBackground: true);
+      // App goes to background - switch to 30s intervals with batching
+      print('📱 App going to background');
+      print('   📍 Switching to 30s GPS intervals + 1min batch uploads');
+      print('   🎵 Audio will continue playing in background');
+      _locationService.enterBackgroundMode();
     } else if (state == AppLifecycleState.resumed) {
-      // App comes to foreground - switch to 5s intervals
-      print('📱 App resuming, switching to 5s GPS intervals');
-      _locationService.stopTracking();
-      _locationService.startTracking(isBackground: false);
+      // App comes to foreground - switch to 5s intervals with immediate upload
+      print('📱 App resuming to foreground');
+      print('   📍 Switching to 5s GPS intervals + immediate uploads');
+      _locationService.enterForegroundMode();
     }
   }
 

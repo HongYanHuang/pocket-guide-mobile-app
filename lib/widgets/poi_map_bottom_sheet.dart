@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/screens/section_list_screen.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:pocket_guide_mobile/services/background_audio_service.dart';
 
 class POIMapBottomSheet extends StatefulWidget {
   final TourPOI poi;
@@ -391,7 +391,7 @@ class _AudioSectionCard extends StatefulWidget {
 }
 
 class _AudioSectionCardState extends State<_AudioSectionCard> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final _audioService = BackgroundAudioService.instance;
   bool _isPlaying = false;
   bool _isLoading = false;
   bool _isExpanded = false; // Default collapsed
@@ -401,45 +401,37 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
   @override
   void initState() {
     super.initState();
-    _setupAudioPlayer();
+    _setupAudioListeners();
   }
 
-  void _setupAudioPlayer() {
-    _audioPlayer.onDurationChanged.listen((duration) {
+  void _setupAudioListeners() {
+    // Listen to playback state changes
+    _audioService.playbackStateStream.listen((state) {
       if (mounted) {
         setState(() {
-          _duration = duration;
+          _isPlaying = state == PlaybackState.playing;
+          _isLoading = state == PlaybackState.buffering;
+          if (state == PlaybackState.completed) {
+            _position = Duration.zero;
+          }
         });
       }
     });
 
-    _audioPlayer.onPositionChanged.listen((position) {
+    // Listen to position changes
+    _audioService.positionStream.listen((position) {
       if (mounted) {
         setState(() {
           _position = position;
-          if (position > Duration.zero && _isLoading) {
-            _isLoading = false;
-          }
         });
       }
     });
 
-    _audioPlayer.onPlayerStateChanged.listen((state) {
-      if (mounted) {
+    // Listen to duration changes
+    _audioService.durationStream.listen((duration) {
+      if (mounted && duration != null) {
         setState(() {
-          _isPlaying = state == PlayerState.playing;
-          if (state != PlayerState.playing) {
-            _isLoading = false;
-          }
-        });
-      }
-    });
-
-    _audioPlayer.onPlayerComplete.listen((_) {
-      if (mounted) {
-        setState(() {
-          _isPlaying = false;
-          _position = Duration.zero;
+          _duration = duration;
         });
       }
     });
@@ -455,7 +447,7 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
       if (_isPlaying) {
         // Currently playing, so pause
         print('⏸️ Pausing audio');
-        await _audioPlayer.pause();
+        await _audioService.pause();
       } else {
         // Not playing, so start or resume
         if (_position == Duration.zero) {
@@ -464,11 +456,15 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
           setState(() {
             _isLoading = true;
           });
-          await _audioPlayer.play(UrlSource(widget.audioUrl!));
+          await _audioService.play(
+            url: widget.audioUrl!,
+            title: widget.title,
+            subtitle: 'Section ${widget.sectionNumber}',
+          );
         } else {
           // Resume from paused position
           print('▶️ Resuming audio');
-          await _audioPlayer.resume();
+          await _audioService.resume();
         }
       }
     } catch (e) {
@@ -489,12 +485,6 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds % 60;
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override

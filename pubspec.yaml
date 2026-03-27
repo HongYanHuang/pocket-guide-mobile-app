@@ -49,8 +49,9 @@ dependencies:
   built_collection: ^5.1.1
   built_value: ^8.12.3
 
-  # Audio player
-  audioplayers: ^5.2.1
+  # Audio player with background support
+  just_audio: ^0.9.36
+  audio_service: ^0.18.12
 
   # Authentication
   flutter_secure_storage: ^9.0.0

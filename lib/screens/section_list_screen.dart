@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:pocket_guide_mobile/services/background_audio_service.dart';
 
 class SectionListScreen extends StatefulWidget {
   final String tourId;
@@ -25,12 +25,21 @@ class SectionListScreen extends StatefulWidget {
 
 class _SectionListScreenState extends State<SectionListScreen> {
   int? _playingSectionNumber;
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final _audioService = BackgroundAudioService.instance;
 
   @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    // Listen to playback state to update UI
+    _audioService.playbackStateStream.listen((state) {
+      if (mounted) {
+        if (state == PlaybackState.completed || state == PlaybackState.paused) {
+          setState(() {
+            // Keep track of which section was playing
+          });
+        }
+      }
+    });
   }
 
   Future<void> _playSection(TranscriptSection section) async {
@@ -43,18 +52,22 @@ class _SectionListScreenState extends State<SectionListScreen> {
     try {
       // Stop current if playing different section
       if (_playingSectionNumber != null && _playingSectionNumber != section.sectionNumber) {
-        await _audioPlayer.stop();
+        await _audioService.stop();
       }
 
       // Toggle play/pause
       if (_playingSectionNumber == section.sectionNumber) {
-        await _audioPlayer.stop();
+        await _audioService.stop();
         setState(() {
           _playingSectionNumber = null;
         });
       } else {
         print('🎵 Playing section ${section.sectionNumber}: $audioUrl');
-        await _audioPlayer.play(UrlSource(audioUrl));
+        await _audioService.play(
+          url: audioUrl,
+          title: section.title,
+          subtitle: widget.poiName,
+        );
         setState(() {
           _playingSectionNumber = section.sectionNumber;
         });

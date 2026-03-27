@@ -101,10 +101,12 @@ class TourProgressService {
     }
   }
 
-  // Upload GPS trail points (batch)
+  // Upload GPS trail points (batch) - new endpoint
   Future<void> uploadTrailPoints({
     required String tourId,
     required List<GPSPoint> points,
+    int day = 1,
+    String uploadType = 'background', // 'background' or 'foreground'
   }) async {
     if (_jwtToken == null) {
       throw Exception('Authentication required: No JWT token available');
@@ -119,21 +121,38 @@ class TourProgressService {
       // Limit to 100 points per request as per API spec
       final batch = points.take(100).toList();
       print('📤 Uploading ${batch.length} GPS trail points for tour: $tourId');
+      print('   Upload type: $uploadType, Day: $day');
 
-      final request = TrailUploadRequest(points: batch);
+      // Convert to new batch format
+      final coordinates = batch.map((point) => {
+        'latitude': point.latitude,
+        'longitude': point.longitude,
+        'timestamp': point.timestamp.toIso8601String(),
+        'accuracy': point.accuracy,
+        'altitude': 0.0, // GPSPoint doesn't have altitude
+        'heading': 0.0, // GPSPoint doesn't have heading
+        'speed': 0.0, // GPSPoint doesn't have speed
+      }).toList();
 
+      final requestBody = {
+        'coordinates': coordinates,
+        'day': day,
+        'upload_type': uploadType,
+      };
+
+      // Use new batch endpoint
       final response = await http.post(
-        Uri.parse('$baseUrl/tours/$tourId/trail'),
+        Uri.parse('$baseUrl/client/tours/$tourId/trail/batch'),
         headers: {
           'Authorization': 'Bearer $_jwtToken',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(request.toJson()),
+        body: jsonEncode(requestBody),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('✅ Trail uploaded: ${data['points_saved']} points saved (total: ${data['total_points']})');
+        print('✅ Trail batch uploaded: ${data['coordinates_received']} coordinates received');
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid or expired token');
       } else if (response.statusCode == 403) {

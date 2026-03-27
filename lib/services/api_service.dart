@@ -634,4 +634,41 @@ class ApiService {
       rethrow;
     }
   }
+
+  /// Batch upload GPS trail coordinates
+  Future<void> uploadTrailBatch({
+    required String accessToken,
+    required String tourId,
+    required List<Map<String, dynamic>> coordinates,
+    required int day,
+    required String uploadType, // 'background' or 'foreground'
+  }) async {
+    try {
+      print('📤 Uploading trail batch: ${coordinates.length} coordinates');
+      print('   Tour: $tourId, Day: $day, Type: $uploadType');
+
+      // Set authorization header
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+
+      final response = await _dio.post(
+        '/client/tours/$tourId/trail/batch',
+        data: {
+          'coordinates': coordinates,
+          'day': day,
+          'upload_type': uploadType,
+        },
+      );
+
+      // Clear authorization header
+      _dio.options.headers.remove('Authorization');
+
+      print('✅ Trail batch uploaded successfully');
+      print('   Response: ${response.data}');
+    } catch (e) {
+      print('❌ Error uploading trail batch: $e');
+      // Clear authorization header on error
+      _dio.options.headers.remove('Authorization');
+      rethrow;
+    }
+  }
 }
