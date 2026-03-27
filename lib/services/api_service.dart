@@ -17,7 +17,7 @@ class ApiService {
       return 'http://localhost:8000';
     } else {
       // For mobile apps, use Cloudflare Tunnel
-      return 'https://binding-extras-significant-musician.trycloudflare.com';
+      return 'https://fed-designer-combine-tied.trycloudflare.com';
     }
   }
 
