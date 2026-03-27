@@ -239,20 +239,19 @@ class AuthService {
       print('');
 
       // Generate PKCE code verifier and challenge
+      // NOTE: We DON'T generate state here - backend generates it!
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);
-      final state = _generateState();
 
-      print('✅ Step 1: Generated security parameters');
+      print('✅ Step 1: Generated PKCE parameters');
       print('   Code Verifier (first 20): ${codeVerifier.substring(0, 20)}...');
       print('   Code Challenge (first 20): ${codeChallenge.substring(0, 20)}...');
-      print('   State (first 20): ${state.substring(0, 20)}...');
+      print('   ⚠️  State will come from backend (not client-generated)');
       print('');
 
-      // Save for later verification
+      // Save code verifier only (state comes from backend)
       await _storageService.saveCodeVerifier(codeVerifier);
-      await _storageService.saveOAuthState(state);
-      print('✅ Step 2: Saved to storage');
+      print('✅ Step 2: Saved code verifier to storage');
       print('');
 
       // Get redirect URI (current origin + /auth/callback)
@@ -291,8 +290,35 @@ class AuthService {
       final authUrl = loginData['auth_url'] as String;
       print('✅ Step 5: Received auth URL from backend');
       print('');
+
+      // Extract state from backend response or parse from auth_url
+      String? backendState;
+
+      // First check if backend provides state directly in response
+      if (loginData.containsKey('state')) {
+        backendState = loginData['state'] as String;
+        print('✅ Step 6: Got state from backend response');
+        print('   State (first 20): ${backendState.substring(0, 20)}...');
+      } else {
+        // Parse state from auth_url query parameters
+        final googleUri = Uri.parse(authUrl);
+        backendState = googleUri.queryParameters['state'];
+
+        if (backendState == null) {
+          print('❌ ERROR: No state found in backend response or auth_url');
+          throw Exception('Backend did not provide state parameter');
+        }
+
+        print('✅ Step 6: Extracted state from auth_url');
+        print('   State (first 20): ${backendState.substring(0, 20)}...');
+      }
+
+      // Save backend's state (CRITICAL: Must use backend's state, not client-generated!)
+      await _storageService.saveOAuthState(backendState);
+      print('   ✅ Saved backend state to storage for later validation');
+      print('');
       print('═══════════════════════════════════════════════════════════════');
-      print('📥 GOOGLE OAUTH URL BREAKDOWN');
+      print('📥 GOOGLE OAUTH URL BREAKDOWN (Step 7)');
       print('═══════════════════════════════════════════════════════════════');
 
       // Parse and display URL parameters
@@ -317,7 +343,7 @@ class AuthService {
         } else if (key == 'scope') {
           print('  ✅ scope: $value');
         } else if (key == 'state') {
-          print('  ✅ state: ${value.substring(0, 20)}...');
+          print('  ✅ state: ${value.substring(0, 20)}... ${value == backendState ? "(matches saved)" : "(MISMATCH!)"}');
         } else if (key == 'code_challenge') {
           print('  ✅ code_challenge: ${value.substring(0, 20)}...');
         } else if (key == 'code_challenge_method') {
@@ -331,7 +357,7 @@ class AuthService {
       print(authUrl);
       print('');
       print('═══════════════════════════════════════════════════════════════');
-      print('🚀 Step 6: Redirecting to Google...');
+      print('🚀 Step 8: Redirecting to Google...');
       print('═══════════════════════════════════════════════════════════════');
       print('');
 
