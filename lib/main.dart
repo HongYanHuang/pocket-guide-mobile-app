@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
@@ -7,6 +8,12 @@ import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_mobile/design_system/preview_screen.dart';
+import 'package:pocket_guide_mobile/design_system/colors.dart';
+import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/design_system/spacing.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_button.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 
 void main() {
@@ -30,8 +37,12 @@ class PocketGuideApp extends StatelessWidget {
     return MaterialApp(
       title: 'Pocket Guide',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: PGColors.brand),
+        scaffoldBackgroundColor: PGColors.background,
         useMaterial3: true,
+        // Use Cupertino-style colors where possible
+        primaryColor: PGColors.brand,
+        dividerColor: PGColors.divider,
       ),
       initialRoute: initialRoute,
       routes: {
@@ -81,15 +92,15 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
+      backgroundColor: PGColors.brand,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.explore,
+              CupertinoIcons.map_fill,
               size: 100,
-              color: Colors.white,
+              color: PGColors.white,
             ),
             const SizedBox(height: 24),
             Text(
@@ -97,7 +108,7 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: PGColors.white,
               ),
             ),
             const SizedBox(height: 32),
@@ -128,72 +139,54 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const CreateTourScreen(),
-            ),
-          );
-        },
-        elevation: 4,
-        child: const Icon(Icons.add, size: 32),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(Icons.home, 'Home', 0),
-            const SizedBox(width: 48), // Space for FAB
-            _buildNavItem(Icons.person, 'Account', 1),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    final isSelected = _currentIndex == index;
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _currentIndex = index;
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: PGColors.background,
+          body: IndexedStack(
+            index: _currentIndex,
+            children: _screens,
+          ),
+          bottomNavigationBar: PGTabBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            items: [
+              PGTabItem(
+                icon: CupertinoIcons.house,
+                activeIcon: CupertinoIcons.house_fill,
+                label: 'Tours',
               ),
-            ),
-          ],
+              PGTabItem(
+                icon: CupertinoIcons.person,
+                activeIcon: CupertinoIcons.person_fill,
+                label: 'Account',
+              ),
+            ],
+          ),
         ),
-      ),
+        // Floating action button overlay (using Material FAB for functionality)
+        Positioned(
+          right: 16,
+          bottom: 70,
+          child: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (context) => const CreateTourScreen(),
+                ),
+              );
+            },
+            backgroundColor: PGColors.brand,
+            elevation: 4,
+            child: Icon(CupertinoIcons.add, size: 32, color: PGColors.white),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -258,89 +251,99 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Home'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.palette),
-            tooltip: 'Design System Preview',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const DesignSystemPreview(),
-                ),
-              );
-            },
-          ),
-        ],
+    return CupertinoPageScaffold(
+      backgroundColor: PGColors.background,
+      navigationBar: PGNavigationBar(
+        title: 'Tours',
+        trailing: PGNavButton(
+          icon: CupertinoIcons.paintbrush,
+          onPressed: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (context) => const DesignSystemPreview(),
+              ),
+            );
+          },
+        ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Destination selector
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: InkWell(
-              onTap: _showCitySelector,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.location_on, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      _selectedCity ?? 'Select Destination',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: _selectedCity != null
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                        color: _selectedCity != null
-                            ? Colors.black
-                            : Colors.grey.shade600,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Destination selector
+            Padding(
+              padding: PGSpacing.paddingL,
+              child: CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _showCitySelector,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: PGSpacing.l,
+                    vertical: PGSpacing.m,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: PGColors.border),
+                    borderRadius: PGRadius.radiusM,
+                    color: PGColors.surface,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.location_solid,
+                        size: 20,
+                        color: PGColors.brand,
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-                  ],
+                      SizedBox(width: PGSpacing.s),
+                      Text(
+                        _selectedCity ?? 'Select Destination',
+                        style: (_selectedCity != null
+                                ? PGTypography.headline
+                                : PGTypography.body)
+                            .copyWith(
+                          color: _selectedCity != null
+                              ? PGColors.textPrimary
+                              : PGColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(width: PGSpacing.xs),
+                      Icon(
+                        CupertinoIcons.chevron_down,
+                        size: 16,
+                        color: PGColors.textSecondary,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          // Tours list
-          Expanded(
-            child: _selectedCity == null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.explore_outlined,
-                          size: 80,
-                          color: Colors.grey.shade300,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Select a destination to view tours',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
+            // Tours list
+            Expanded(
+              child: _selectedCity == null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            CupertinoIcons.map,
+                            size: 80,
+                            color: PGColors.gray300,
                           ),
-                        ),
-                      ],
-                    ),
-                  )
-                : ToursList(city: _selectedCity!),
-          ),
-        ],
+                          SizedBox(height: PGSpacing.l),
+                          Text(
+                            'Select a destination to view tours',
+                            style: PGTypography.body.copyWith(
+                              color: PGColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ToursList(city: _selectedCity!),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -399,99 +402,115 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
+      decoration: BoxDecoration(
+        color: PGColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(PGRadius.l)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Handle bar
           Container(
-            margin: const EdgeInsets.only(top: 12),
+            margin: EdgeInsets.only(top: PGSpacing.m),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
+              color: PGColors.gray300,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
           // Title
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: PGSpacing.paddingL,
             child: Text(
               'Select Destination',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: PGTypography.title2,
             ),
           ),
           // Search bar
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: TextField(
+            padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
+            child: CupertinoSearchTextField(
               controller: _searchController,
               onChanged: _filterCities,
-              decoration: InputDecoration(
-                hintText: 'Search cities...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterCities('');
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              ),
+              placeholder: 'Search cities...',
+              style: PGTypography.body,
+              backgroundColor: PGColors.gray100,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: PGSpacing.l),
           // Popular Cities label
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Popular Cities',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: PGTypography.headline,
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: PGSpacing.s),
           // Cities list
           Flexible(
             child: widget.loading
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: CircularProgressIndicator(),
+                      padding: PGSpacing.paddingXL,
+                      child: CupertinoActivityIndicator(
+                        color: PGColors.brand,
+                      ),
                     ),
                   )
                 : _filteredCities.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Text('No cities found'),
+                          padding: PGSpacing.paddingXL,
+                          child: Text(
+                            'No cities found',
+                            style: PGTypography.body.copyWith(
+                              color: PGColors.textSecondary,
+                            ),
+                          ),
                         ),
                       )
-                    : ListView.builder(
+                    : ListView.separated(
                         shrinkWrap: true,
                         itemCount: _filteredCities.length,
+                        separatorBuilder: (context, index) => Divider(
+                          height: 1,
+                          color: PGColors.divider,
+                          indent: PGSpacing.l + 40,
+                        ),
                         itemBuilder: (context, index) {
                           final city = _filteredCities[index];
-                          return ListTile(
-                            leading: const Icon(Icons.location_city),
-                            title: Text(city),
-                            onTap: () => widget.onCitySelected(city),
+                          return CupertinoButton(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: PGSpacing.l,
+                              vertical: PGSpacing.m,
+                            ),
+                            onPressed: () => widget.onCitySelected(city),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.building_2_fill,
+                                  color: PGColors.brand,
+                                  size: 24,
+                                ),
+                                SizedBox(width: PGSpacing.l),
+                                Expanded(
+                                  child: Text(
+                                    city,
+                                    style: PGTypography.body,
+                                  ),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: PGSpacing.l),
         ],
       ),
     );
@@ -612,12 +631,30 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'My Tours'),
-            Tab(text: 'Public Tours'),
-          ],
+        Container(
+          padding: PGSpacing.paddingL,
+          child: CupertinoSlidingSegmentedControl<int>(
+            groupValue: _tabController.index,
+            children: {
+              0: Padding(
+                padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
+                child: Text('My Tours', style: PGTypography.callout),
+              ),
+              1: Padding(
+                padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
+                child: Text('Public Tours', style: PGTypography.callout),
+              ),
+            },
+            onValueChanged: (value) {
+              if (value != null) {
+                setState(() {
+                  _tabController.index = value;
+                });
+              }
+            },
+            thumbColor: PGColors.brand,
+            backgroundColor: PGColors.gray100,
+          ),
         ),
         Expanded(
           child: TabBarView(
@@ -634,25 +671,43 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
 
   Widget _buildMyToursTab() {
     if (_loadingMyTours) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: CupertinoActivityIndicator(color: PGColors.brand),
+      );
     }
 
     if (_errorMyTours != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text('Failed to load tours', style: TextStyle(color: Colors.red.shade600)),
-            const SizedBox(height: 8),
-            Text(_errorMyTours!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadMyTours,
-              child: const Text('Retry'),
-            ),
-          ],
+        child: Padding(
+          padding: PGSpacing.screen,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 60,
+                color: PGColors.error,
+              ),
+              SizedBox(height: PGSpacing.l),
+              Text(
+                'Failed to load tours',
+                style: PGTypography.headline.copyWith(color: PGColors.error),
+              ),
+              SizedBox(height: PGSpacing.s),
+              Text(
+                _errorMyTours!,
+                style: PGTypography.footnote.copyWith(
+                  color: PGColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: PGSpacing.l),
+              PGButton(
+                text: 'Retry',
+                onPressed: _loadMyTours,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -662,25 +717,34 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.tour_outlined, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
+            Icon(
+              CupertinoIcons.map,
+              size: 80,
+              color: PGColors.gray300,
+            ),
+            SizedBox(height: PGSpacing.l),
             Text(
               'No tours created yet',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: PGTypography.body.copyWith(
+                color: PGColors.textSecondary,
+              ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: PGSpacing.s),
             Text(
               'Tap the + button to create your first tour',
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
+              style: PGTypography.subheadline.copyWith(
+                color: PGColors.textTertiary,
+              ),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return ListView.separated(
+      padding: PGSpacing.paddingL,
       itemCount: _myTours.length,
+      separatorBuilder: (context, index) => SizedBox(height: PGSpacing.m),
       itemBuilder: (context, index) {
         final tour = _myTours[index] as Map<String, dynamic>;
         return _buildTourCard(
@@ -697,25 +761,43 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
 
   Widget _buildPublicToursTab() {
     if (_loadingPublicTours) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(
+        child: CupertinoActivityIndicator(color: PGColors.brand),
+      );
     }
 
     if (_errorPublicTours != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error_outline, size: 60, color: Colors.red.shade300),
-            const SizedBox(height: 16),
-            Text('Failed to load tours', style: TextStyle(color: Colors.red.shade600)),
-            const SizedBox(height: 8),
-            Text(_errorPublicTours!, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadPublicTours,
-              child: const Text('Retry'),
-            ),
-          ],
+        child: Padding(
+          padding: PGSpacing.screen,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                CupertinoIcons.exclamationmark_triangle,
+                size: 60,
+                color: PGColors.error,
+              ),
+              SizedBox(height: PGSpacing.l),
+              Text(
+                'Failed to load tours',
+                style: PGTypography.headline.copyWith(color: PGColors.error),
+              ),
+              SizedBox(height: PGSpacing.s),
+              Text(
+                _errorPublicTours!,
+                style: PGTypography.footnote.copyWith(
+                  color: PGColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: PGSpacing.l),
+              PGButton(
+                text: 'Retry',
+                onPressed: _loadPublicTours,
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -725,20 +807,27 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.tour_outlined, size: 80, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
+            Icon(
+              CupertinoIcons.map,
+              size: 80,
+              color: PGColors.gray300,
+            ),
+            SizedBox(height: PGSpacing.l),
             Text(
               'No public tours available for ${widget.city}',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+              style: PGTypography.body.copyWith(
+                color: PGColors.textSecondary,
+              ),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
+    return ListView.separated(
+      padding: PGSpacing.paddingL,
       itemCount: _publicTours.length,
+      separatorBuilder: (context, index) => SizedBox(height: PGSpacing.m),
       itemBuilder: (context, index) {
         final tour = _publicTours[index];
         return _buildTourCard(
@@ -761,48 +850,19 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
     required String city,
     required int totalPois,
   }) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TourWithTranscriptScreen(tourId: tourId),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text('$days days'),
-                  const SizedBox(width: 16),
-                  Icon(Icons.location_city, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(city),
-                  const Spacer(),
-                  Icon(Icons.place, size: 16, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text('$totalPois POIs'),
-                ],
-              ),
-            ],
+    return PGTourCard(
+      title: title,
+      subtitle: city,
+      duration: '$days days',
+      poiCount: totalPois,
+      onTap: () {
+        Navigator.push(
+          context,
+          CupertinoPageRoute(
+            builder: (context) => TourWithTranscriptScreen(tourId: tourId),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -838,22 +898,22 @@ class _AccountsScreenState extends State<AccountsScreen> {
   bool _loading = false;
 
   Future<void> _handleLogout() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showCupertinoDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+      builder: (context) => CupertinoAlertDialog(
+        title: Text('Logout', style: PGTypography.headline),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: PGTypography.body,
+        ),
         actions: [
-          TextButton(
+          CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: PGColors.brand)),
           ),
-          ElevatedButton(
+          CupertinoDialogAction(
+            isDestructiveAction: true,
             onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
             child: const Text('Logout'),
           ),
         ],
@@ -867,7 +927,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
 
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          CupertinoPageRoute(builder: (context) => const LoginScreen()),
           (route) => false,
         );
       }
@@ -876,23 +936,54 @@ class _AccountsScreenState extends State<AccountsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: const Text('Account'),
+    return CupertinoPageScaffold(
+      backgroundColor: PGColors.background,
+      navigationBar: PGNavigationBar(
+        title: 'Account',
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              children: [
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.red),
-                  title: const Text('Logout', style: TextStyle(color: Colors.red)),
-                  onTap: _handleLogout,
-                ),
-              ],
-            ),
+      child: SafeArea(
+        child: _loading
+            ? Center(
+                child: CupertinoActivityIndicator(color: PGColors.brand),
+              )
+            : ListView(
+                padding: PGSpacing.screen,
+                children: [
+                  SizedBox(height: PGSpacing.l),
+                  // Logout button
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: _handleLogout,
+                    child: Container(
+                      padding: PGSpacing.paddingL,
+                      decoration: BoxDecoration(
+                        color: PGColors.surface,
+                        borderRadius: PGRadius.radiusM,
+                        border: Border.all(color: PGColors.error, width: 1),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.arrow_right_square,
+                            color: PGColors.error,
+                            size: 24,
+                          ),
+                          SizedBox(width: PGSpacing.l),
+                          Expanded(
+                            child: Text(
+                              'Logout',
+                              style: PGTypography.body.copyWith(
+                                color: PGColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }
