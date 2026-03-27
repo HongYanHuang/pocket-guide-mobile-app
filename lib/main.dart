@@ -1643,8 +1643,8 @@ class _SectionCardState extends State<_SectionCard> {
           });
           await _audioService.play(
             url: widget.audioUrl!,
-            title: widget.title,
-            subtitle: 'Section ${widget.sectionNumber}',
+            title: widget.section.title,
+            subtitle: 'Section ${widget.section.sectionNumber}',
           );
         } else {
           await _audioService.resume();

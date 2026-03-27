@@ -239,7 +239,7 @@ class _AudioPlayerHandler extends BaseAudioHandler {
   }
 
   /// Update the media item shown in notification
-  void updateMediaItem(MediaItem item) {
+  Future<void> updateMediaItem(MediaItem item) async {
     mediaItem.add(item);
   }
 }

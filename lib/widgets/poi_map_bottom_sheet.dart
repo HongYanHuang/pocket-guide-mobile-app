@@ -458,8 +458,8 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
           });
           await _audioService.play(
             url: widget.audioUrl!,
-            title: widget.title,
-            subtitle: 'Section ${widget.sectionNumber}',
+            title: widget.section.title,
+            subtitle: 'Section ${widget.section.sectionNumber}',
           );
         } else {
           // Resume from paused position
@@ -587,7 +587,7 @@ class _AudioSectionCardState extends State<_AudioSectionCard> {
                     inactiveColor: Colors.grey.shade300,
                     onChanged: (value) async {
                       final newPosition = Duration(seconds: value.toInt());
-                      await _audioPlayer.seek(newPosition);
+                      await _audioService.seek(newPosition);
                     },
                   ),
                 ),
