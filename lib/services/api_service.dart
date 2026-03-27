@@ -327,6 +327,11 @@ class ApiService {
     required String codeChallenge,
   }) async {
     try {
+      print('');
+      print('─────────────────────────────────────────────────────────');
+      print('API: Calling /auth/client/google/login');
+      print('─────────────────────────────────────────────────────────');
+
       // Use client-specific endpoint: /auth/client/google/login
       final response = await _dio.get(
         '/auth/client/google/login',
@@ -336,13 +341,55 @@ class ApiService {
         },
       );
 
+      print('✅ Backend responded with status: ${response.statusCode}');
+      print('   Response type: ${response.data?.runtimeType}');
+
       if (response.data == null) {
+        print('❌ ERROR: Backend returned null data');
         throw Exception('No data returned from login initiation');
       }
 
-      return response.data as Map<String, dynamic>;
-    } catch (e) {
-      print('Error initiating Google login: $e');
+      final data = response.data as Map<String, dynamic>;
+      print('   Response keys: ${data.keys.toList()}');
+
+      if (data.containsKey('auth_url')) {
+        final authUrl = data['auth_url'] as String;
+        print('   ✅ auth_url present (${authUrl.length} chars)');
+      } else {
+        print('   ❌ auth_url missing!');
+      }
+
+      if (data.containsKey('state')) {
+        print('   • state: ${data['state']}');
+      }
+
+      print('─────────────────────────────────────────────────────────');
+      print('');
+
+      return data;
+    } catch (e, stackTrace) {
+      print('');
+      print('─────────────────────────────────────────────────────────');
+      print('❌ API ERROR: initiateGoogleLogin');
+      print('─────────────────────────────────────────────────────────');
+      print('Error type: ${e.runtimeType}');
+      print('Error: $e');
+
+      if (e.toString().contains('DioException')) {
+        print('');
+        print('This is a network/HTTP error. Possible causes:');
+        print('  1. Backend not running on $baseUrl');
+        print('  2. CORS not configured for $baseUrl');
+        print('  3. Backend endpoint /auth/client/google/login not available');
+        print('  4. Network connectivity issue');
+      }
+
+      print('');
+      print('Stack trace:');
+      print(stackTrace);
+      print('─────────────────────────────────────────────────────────');
+      print('');
+
       rethrow;
     }
   }
@@ -354,6 +401,16 @@ class ApiService {
     required String codeVerifier,
   }) async {
     try {
+      print('');
+      print('─────────────────────────────────────────────────────────');
+      print('API: Calling /auth/client/google/callback');
+      print('─────────────────────────────────────────────────────────');
+      print('   Sending:');
+      print('     - code: ${code.substring(0, 30)}... (${code.length} chars)');
+      print('     - state: ${state.substring(0, 30)}... (${state.length} chars)');
+      print('     - code_verifier: ${codeVerifier.substring(0, 30)}... (${codeVerifier.length} chars)');
+      print('');
+
       // Use client-specific endpoint: /auth/client/google/callback
       final response = await _dio.get(
         '/auth/client/google/callback',
@@ -364,12 +421,33 @@ class ApiService {
         },
       );
 
+      print('✅ Backend responded with status: ${response.statusCode}');
+      print('   Response type: ${response.data?.runtimeType}');
+
       if (response.data == null) {
+        print('❌ ERROR: Backend returned null data');
         throw Exception('No data returned from token exchange');
       }
 
       // Parse response as AuthTokenResponse
       final tokenData = response.data as Map<String, dynamic>;
+      print('   Response keys: ${tokenData.keys.toList()}');
+
+      // Check for required fields
+      final requiredFields = ['access_token', 'refresh_token', 'token_type', 'expires_in'];
+      for (final field in requiredFields) {
+        if (tokenData.containsKey(field)) {
+          if (field == 'access_token' || field == 'refresh_token') {
+            final token = tokenData[field] as String;
+            print('   ✅ $field: ${token.substring(0, 20)}... (${token.length} chars)');
+          } else {
+            print('   ✅ $field: ${tokenData[field]}');
+          }
+        } else {
+          print('   ❌ $field: MISSING!');
+        }
+      }
+
       final authResponse = AuthTokenResponse(
         (b) => b
           ..accessToken = tokenData['access_token']
@@ -378,9 +456,41 @@ class ApiService {
           ..expiresIn = tokenData['expires_in'],
       );
 
+      print('   ✅ Tokens parsed successfully');
+      print('─────────────────────────────────────────────────────────');
+      print('');
+
       return authResponse;
-    } catch (e) {
-      print('Error exchanging code for tokens: $e');
+    } catch (e, stackTrace) {
+      print('');
+      print('─────────────────────────────────────────────────────────');
+      print('❌ API ERROR: exchangeCodeForTokens');
+      print('─────────────────────────────────────────────────────────');
+      print('Error type: ${e.runtimeType}');
+      print('Error: $e');
+
+      if (e.toString().contains('DioException')) {
+        print('');
+        print('This is a network/HTTP error. Check:');
+        print('  1. Backend received the callback request');
+        print('  2. Backend can exchange code with Google');
+        print('  3. Backend has correct Google OAuth credentials');
+        print('  4. Code verifier matches code challenge from initiation');
+      }
+
+      if (e.toString().contains('type \'Null\' is not a subtype')) {
+        print('');
+        print('This is a data parsing error. Check:');
+        print('  1. Backend returns all required token fields');
+        print('  2. Token field names match expected format');
+      }
+
+      print('');
+      print('Stack trace:');
+      print(stackTrace);
+      print('─────────────────────────────────────────────────────────');
+      print('');
+
       rethrow;
     }
   }

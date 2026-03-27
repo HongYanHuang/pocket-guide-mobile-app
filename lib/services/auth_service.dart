@@ -58,41 +58,100 @@ class AuthService {
   // Handle OAuth callback from web (called by AuthCallbackScreen)
   Future<bool> handleWebCallback(String code, String state) async {
     try {
-      print('🔐 handleWebCallback: Starting callback processing');
-      print('   Code: ${code.substring(0, 10)}...');
-      print('   State: ${state.substring(0, 10)}...');
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('🔐 WEB GOOGLE OAUTH - CALLBACK PHASE');
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
+
+      print('✅ Step 1: Received callback from Google');
+      print('   Code (first 20): ${code.length > 20 ? code.substring(0, 20) : code}...');
+      print('   Code length: ${code.length} characters');
+      print('   State (first 20): ${state.length > 20 ? state.substring(0, 20) : state}...');
+      print('   State length: ${state.length} characters');
+      print('');
 
       // Validate state to prevent CSRF
+      print('✅ Step 2: Validating state (CSRF protection)');
       final savedState = await _storageService.getOAuthState();
-      print('   Saved state: ${savedState?.substring(0, 10)}...');
+
+      if (savedState == null) {
+        print('❌ ERROR: No saved state found in storage!');
+        print('   This could mean:');
+        print('   1. Storage was cleared between login initiation and callback');
+        print('   2. OAuth flow was not initiated properly');
+        print('   3. Browser storage is not working correctly');
+        throw Exception('No saved state found - OAuth flow not initiated properly');
+      }
+
+      print('   Saved state (first 20): ${savedState.substring(0, 20)}...');
+      print('   Received state (first 20): ${state.substring(0, 20)}...');
 
       if (savedState != state) {
-        print('❌ State mismatch! Saved: $savedState, Received: $state');
+        print('❌ ERROR: State mismatch!');
+        print('   Saved:    $savedState');
+        print('   Received: $state');
+        print('   This indicates a possible CSRF attack or storage issue!');
         throw Exception('Invalid state parameter - possible CSRF attack');
       }
-      print('✅ State validation passed');
+      print('   ✅ State matches! CSRF check passed.');
+      print('');
 
       // Get code verifier
+      print('✅ Step 3: Retrieving PKCE code verifier from storage');
       final codeVerifier = await _storageService.getCodeVerifier();
+
       if (codeVerifier == null) {
-        print('❌ No code verifier found in storage');
+        print('❌ ERROR: No code verifier found in storage!');
+        print('   This should have been saved during login initiation.');
         throw Exception('Missing PKCE code verifier');
       }
-      print('✅ Code verifier retrieved');
+
+      print('   Code verifier (first 20): ${codeVerifier.substring(0, 20)}...');
+      print('   Code verifier length: ${codeVerifier.length} characters');
+      print('');
 
       // Exchange code for tokens
-      print('🔐 Exchanging code for tokens...');
+      print('═══════════════════════════════════════════════════════════════');
+      print('📤 Step 4: Exchanging authorization code for tokens');
+      print('═══════════════════════════════════════════════════════════════');
+      print('   Calling: ${ApiService.baseUrl}/auth/client/google/callback');
+      print('   Parameters:');
+      print('     - code: ${code.substring(0, 30)}...');
+      print('     - state: ${state.substring(0, 30)}...');
+      print('     - code_verifier: ${codeVerifier.substring(0, 30)}...');
+      print('');
+
       await _handleCallback(code, state, codeVerifier);
-      print('✅ Token exchange successful');
+
+      print('');
+      print('✅ Step 5: Token exchange successful!');
+      print('   Access token and refresh token have been saved.');
+      print('');
 
       // Clean up temporary storage
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
-      print('✅ Temporary storage cleaned up');
+      print('✅ Step 6: Cleaned up temporary OAuth storage');
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('✅ WEB OAUTH LOGIN COMPLETE!');
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
 
       return true;
-    } catch (e) {
-      print('❌ Login error in handleWebCallback: $e');
+    } catch (e, stackTrace) {
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('❌ CALLBACK ERROR');
+      print('═══════════════════════════════════════════════════════════════');
+      print('Error: $e');
+      print('');
+      print('Stack trace:');
+      print(stackTrace);
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
+
       // Clean up on error
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
@@ -173,34 +232,43 @@ class AuthService {
   // Web login using OAuth flow (for web platform)
   Future<bool> _loginWeb() async {
     try {
-      print('🔐 ===== WEB GOOGLE OAUTH =====');
-      print('   Starting web OAuth flow...');
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('🔐 WEB GOOGLE OAUTH - INITIATION PHASE');
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
 
       // Generate PKCE code verifier and challenge
       final codeVerifier = _generateCodeVerifier();
       final codeChallenge = _generateCodeChallenge(codeVerifier);
       final state = _generateState();
 
-      print('✅ Generated PKCE and state');
+      print('✅ Step 1: Generated security parameters');
+      print('   Code Verifier (first 20): ${codeVerifier.substring(0, 20)}...');
+      print('   Code Challenge (first 20): ${codeChallenge.substring(0, 20)}...');
+      print('   State (first 20): ${state.substring(0, 20)}...');
+      print('');
 
       // Save for later verification
       await _storageService.saveCodeVerifier(codeVerifier);
       await _storageService.saveOAuthState(state);
-
-      print('✅ Saved to storage');
+      print('✅ Step 2: Saved to storage');
+      print('');
 
       // Get redirect URI (current origin + /auth/callback)
-      // IMPORTANT: For web OAuth to work, you must:
-      // 1. Run Flutter web on fixed port: flutter run -d chrome --web-port=3000
-      // 2. Add this URL to Google OAuth Web Client authorized redirect URIs:
-      //    http://localhost:3000/auth/callback
       final redirectUri = '${Uri.base.origin}/auth/callback';
+      print('✅ Step 3: Determined redirect URI');
+      print('   Current origin: ${Uri.base.origin}');
       print('   Redirect URI: $redirectUri');
-      print('   ⚠️  Make sure this URL is whitelisted in Google OAuth Web Client!');
+      print('   ⚠️  This MUST be whitelisted in Google OAuth Web Client!');
+      print('');
 
-      print('📤 Sending to backend:');
-      print('   redirect_uri: $redirectUri');
-      print('   code_challenge: ${codeChallenge.substring(0, 20)}...');
+      print('📤 Step 4: Calling backend /auth/client/google/login');
+      print('   Endpoint: ${ApiService.baseUrl}/auth/client/google/login');
+      print('   Parameters:');
+      print('     - redirect_uri: $redirectUri');
+      print('     - code_challenge: ${codeChallenge.substring(0, 30)}...');
+      print('');
 
       // Call backend to initiate OAuth and get Google auth URL
       final loginData = await _apiService.initiateGoogleLogin(
@@ -208,21 +276,64 @@ class AuthService {
         codeChallenge: codeChallenge,
       );
 
-      if (loginData == null || loginData['auth_url'] == null) {
-        throw Exception('Failed to get auth URL from backend');
+      if (loginData == null) {
+        print('❌ ERROR: Backend returned null');
+        throw Exception('Backend returned null response');
+      }
+
+      if (loginData['auth_url'] == null) {
+        print('❌ ERROR: No auth_url in backend response');
+        print('   Response keys: ${loginData.keys.toList()}');
+        print('   Full response: $loginData');
+        throw Exception('No auth_url in backend response');
       }
 
       final authUrl = loginData['auth_url'] as String;
-      print('✅ Got auth URL from backend');
-      print('📥 Google OAuth URL:');
-      print('   $authUrl');
+      print('✅ Step 5: Received auth URL from backend');
       print('');
-      print('🔍 Check this URL for:');
-      print('   - client_id: Should be Web OAuth client ID (not iOS client ID)');
-      print('   - redirect_uri: Should be http://localhost:3000/auth/callback');
-      print('   - response_type: Should be "code"');
+      print('═══════════════════════════════════════════════════════════════');
+      print('📥 GOOGLE OAUTH URL BREAKDOWN');
+      print('═══════════════════════════════════════════════════════════════');
+
+      // Parse and display URL parameters
+      final googleUri = Uri.parse(authUrl);
+      print('Base URL: ${googleUri.scheme}://${googleUri.host}${googleUri.path}');
       print('');
-      print('   Redirecting to Google...');
+      print('Query Parameters:');
+      googleUri.queryParameters.forEach((key, value) {
+        if (key == 'client_id') {
+          print('  ✅ client_id: ${value.substring(0, 20)}... (${value.length} chars)');
+          print('     ⚠️  This should be Web OAuth client, NOT iOS client!');
+        } else if (key == 'redirect_uri') {
+          print('  ${value == redirectUri ? "✅" : "❌"} redirect_uri: $value');
+          if (value != redirectUri) {
+            print('     ❌ MISMATCH! Expected: $redirectUri');
+          }
+        } else if (key == 'response_type') {
+          print('  ${value == "code" ? "✅" : "❌"} response_type: $value');
+          if (value != 'code') {
+            print('     ❌ Should be "code" for authorization code flow!');
+          }
+        } else if (key == 'scope') {
+          print('  ✅ scope: $value');
+        } else if (key == 'state') {
+          print('  ✅ state: ${value.substring(0, 20)}...');
+        } else if (key == 'code_challenge') {
+          print('  ✅ code_challenge: ${value.substring(0, 20)}...');
+        } else if (key == 'code_challenge_method') {
+          print('  ${value == "S256" ? "✅" : "❌"} code_challenge_method: $value');
+        } else {
+          print('  • $key: $value');
+        }
+      });
+      print('');
+      print('Full URL:');
+      print(authUrl);
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('🚀 Step 6: Redirecting to Google...');
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
 
       // For web: Redirect the entire page to Google OAuth
       // Google will redirect back to /auth/callback after authentication
@@ -233,14 +344,24 @@ class AuthService {
           webOnlyWindowName: '_self', // Redirect in same tab
         );
       } else {
+        print('❌ ERROR: Could not launch URL');
         throw Exception('Could not launch auth URL');
       }
 
       // Note: This code won't execute because the page redirects
       // The AuthCallbackScreen will handle the callback when Google redirects back
       return true;
-    } catch (e) {
-      print('❌ Web login error: $e');
+    } catch (e, stackTrace) {
+      print('');
+      print('═══════════════════════════════════════════════════════════════');
+      print('❌ WEB LOGIN ERROR');
+      print('═══════════════════════════════════════════════════════════════');
+      print('Error: $e');
+      print('Stack trace:');
+      print(stackTrace);
+      print('═══════════════════════════════════════════════════════════════');
+      print('');
+
       // Clean up on error
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
