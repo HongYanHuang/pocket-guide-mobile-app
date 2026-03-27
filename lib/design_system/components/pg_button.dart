@@ -48,7 +48,7 @@ class PGButton extends StatelessWidget {
         ),
         color: isPrimary ? PGColors.brand : null,
         borderRadius: BorderRadius.circular(PGRadius.m),
-        disabledColor: isPrimary ? PGColors.gray300 : null,
+        disabledColor: PGColors.gray300,
         onPressed: isLoading ? null : onPressed,
         child: isLoading
             ? SizedBox(
