@@ -1,6 +1,13 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart' show showDatePicker;
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:pocket_guide_mobile/design_system/colors.dart';
+import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/design_system/spacing.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_button.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
 import 'package:intl/intl.dart';
 
 class CreateTourScreen extends StatefulWidget {
@@ -13,7 +20,6 @@ class CreateTourScreen extends StatefulWidget {
 class _CreateTourScreenState extends State<CreateTourScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
-  final _formKey = GlobalKey<FormState>();
 
   // Form fields
   String? _selectedCity;
@@ -36,7 +42,6 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     'Religious Sites': false,
     'Photography': false,
   };
-  final TextEditingController _customInterestController = TextEditingController();
 
   // Must-see POIs
   final TextEditingController _mustSeeController = TextEditingController();
@@ -59,7 +64,6 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
 
   @override
   void dispose() {
-    _customInterestController.dispose();
     _mustSeeController.dispose();
     _startLocationController.dispose();
     _endLocationController.dispose();
@@ -77,19 +81,27 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load cities: $e')),
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: Text('Error'),
+            content: Text('Failed to load cities: $e'),
+            actions: [
+              CupertinoDialogAction(
+                child: Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
         );
       }
     }
   }
 
   void _setDefaultLanguage() {
-    // Get system language
     final systemLocale = WidgetsBinding.instance.platformDispatcher.locale;
     final languageCode = systemLocale.languageCode;
 
-    // Map to supported languages
     if (languageCode == 'zh') {
       _language = systemLocale.countryCode == 'CN' ? 'zh-cn' : 'zh-tw';
     } else if (['en', 'fr', 'es', 'ja', 'ko'].contains(languageCode)) {
@@ -97,7 +109,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     } else if (languageCode == 'pt') {
       _language = 'pt-br';
     } else {
-      _language = 'en'; // Default to English
+      _language = 'en';
     }
   }
 
@@ -132,13 +144,19 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
   }
 
   Future<void> _generateTour() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
     if (_selectedCity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a city')),
+      showCupertinoDialog(
+        context: context,
+        builder: (context) => CupertinoAlertDialog(
+          title: Text('Missing Information'),
+          content: Text('Please select a city'),
+          actions: [
+            CupertinoDialogAction(
+              child: Text('OK'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -148,467 +166,552 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     });
 
     try {
-      // Get access token
       final accessToken = await _authService.getAccessToken();
       if (accessToken == null) {
         throw Exception('Not authenticated');
       }
 
-      // Collect selected interests
-      final interests = <String>[];
-      _selectedInterests.forEach((interest, selected) {
-        if (selected) {
-          interests.add(interest.toLowerCase());
-        }
-      });
+      // Prepare interests
+      final selectedInterestsList = _selectedInterests.entries
+          .where((e) => e.value)
+          .map((e) => e.key)
+          .toList();
 
-      // Add custom interest if provided
-      final customInterest = _customInterestController.text.trim();
-      if (customInterest.isNotEmpty) {
-        interests.add(customInterest.toLowerCase());
-      }
+      // Prepare request
+      final Map<String, dynamic> requestData = {
+        'city': _selectedCity,
+        'duration_days': _days,
+        'language': _language,
+        'pacing_preferences': {
+          'pace': _pace,
+          'walking_intensity': _walking,
+        },
+        'interests': selectedInterestsList,
+        'must_see_pois': _mustSeePOIs,
+        'start_location': _startLocationController.text.trim().isEmpty
+            ? null
+            : _startLocationController.text.trim(),
+        'end_location': _useDifferentEndLocation &&
+                _endLocationController.text.trim().isNotEmpty
+            ? _endLocationController.text.trim()
+            : null,
+        'start_date': DateFormat('yyyy-MM-dd').format(_startDate),
+      };
 
-      // Validate start location format (lat,lng)
-      String? startLocation;
-      if (_startLocationController.text.isNotEmpty) {
-        final startLoc = _startLocationController.text.trim();
-        if (!_validateLatLng(startLoc)) {
-          throw Exception('Invalid start location format. Use: lat,lng (e.g., 41.8902,12.4922)');
-        }
-        startLocation = startLoc;
-      }
+      print('🚀 Generating tour with request: $requestData');
 
-      // Validate end location format
-      String? endLocation;
-      if (_useDifferentEndLocation && _endLocationController.text.isNotEmpty) {
-        final endLoc = _endLocationController.text.trim();
-        if (!_validateLatLng(endLoc)) {
-          throw Exception('Invalid end location format. Use: lat,lng (e.g., 41.8902,12.4922)');
-        }
-        endLocation = endLoc;
-      }
-
-      // Generate tour
-      final result = await _apiService.generateTour(
+      final tourId = await _apiService.generateTour(
         accessToken: accessToken,
-        city: _selectedCity!.toLowerCase(),
-        days: _days,
-        interests: interests.isEmpty ? null : interests,
-        mustSee: _mustSeePOIs.isEmpty ? null : _mustSeePOIs,
-        pace: _pace,
-        walking: _walking,
-        language: _language,
-        startLocation: startLocation,
-        endLocation: endLocation,
-        startDate: DateFormat('yyyy-MM-dd').format(_startDate),
+        requestData: requestData,
       );
 
+      print('✅ Tour generated with ID: $tourId');
+
+      setState(() {
+        _isLoading = false;
+      });
+
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Tour created: ${result['title_display']}'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Navigate to tour details
-        final tourId = result['tour_id'] as String;
-        Navigator.pushNamed(
-          context,
-          '/tour-detail',
-          arguments: {
-            'tourId': tourId,
-            'city': _selectedCity,
-          },
-        );
+        Navigator.of(context).pop(tourId);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      print('❌ Tour generation failed: $e');
+      setState(() {
+        _isLoading = false;
+      });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+      if (mounted) {
+        showCupertinoDialog(
+          context: context,
+          builder: (context) => CupertinoAlertDialog(
+            title: Text('Generation Failed'),
             content: Text('Failed to generate tour: $e'),
-            backgroundColor: Colors.red,
+            actions: [
+              CupertinoDialogAction(
+                child: Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
         );
       }
-    }
-  }
-
-  bool _validateLatLng(String input) {
-    final parts = input.split(',');
-    if (parts.length != 2) return false;
-
-    try {
-      final lat = double.parse(parts[0].trim());
-      final lng = double.parse(parts[1].trim());
-      return lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
-    } catch (e) {
-      return false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Your Tour'),
-        elevation: 0,
+    return CupertinoPageScaffold(
+      backgroundColor: PGColors.background,
+      navigationBar: PGNavigationBar(
+        title: 'Create Tour',
+        leading: PGBackButton(),
       ),
-      body: Stack(
-        children: [
-          Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
+      child: SafeArea(
+        child: Stack(
+          children: [
+            ListView(
+              padding: PGSpacing.screen,
               children: [
-                // City Selector
-                _buildSectionTitle('Destination', required: true),
-                DropdownButtonFormField<String>(
-                  value: _selectedCity,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Select a city',
-                  ),
-                  items: _cities.map((city) {
-                    return DropdownMenuItem(
-                      value: city,
-                      child: Text(city),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedCity = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a city';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 24),
+                SizedBox(height: PGSpacing.l),
 
-                // Duration
-                _buildSectionTitle('Duration', required: true),
+                // City Selection
+                _buildSectionTitle('Destination'),
+                SizedBox(height: PGSpacing.m),
+                CupertinoButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () => _showCityPicker(),
+                  child: Container(
+                    padding: PGSpacing.paddingL,
+                    decoration: BoxDecoration(
+                      color: PGColors.surface,
+                      borderRadius: PGRadius.radiusM,
+                      border: Border.all(color: PGColors.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _selectedCity ?? 'Select a city',
+                          style: PGTypography.body.copyWith(
+                            color: _selectedCity != null
+                                ? PGColors.textPrimary
+                                : PGColors.textSecondary,
+                          ),
+                        ),
+                        Icon(
+                          CupertinoIcons.chevron_down,
+                          size: 20,
+                          color: PGColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: PGSpacing.xxl),
+
+                // Duration & Start Date
+                _buildSectionTitle('Duration & Date'),
+                SizedBox(height: PGSpacing.m),
                 Row(
                   children: [
                     Expanded(
-                      child: TextFormField(
-                        initialValue: _days.toString(),
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          suffixText: 'days',
+                      child: Container(
+                        padding: PGSpacing.paddingL,
+                        decoration: BoxDecoration(
+                          color: PGColors.surface,
+                          borderRadius: PGRadius.radiusM,
+                          border: Border.all(color: PGColors.border),
                         ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Required';
-                          }
-                          final days = int.tryParse(value);
-                          if (days == null || days < 1 || days > 14) {
-                            return 'Must be 1-14 days';
-                          }
-                          return null;
-                        },
-                        onChanged: (value) {
-                          final days = int.tryParse(value);
-                          if (days != null) {
-                            setState(() {
-                              _days = days;
-                            });
-                          }
-                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Days', style: PGTypography.caption1),
+                            SizedBox(height: PGSpacing.xs),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              onPressed: () => _showDaysPicker(),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _days.toString(),
+                                    style: PGTypography.headline,
+                                  ),
+                                  SizedBox(width: PGSpacing.xs),
+                                  Icon(
+                                    CupertinoIcons.chevron_down,
+                                    size: 16,
+                                    color: PGColors.textSecondary,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: PGSpacing.m),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Start Date',
-                            style: Theme.of(context).textTheme.bodySmall,
+                      child: CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _selectDate(context),
+                        child: Container(
+                          padding: PGSpacing.paddingL,
+                          decoration: BoxDecoration(
+                            color: PGColors.surface,
+                            borderRadius: PGRadius.radiusM,
+                            border: Border.all(color: PGColors.border),
                           ),
-                          const SizedBox(height: 4),
-                          OutlinedButton.icon(
-                            onPressed: () => _selectDate(context),
-                            icon: const Icon(Icons.calendar_today, size: 18),
-                            label: Text(DateFormat('MMM dd, yyyy').format(_startDate)),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Start Date', style: PGTypography.caption1),
+                              SizedBox(height: PGSpacing.xs),
+                              Text(
+                                DateFormat('MMM d, y').format(_startDate),
+                                style: PGTypography.body,
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-
-                // Language
-                _buildSectionTitle('Language', required: true),
-                DropdownButtonFormField<String>(
-                  value: _language,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(value: 'en', child: Text('English')),
-                    DropdownMenuItem(value: 'zh-tw', child: Text('繁體中文')),
-                    DropdownMenuItem(value: 'zh-cn', child: Text('简体中文')),
-                    DropdownMenuItem(value: 'fr', child: Text('Français')),
-                    DropdownMenuItem(value: 'es', child: Text('Español')),
-                    DropdownMenuItem(value: 'pt-br', child: Text('Português (Brasil)')),
-                    DropdownMenuItem(value: 'ja', child: Text('日本語')),
-                    DropdownMenuItem(value: 'ko', child: Text('한국어')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _language = value;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Pace
-                _buildSectionTitle('Pace', required: true),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'relaxed', label: Text('Relaxed'), icon: Icon(Icons.self_improvement)),
-                    ButtonSegment(value: 'normal', label: Text('Normal'), icon: Icon(Icons.directions_walk)),
-                    ButtonSegment(value: 'packed', label: Text('Packed'), icon: Icon(Icons.directions_run)),
-                  ],
-                  selected: {_pace},
-                  onSelectionChanged: (Set<String> newSelection) {
-                    setState(() {
-                      _pace = newSelection.first;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildHelpText('Relaxed: 2-3 POIs/day • Normal: 4-5 POIs/day • Packed: 6+ POIs/day'),
-                const SizedBox(height: 24),
-
-                // Walking Tolerance
-                _buildSectionTitle('Walking Tolerance', required: true),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'low', label: Text('Low'), icon: Icon(Icons.accessible)),
-                    ButtonSegment(value: 'moderate', label: Text('Moderate'), icon: Icon(Icons.directions_walk)),
-                    ButtonSegment(value: 'high', label: Text('High'), icon: Icon(Icons.hiking)),
-                  ],
-                  selected: {_walking},
-                  onSelectionChanged: (Set<String> newSelection) {
-                    setState(() {
-                      _walking = newSelection.first;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                _buildHelpText('Low: <3km/day • Moderate: 3-6km/day • High: >6km/day'),
-                const SizedBox(height: 24),
+                SizedBox(height: PGSpacing.xxl),
 
                 // Interests
                 _buildSectionTitle('Interests'),
+                SizedBox(height: PGSpacing.m),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: PGSpacing.s,
+                  runSpacing: PGSpacing.s,
                   children: _selectedInterests.keys.map((interest) {
-                    return FilterChip(
-                      label: Text(interest),
-                      selected: _selectedInterests[interest]!,
-                      onSelected: (selected) {
+                    final isSelected = _selectedInterests[interest]!;
+                    return CupertinoButton(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: PGSpacing.l,
+                        vertical: PGSpacing.s,
+                      ),
+                      color: isSelected ? PGColors.brand : PGColors.surface,
+                      borderRadius: BorderRadius.circular(PGRadius.l),
+                      minSize: 0,
+                      onPressed: () {
                         setState(() {
-                          _selectedInterests[interest] = selected;
+                          _selectedInterests[interest] =
+                              !_selectedInterests[interest]!;
                         });
                       },
+                      child: Text(
+                        interest,
+                        style: PGTypography.callout.copyWith(
+                          color: isSelected ? PGColors.white : PGColors.textPrimary,
+                        ),
+                      ),
                     );
                   }).toList(),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _customInterestController,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Tell us what you dive in...',
-                    prefixIcon: Icon(Icons.lightbulb_outline),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                SizedBox(height: PGSpacing.xxl),
+
+                // Pace & Walking
+                _buildSectionTitle('Preferences'),
+                SizedBox(height: PGSpacing.m),
+                _buildPreferenceRow('Pace', _pace, {
+                  'relaxed': 'Relaxed',
+                  'normal': 'Normal',
+                  'fast': 'Fast',
+                }, (value) {
+                  setState(() => _pace = value);
+                }),
+                SizedBox(height: PGSpacing.m),
+                _buildPreferenceRow('Walking', _walking, {
+                  'light': 'Light',
+                  'moderate': 'Moderate',
+                  'intensive': 'Intensive',
+                }, (value) {
+                  setState(() => _walking = value);
+                }),
+                SizedBox(height: PGSpacing.xxl),
 
                 // Must-see POIs
-                _buildSectionTitle('Must-See Places'),
+                _buildSectionTitle('Must-See Places (Optional)'),
+                SizedBox(height: PGSpacing.m),
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(
+                      child: CupertinoTextField(
                         controller: _mustSeeController,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          hintText: 'Enter POI name',
-                          prefixIcon: Icon(Icons.location_on),
+                        placeholder: 'Enter a place name',
+                        padding: PGSpacing.paddingL,
+                        decoration: BoxDecoration(
+                          color: PGColors.surface,
+                          borderRadius: PGRadius.radiusM,
+                          border: Border.all(color: PGColors.border),
                         ),
-                        onSubmitted: (_) => _addMustSeePOI(),
+                        style: PGTypography.body,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
+                    SizedBox(width: PGSpacing.m),
+                    CupertinoButton(
+                      padding: PGSpacing.paddingL,
+                      color: PGColors.brand,
+                      borderRadius: BorderRadius.circular(PGRadius.m),
+                      minSize: 0,
                       onPressed: _addMustSeePOI,
-                      icon: const Icon(Icons.add_circle),
-                      color: Theme.of(context).colorScheme.primary,
-                      iconSize: 32,
+                      child: Icon(CupertinoIcons.add, color: PGColors.white),
                     ),
                   ],
                 ),
                 if (_mustSeePOIs.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: PGSpacing.m),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: PGSpacing.s,
+                    runSpacing: PGSpacing.s,
                     children: _mustSeePOIs.map((poi) {
-                      return Chip(
-                        label: Text(poi),
-                        onDeleted: () => _removeMustSeePOI(poi),
+                      return Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: PGSpacing.m,
+                          vertical: PGSpacing.s,
+                        ),
+                        decoration: BoxDecoration(
+                          color: PGColors.gray100,
+                          borderRadius: BorderRadius.circular(PGRadius.s),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(poi, style: PGTypography.callout),
+                            SizedBox(width: PGSpacing.s),
+                            CupertinoButton(
+                              padding: EdgeInsets.zero,
+                              minSize: 0,
+                              onPressed: () => _removeMustSeePOI(poi),
+                              child: Icon(
+                                CupertinoIcons.xmark_circle_fill,
+                                size: 18,
+                                color: PGColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     }).toList(),
                   ),
                 ],
-                const SizedBox(height: 24),
+                SizedBox(height: PGSpacing.xxl),
 
-                // Start Location
-                _buildSectionTitle('Start Location'),
-                TextField(
+                // Start/End Location
+                _buildSectionTitle('Start Location (Optional)'),
+                SizedBox(height: PGSpacing.m),
+                CupertinoTextField(
                   controller: _startLocationController,
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'lat,lng (e.g., 41.8902,12.4922)',
-                    prefixIcon: Icon(Icons.my_location),
+                  placeholder: 'e.g., Hotel name or address',
+                  padding: PGSpacing.paddingL,
+                  decoration: BoxDecoration(
+                    color: PGColors.surface,
+                    borderRadius: PGRadius.radiusM,
+                    border: Border.all(color: PGColors.border),
                   ),
+                  style: PGTypography.body,
                 ),
-                const SizedBox(height: 8),
-                _buildHelpText('Optional: Enter coordinates for your accommodation'),
-                const SizedBox(height: 24),
-
-                // End Location
-                CheckboxListTile(
-                  title: const Text('Use different end location'),
-                  value: _useDifferentEndLocation,
-                  onChanged: (value) {
-                    setState(() {
-                      _useDifferentEndLocation = value ?? false;
-                      if (!_useDifferentEndLocation) {
-                        _endLocationController.clear();
-                      }
-                    });
-                  },
-                  contentPadding: EdgeInsets.zero,
+                SizedBox(height: PGSpacing.l),
+                Row(
+                  children: [
+                    CupertinoSwitch(
+                      value: _useDifferentEndLocation,
+                      activeColor: PGColors.brand,
+                      onChanged: (value) {
+                        setState(() => _useDifferentEndLocation = value);
+                      },
+                    ),
+                    SizedBox(width: PGSpacing.m),
+                    Text(
+                      'Different end location',
+                      style: PGTypography.body,
+                    ),
+                  ],
                 ),
                 if (_useDifferentEndLocation) ...[
-                  TextField(
+                  SizedBox(height: PGSpacing.m),
+                  CupertinoTextField(
                     controller: _endLocationController,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'lat,lng (e.g., 41.9028,12.4964)',
-                      prefixIcon: Icon(Icons.location_on),
+                    placeholder: 'End location',
+                    padding: PGSpacing.paddingL,
+                    decoration: BoxDecoration(
+                      color: PGColors.surface,
+                      borderRadius: PGRadius.radiusM,
+                      border: Border.all(color: PGColors.border),
                     ),
+                    style: PGTypography.body,
                   ),
-                  const SizedBox(height: 24),
                 ],
+                SizedBox(height: PGSpacing.xxl * 2),
 
                 // Generate Button
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _isLoading ? null : _generateTour,
-                  icon: const Icon(Icons.auto_awesome),
-                  label: const Text('Generate Tour'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 18),
-                  ),
+                PGButton(
+                  text: 'Generate Tour',
+                  icon: CupertinoIcons.sparkles,
+                  onPressed: _generateTour,
+                  isFullWidth: true,
+                  size: PGButtonSize.large,
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: PGSpacing.xxl),
               ],
             ),
-          ),
 
-          // Loading Overlay
-          if (_isLoading)
-            Container(
-              color: Colors.black54,
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
+            // Loading overlay
+            if (_isLoading)
+              Container(
+                color: PGColors.black.withOpacity(0.5),
+                child: Center(
+                  child: Container(
+                    padding: PGSpacing.paddingXL,
+                    decoration: BoxDecoration(
+                      color: PGColors.surface,
+                      borderRadius: PGRadius.radiusL,
+                    ),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const CircularProgressIndicator(),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Generating Your Tour',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        CupertinoActivityIndicator(
+                          radius: 20,
+                          color: PGColors.brand,
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: PGSpacing.l),
                         Text(
-                          'This may take up to 60 seconds...',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                          ),
+                          'Generating your tour...',
+                          style: PGTypography.headline,
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title, {bool required = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: PGTypography.title3,
+    );
+  }
+
+  Widget _buildPreferenceRow(
+    String label,
+    String currentValue,
+    Map<String, String> options,
+    Function(String) onChanged,
+  ) {
+    return Container(
+      padding: PGSpacing.paddingL,
+      decoration: BoxDecoration(
+        color: PGColors.surface,
+        borderRadius: PGRadius.radiusM,
+        border: Border.all(color: PGColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (required)
-            Text(
-              ' *',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.error,
-                fontSize: 16,
+          Text(label, style: PGTypography.caption1),
+          SizedBox(height: PGSpacing.s),
+          CupertinoSlidingSegmentedControl<String>(
+            groupValue: currentValue,
+            children: options.map(
+              (key, value) => MapEntry(
+                key,
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
+                  child: Text(value, style: PGTypography.callout),
+                ),
               ),
             ),
+            onValueChanged: (value) {
+              if (value != null) onChanged(value);
+            },
+            thumbColor: PGColors.brand,
+            backgroundColor: PGColors.gray100,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildHelpText(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        color: Colors.grey[600],
+  void _showCityPicker() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => Container(
+        height: 250,
+        color: PGColors.background,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CupertinoButton(
+                  child: Text('Cancel'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                CupertinoButton(
+                  child: Text('Done'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: CupertinoPicker(
+                itemExtent: 40,
+                onSelectedItemChanged: (index) {
+                  setState(() {
+                    _selectedCity = _cities[index];
+                  });
+                },
+                scrollController: FixedExtentScrollController(
+                  initialItem: _selectedCity != null
+                      ? _cities.indexOf(_selectedCity!)
+                      : 0,
+                ),
+                children: _cities
+                    .map((city) => Center(
+                          child: Text(city, style: PGTypography.body),
+                        ))
+                    .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDaysPicker() {
+    showCupertinoModalPopup(
+      context: context,
+      builder: (context) => Container(
+        height: 250,
+        color: PGColors.background,
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                CupertinoButton(
+                  child: Text('Cancel'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                CupertinoButton(
+                  child: Text('Done'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            Expanded(
+              child: CupertinoPicker(
+                itemExtent: 40,
+                onSelectedItemChanged: (index) {
+                  setState(() {
+                    _days = index + 1;
+                  });
+                },
+                scrollController: FixedExtentScrollController(
+                  initialItem: _days - 1,
+                ),
+                children: List.generate(
+                  14,
+                  (index) => Center(
+                    child: Text(
+                      '${index + 1} ${(index + 1) == 1 ? 'day' : 'days'}',
+                      style: PGTypography.body,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
