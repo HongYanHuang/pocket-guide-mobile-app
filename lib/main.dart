@@ -6,6 +6,7 @@ import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
+import 'package:pocket_guide_mobile/design_system/preview_screen.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 
 void main() {
@@ -261,6 +262,20 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Home'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.palette),
+            tooltip: 'Design System Preview',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DesignSystemPreview(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
