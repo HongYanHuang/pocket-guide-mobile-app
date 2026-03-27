@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +11,10 @@ import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
 import 'package:pocket_guide_mobile/widgets/poi_map_bottom_sheet.dart';
+import 'package:pocket_guide_mobile/design_system/colors.dart';
+import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/design_system/spacing.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart';
 
 class MapTourScreen extends StatefulWidget {
   final TourDetail tourDetail;
@@ -585,20 +590,16 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.isActiveMode ? 'Active Tour' : 'Tour Preview'),
-        actions: [
-          if (widget.tourDetail.itinerary.length > 1)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: _buildDaySelector(),
-              ),
-            ),
-        ],
+    return CupertinoPageScaffold(
+      backgroundColor: PGColors.background,
+      navigationBar: PGNavigationBar(
+        title: widget.isActiveMode ? 'Active Tour' : 'Tour Preview',
+        leading: PGBackButton(),
+        trailing: widget.tourDetail.itinerary.length > 1
+            ? _buildDaySelector()
+            : null,
       ),
-      body: Stack(
+      child: Stack(
         children: [
           FlutterMap(
             mapController: _mapController,
@@ -639,28 +640,33 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
               top: 16,
               left: 16,
               right: 16,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade300),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_off, color: Colors.red.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Location permission denied. Tour tracking disabled.',
-                        style: TextStyle(
-                          color: Colors.red.shade700,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+              child: SafeArea(
+                child: Container(
+                  padding: PGSpacing.paddingL,
+                  decoration: BoxDecoration(
+                    color: PGColors.errorLight,
+                    borderRadius: PGRadius.radiusM,
+                    border: Border.all(color: PGColors.error),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        CupertinoIcons.location_slash,
+                        color: PGColors.error,
+                        size: 20,
+                      ),
+                      SizedBox(width: PGSpacing.s),
+                      Expanded(
+                        child: Text(
+                          'Location permission denied. Tour tracking disabled.',
+                          style: PGTypography.footnote.copyWith(
+                            color: PGColors.error,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -670,13 +676,16 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
             Positioned(
               bottom: 24,
               right: 16,
-              child: FloatingActionButton(
-                mini: true,
-                backgroundColor: Colors.white,
+              child: CupertinoButton(
+                padding: PGSpacing.paddingL,
+                color: PGColors.surface,
+                borderRadius: BorderRadius.circular(28),
+                minSize: 0,
                 onPressed: _centerOnUserLocation,
                 child: Icon(
-                  Icons.my_location,
-                  color: Colors.blue.shade600,
+                  CupertinoIcons.location_fill,
+                  color: PGColors.brand,
+                  size: 24,
                 ),
               ),
             ),
@@ -701,34 +710,80 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
   // Day selector widget
   Widget _buildDaySelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
+    return CupertinoButton(
+      padding: EdgeInsets.symmetric(
+        horizontal: PGSpacing.m,
+        vertical: PGSpacing.xs,
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<int>(
-          value: _selectedDay,
-          isDense: true,
-          items: List.generate(
-            widget.tourDetail.itinerary.length,
-            (index) => DropdownMenuItem(
-              value: index + 1,
-              child: Text('Day ${index + 1}'),
+      minSize: 0,
+      color: PGColors.surface,
+      borderRadius: BorderRadius.circular(PGRadius.s),
+      onPressed: () {
+        showCupertinoModalPopup(
+          context: context,
+          builder: (context) => Container(
+            height: 250,
+            color: PGColors.background,
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CupertinoButton(
+                      child: Text('Cancel'),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    CupertinoButton(
+                      child: Text('Done'),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+                Expanded(
+                  child: CupertinoPicker(
+                    itemExtent: 40,
+                    onSelectedItemChanged: (index) {
+                      setState(() {
+                        _selectedDay = index + 1;
+                      });
+                      // Re-center map on new day's POIs
+                      _mapController.move(_calculateCenter(), _calculateZoom());
+                    },
+                    scrollController: FixedExtentScrollController(
+                      initialItem: _selectedDay - 1,
+                    ),
+                    children: List.generate(
+                      widget.tourDetail.itinerary.length,
+                      (index) => Center(
+                        child: Text(
+                          'Day ${index + 1}',
+                          style: PGTypography.body,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          onChanged: (day) {
-            if (day != null) {
-              setState(() {
-                _selectedDay = day;
-              });
-              // Re-center map on new day's POIs
-              _mapController.move(_calculateCenter(), _calculateZoom());
-            }
-          },
-        ),
+        );
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Day $_selectedDay',
+            style: PGTypography.callout.copyWith(
+              color: PGColors.textPrimary,
+            ),
+          ),
+          SizedBox(width: PGSpacing.xs),
+          Icon(
+            CupertinoIcons.chevron_down,
+            size: 14,
+            color: PGColors.textSecondary,
+          ),
+        ],
       ),
     );
   }

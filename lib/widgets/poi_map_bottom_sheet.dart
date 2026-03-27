@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/screens/section_list_screen.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
+import 'package:pocket_guide_mobile/design_system/colors.dart';
+import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/design_system/spacing.dart';
+import 'package:pocket_guide_mobile/design_system/components/pg_button.dart';
 
 class POIMapBottomSheet extends StatefulWidget {
   final TourPOI poi;
@@ -149,66 +154,72 @@ class _POIMapBottomSheetState extends State<POIMapBottomSheet> {
               // Prevent taps inside the sheet from closing it
             },
             child: Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              decoration: BoxDecoration(
+                color: PGColors.surface,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(PGRadius.l)),
               ),
               child: Column(
             children: [
               // Handle bar
               Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
+                margin: EdgeInsets.symmetric(vertical: PGSpacing.m),
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: PGColors.gray300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
 
               // Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: EdgeInsets.symmetric(horizontal: PGSpacing.xl),
                 child: Row(
                   children: [
                     Container(
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: widget.completed ? Colors.green.shade600 : Colors.grey.shade400,
+                        color: widget.completed ? PGColors.brand : PGColors.gray400,
                         shape: BoxShape.circle,
                       ),
                       child: Center(
-                        child: Text(
-                          '${widget.poiNumber}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
+                        child: widget.completed
+                            ? Icon(
+                                CupertinoIcons.checkmark,
+                                color: PGColors.white,
+                                size: 18,
+                              )
+                            : Text(
+                                '${widget.poiNumber}',
+                                style: PGTypography.callout.copyWith(
+                                  color: PGColors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: PGSpacing.m),
                     Expanded(
                       child: Text(
                         widget.poi.poi,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: PGTypography.title3,
                       ),
                     ),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: PGSpacing.l),
 
               // Content
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: CupertinoActivityIndicator(
+                          color: PGColors.brand,
+                        ),
+                      )
                     : _sectionedData != null && _sectionedData!.sections.isNotEmpty
                         ? Column(
                             children: [
