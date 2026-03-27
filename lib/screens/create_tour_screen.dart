@@ -177,33 +177,28 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
           .map((e) => e.key)
           .toList();
 
-      // Prepare request
-      final Map<String, dynamic> requestData = {
-        'city': _selectedCity,
-        'duration_days': _days,
-        'language': _language,
-        'pacing_preferences': {
-          'pace': _pace,
-          'walking_intensity': _walking,
-        },
-        'interests': selectedInterestsList,
-        'must_see_pois': _mustSeePOIs,
-        'start_location': _startLocationController.text.trim().isEmpty
+      print('🚀 Generating tour for $_selectedCity, $_days days');
+
+      final response = await _apiService.generateTour(
+        accessToken: accessToken,
+        city: _selectedCity!,
+        days: _days,
+        language: _language,
+        pace: _pace,
+        walking: _walking,
+        interests: selectedInterestsList.isEmpty ? null : selectedInterestsList,
+        mustSee: _mustSeePOIs.isEmpty ? null : _mustSeePOIs,
+        startLocation: _startLocationController.text.trim().isEmpty
             ? null
             : _startLocationController.text.trim(),
-        'end_location': _useDifferentEndLocation &&
+        endLocation: _useDifferentEndLocation &&
                 _endLocationController.text.trim().isNotEmpty
             ? _endLocationController.text.trim()
             : null,
-        'start_date': DateFormat('yyyy-MM-dd').format(_startDate),
-      };
-
-      print('🚀 Generating tour with request: $requestData');
-
-      final tourId = await _apiService.generateTour(
-        accessToken: accessToken,
-        requestData: requestData,
+        startDate: DateFormat('yyyy-MM-dd').format(_startDate),
       );
+
+      final tourId = response['tour_id'] as String;
 
       print('✅ Tour generated with ID: $tourId');
 

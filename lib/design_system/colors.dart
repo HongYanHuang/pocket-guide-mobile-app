@@ -44,8 +44,11 @@ class PGColors {
 
   // Feedback colors (minimal, subtle)
   static const success = Color(0xFF2E7D32);      // Muted green
+  static const successLight = Color(0xFFE8F5E9); // Light green background
   static const error = Color(0xFFC62828);        // Muted red
+  static const errorLight = Color(0xFFFFEBEE);   // Light red background
   static const warning = Color(0xFFEF6C00);      // Muted orange
+  static const warningLight = Color(0xFFFFF3E0); // Light orange background
   static const info = gray700;                   // Just use gray
 
   // Shadows (subtle, iOS-style)
