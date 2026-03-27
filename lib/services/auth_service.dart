@@ -17,9 +17,18 @@ class AuthService {
 
   // Google Sign-In for mobile (native SDK)
   // On iOS, reads configuration from GoogleService-Info.plist automatically
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile', 'openid'],
-  );
+  // Lazy-initialized to avoid web crash (GoogleSignIn only needed for mobile)
+  GoogleSignIn? _googleSignIn;
+
+  // Get GoogleSignIn instance (mobile only)
+  GoogleSignIn _getGoogleSignIn() {
+    if (kIsWeb) {
+      throw Exception('GoogleSignIn should not be used on web platform');
+    }
+    return _googleSignIn ??= GoogleSignIn(
+      scopes: ['email', 'profile', 'openid'],
+    );
+  }
 
   // For web mode: use http://localhost redirect
   // For mobile: use custom URL scheme (pocketguide://)
@@ -114,7 +123,7 @@ class AuthService {
       print('   Starting native Google Sign-In...');
 
       // Sign in with Google (native UI)
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _getGoogleSignIn().signIn();
 
       if (googleUser == null) {
         print('❌ User cancelled Google Sign-In');
@@ -156,7 +165,7 @@ class AuthService {
     } catch (e) {
       print('❌ Mobile login error: $e');
       // Sign out from Google on error
-      await _googleSignIn.signOut();
+      await _getGoogleSignIn().signOut();
       return false;
     }
   }
@@ -386,7 +395,7 @@ class AuthService {
 
       // Sign out from Google Sign-In on mobile
       if (!kIsWeb) {
-        await _googleSignIn.signOut();
+        await _getGoogleSignIn().signOut();
       }
     } catch (e) {
       print('Error during logout: $e');
