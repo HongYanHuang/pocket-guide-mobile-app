@@ -103,7 +103,7 @@ class PGLargeNavigationBar extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Large title (left-aligned)
+            // Title (left-aligned, using title1 size)
             Expanded(
               child: GestureDetector(
                 onTap: onTitleTap,
@@ -112,13 +112,13 @@ class PGLargeNavigationBar extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: PGTypography.largeTitle,
+                      style: PGTypography.title1,
                     ),
                     if (showChevron) ...[
                       SizedBox(width: PGSpacing.xs),
                       Icon(
                         CupertinoIcons.chevron_down,
-                        size: 20,
+                        size: 18,
                         color: PGColors.textPrimary,
                       ),
                     ],

@@ -625,6 +625,7 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             label,
@@ -634,11 +635,14 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
             ),
           ),
           SizedBox(height: PGSpacing.xs),
-          Container(
-            height: 2,
-            width: 40,
-            color: isSelected ? PGColors.brand : Colors.transparent,
-          ),
+          if (isSelected)
+            Container(
+              height: 2,
+              decoration: BoxDecoration(
+                color: PGColors.brand,
+                borderRadius: BorderRadius.circular(1),
+              ),
+            ),
         ],
       ),
     );
@@ -1264,7 +1268,6 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  color: isSwapped ? PGColors.warningLight : null,
                   padding: EdgeInsets.symmetric(
                     horizontal: PGSpacing.l,
                     vertical: PGSpacing.m,
