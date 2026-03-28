@@ -460,7 +460,9 @@ class _CitySelectionBottomSheetState extends State<CitySelectionBottomSheet> {
                                 Expanded(
                                   child: Text(
                                     city,
-                                    style: PGTypography.body,
+                                    style: PGTypography.body.copyWith(
+                                      decoration: TextDecoration.none,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -881,20 +883,36 @@ class _AccountsScreenState extends State<AccountsScreen> {
     final confirmed = await showCupertinoDialog<bool>(
       context: context,
       builder: (context) => CupertinoAlertDialog(
-        title: Text('Logout', style: PGTypography.headline),
+        title: Text(
+          'Logout',
+          style: PGTypography.headline.copyWith(
+            decoration: TextDecoration.none,
+          ),
+        ),
         content: Text(
           'Are you sure you want to logout?',
-          style: PGTypography.body,
+          style: PGTypography.body.copyWith(
+            decoration: TextDecoration.none,
+          ),
         ),
         actions: [
           CupertinoDialogAction(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel', style: TextStyle(color: PGColors.brand)),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: PGColors.brand,
+                decoration: TextDecoration.none,
+              ),
+            ),
           ),
           CupertinoDialogAction(
             isDestructiveAction: true,
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Logout'),
+            child: Text(
+              'Logout',
+              style: TextStyle(decoration: TextDecoration.none),
+            ),
           ),
         ],
       ),
@@ -958,6 +976,7 @@ class _AccountsScreenState extends State<AccountsScreen> {
                               'Logout',
                               style: PGTypography.body.copyWith(
                                 color: PGColors.error,
+                                decoration: TextDecoration.none,
                               ),
                             ),
                           ),
@@ -1175,84 +1194,120 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
     return CupertinoPageScaffold(
       backgroundColor: PGColors.background,
-      navigationBar: PGNavigationBar(
-        title: _tourDetail?.metadata?.titleDisplay ?? 'Tour',
-        leading: PGBackButton(),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (hasPendingChanges)
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                minSize: 0,
-                onPressed: _applyChanges,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: PGSpacing.m,
-                    vertical: PGSpacing.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: PGColors.brand,
-                    borderRadius: BorderRadius.circular(PGRadius.s),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.cloud_upload,
-                        size: 14,
-                        color: PGColors.white,
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        'Apply ${_pendingSwaps.length}',
-                        style: PGTypography.caption1.copyWith(
-                          color: PGColors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Large title navigation bar
+          SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: PGSpacing.l,
+                right: PGSpacing.l,
+                top: PGSpacing.s,
+                bottom: PGSpacing.s,
               ),
-            if (hasPendingChanges) SizedBox(width: PGSpacing.s),
-            PGNavButton(
-              icon: CupertinoIcons.map,
-              onPressed: () {
-                showCupertinoModalPopup(
-                  context: context,
-                  builder: (context) => CupertinoActionSheet(
-                    title: Text('Map View'),
-                    actions: [
-                      CupertinoActionSheetAction(
-                        child: Text('Preview in Map'),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _openMapPreview();
-                        },
+              child: Row(
+                children: [
+                  PGBackButton(),
+                  SizedBox(width: PGSpacing.s),
+                  Expanded(
+                    child: Text(
+                      _tourDetail?.metadata?.titleDisplay ?? 'Tour',
+                      style: PGTypography.title1.copyWith(
+                        decoration: TextDecoration.none,
                       ),
-                      CupertinoActionSheetAction(
-                        child: Text('Start Tour'),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _startTour();
-                        },
-                      ),
-                    ],
-                    cancelButton: CupertinoActionSheetAction(
-                      isDefaultAction: true,
-                      child: Text('Cancel'),
-                      onPressed: () => Navigator.pop(context),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                );
-              },
+                  if (hasPendingChanges) ...[
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minSize: 0,
+                      onPressed: _applyChanges,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: PGSpacing.m,
+                          vertical: PGSpacing.xs,
+                        ),
+                        decoration: BoxDecoration(
+                          color: PGColors.brand,
+                          borderRadius: BorderRadius.circular(PGRadius.s),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.cloud_upload,
+                              size: 14,
+                              color: PGColors.white,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Apply ${_pendingSwaps.length}',
+                              style: PGTypography.caption1.copyWith(
+                                color: PGColors.white,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: PGSpacing.s),
+                  ],
+                  PGNavButton(
+                    icon: CupertinoIcons.map,
+                    onPressed: () {
+                      showCupertinoModalPopup(
+                        context: context,
+                        builder: (context) => CupertinoActionSheet(
+                          title: Text(
+                            'Map View',
+                            style: TextStyle(decoration: TextDecoration.none),
+                          ),
+                          actions: [
+                            CupertinoActionSheetAction(
+                              child: Text(
+                                'Preview in Map',
+                                style: TextStyle(decoration: TextDecoration.none),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _openMapPreview();
+                              },
+                            ),
+                            CupertinoActionSheetAction(
+                              child: Text(
+                                'Start Tour',
+                                style: TextStyle(decoration: TextDecoration.none),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _startTour();
+                              },
+                            ),
+                          ],
+                          cancelButton: CupertinoActionSheetAction(
+                            isDefaultAction: true,
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(decoration: TextDecoration.none),
+                            ),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        child: _loading
+          ),
+          Expanded(
+            child: _loading
             ? Center(
                 child: CupertinoActivityIndicator(color: PGColors.brand),
               )
@@ -1273,6 +1328,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                             'Failed to load tour',
                             style: PGTypography.headline.copyWith(
                               color: PGColors.error,
+                              decoration: TextDecoration.none,
                             ),
                           ),
                           SizedBox(height: PGSpacing.s),
@@ -1280,6 +1336,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                             _error!,
                             style: PGTypography.footnote.copyWith(
                               color: PGColors.textSecondary,
+                              decoration: TextDecoration.none,
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -1288,6 +1345,8 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     ),
                   )
                 : _buildTourContent(),
+          ),
+        ],
       ),
     );
   }
@@ -1312,6 +1371,50 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
           onFetchSectionedTranscript: _fetchSectionedTranscript,
         );
       },
+    );
+  }
+
+  Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
+    try {
+      final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+      final tourId = widget.tourId;
+      String language = 'en';
+      if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
+        language = _tourDetail!.metadata!.languages!.first;
+      }
+
+      final response = await _apiService.fetchSectionedTranscript(city, poiId, tourId, language);
+      return response;
+    } catch (e) {
+      print('Error fetching sectioned transcript: $e');
+      return null;
+    }
+  }
+
+  Future<void> _showAlternatives(TourPOI poi, String currentPOI, int dayNumber, int poiIndex, bool isSwapped) async {
+    final backupOptions = _tourDetail!.backupPois![poi.poi]!.toList();
+    final poiKey = '$dayNumber-$poiIndex';
+
+    showDialog(
+      context: context,
+      builder: (context) => _AlternativesDialog(
+        poi: poi,
+        currentPOI: currentPOI,
+        dayNumber: dayNumber,
+        poiIndex: poiIndex,
+        isSwapped: isSwapped,
+        backupOptions: backupOptions,
+        currentSwap: isSwapped ? _pendingSwaps[poiKey] : null,
+        onSave: (POISwap? swap) {
+          setState(() {
+            if (swap != null) {
+              _pendingSwaps[poiKey] = swap;
+            } else {
+              _pendingSwaps.remove(poiKey);
+            }
+          });
+        },
+      ),
     );
   }
 }
@@ -1372,7 +1475,9 @@ class _DaySectionState extends State<_DaySection> {
                 Expanded(
                   child: Text(
                     'Day ${widget.dayNumber}',
-                    style: PGTypography.title2,
+                    style: PGTypography.title2.copyWith(
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ),
                 Icon(
@@ -1413,6 +1518,7 @@ class _DaySectionState extends State<_DaySection> {
                           '${poiIndex + 1}',
                           style: PGTypography.title2.copyWith(
                             color: PGColors.textSecondary,
+                            decoration: TextDecoration.none,
                           ),
                         ),
                       ),
@@ -1424,7 +1530,9 @@ class _DaySectionState extends State<_DaySection> {
                           children: [
                             Text(
                               currentPOI,
-                              style: PGTypography.headline,
+                              style: PGTypography.headline.copyWith(
+                                decoration: TextDecoration.none,
+                              ),
                             ),
                             SizedBox(height: PGSpacing.xs),
                             Row(
@@ -1437,7 +1545,9 @@ class _DaySectionState extends State<_DaySection> {
                                 SizedBox(width: 4),
                                 Text(
                                   '${poi.estimatedHours.toStringAsFixed(1)} hours',
-                                  style: PGTypography.subheadline,
+                                  style: PGTypography.subheadline.copyWith(
+                                    decoration: TextDecoration.none,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1472,6 +1582,7 @@ class _DaySectionState extends State<_DaySection> {
                                   'Swap',
                                   style: PGTypography.caption1.copyWith(
                                     color: PGColors.brand,
+                                    decoration: TextDecoration.none,
                                   ),
                                 ),
                               ],
@@ -1516,33 +1627,14 @@ class _DaySectionState extends State<_DaySection> {
         final sectionedData = snapshot.data!;
 
         return Container(
-          padding: PGSpacing.paddingL,
+          padding: EdgeInsets.symmetric(horizontal: PGSpacing.l, vertical: PGSpacing.m),
           color: PGColors.gray100,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: sectionedData.sections.map((section) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: PGSpacing.m),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (section.sectionTitle != null) ...[
-                      Text(
-                        section.sectionTitle!,
-                        style: PGTypography.headline.copyWith(
-                          color: PGColors.brand,
-                        ),
-                      ),
-                      SizedBox(height: PGSpacing.xs),
-                    ],
-                    Text(
-                      section.content,
-                      style: PGTypography.body.copyWith(
-                        color: PGColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
+              return _SectionCardExpanded(
+                section: section,
+                audioUrl: section.audioFile,
               );
             }).toList(),
           ),
@@ -1552,46 +1644,263 @@ class _DaySectionState extends State<_DaySection> {
   }
 }
 
-  Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
-    try {
-      final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
-      final tourId = widget.tourId;
-      String language = 'en';
-      if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
-        language = _tourDetail!.metadata!.languages!.first;
-      }
+// Section Card with Audio Player (Collapsible transcript)
+class _SectionCardExpanded extends StatefulWidget {
+  final TranscriptSection section;
+  final String? audioUrl;
 
-      final response = await _apiService.fetchSectionedTranscript(city, poiId, tourId, language);
-      return response;
+  const _SectionCardExpanded({
+    required this.section,
+    this.audioUrl,
+  });
+
+  @override
+  State<_SectionCardExpanded> createState() => _SectionCardExpandedState();
+}
+
+class _SectionCardExpandedState extends State<_SectionCardExpanded> {
+  final _audioService = BackgroundAudioService.instance;
+  bool _isPlaying = false;
+  bool _isLoading = false;
+  bool _isExpanded = false; // Collapsed by default
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAudioListeners();
+  }
+
+  void _setupAudioListeners() {
+    _audioService.playbackStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = state == PlaybackState.playing;
+          _isLoading = state == PlaybackState.buffering;
+          if (state == PlaybackState.completed) {
+            _position = Duration.zero;
+          }
+        });
+      }
+    });
+
+    _audioService.positionStream.listen((position) {
+      if (mounted) {
+        setState(() {
+          _position = position;
+        });
+      }
+    });
+
+    _audioService.durationStream.listen((duration) {
+      if (mounted && duration != null) {
+        setState(() {
+          _duration = duration;
+        });
+      }
+    });
+  }
+
+  Future<void> _togglePlayPause() async {
+    if (widget.audioUrl == null) return;
+
+    try {
+      if (_isPlaying) {
+        await _audioService.pause();
+      } else {
+        if (_position == Duration.zero) {
+          setState(() {
+            _isLoading = true;
+          });
+          await _audioService.play(
+            url: widget.audioUrl!,
+            title: widget.section.title,
+            subtitle: 'Section ${widget.section.sectionNumber}',
+          );
+        } else {
+          await _audioService.resume();
+        }
+      }
     } catch (e) {
-      print('Error fetching sectioned transcript: $e');
-      return null;
+      print('Error playing audio: $e');
+      if (mounted) {
+        setState(() {
+          _isPlaying = false;
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  Future<void> _showAlternatives(TourPOI poi, String currentPOI, int dayNumber, int poiIndex, bool isSwapped) async {
-    final backupOptions = _tourDetail!.backupPois![poi.poi]!.toList();
-    final poiKey = '$dayNumber-$poiIndex';
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
+  }
 
-    showDialog(
-      context: context,
-      builder: (context) => _AlternativesDialog(
-        poi: poi,
-        currentPOI: currentPOI,
-        dayNumber: dayNumber,
-        poiIndex: poiIndex,
-        isSwapped: isSwapped,
-        backupOptions: backupOptions,
-        currentSwap: isSwapped ? _pendingSwaps[poiKey] : null,
-        onSave: (POISwap? swap) {
-          setState(() {
-            if (swap != null) {
-              _pendingSwaps[poiKey] = swap;
-            } else {
-              _pendingSwaps.remove(poiKey);
-            }
-          });
-        },
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.only(bottom: PGSpacing.m),
+      padding: PGSpacing.paddingL,
+      decoration: BoxDecoration(
+        color: PGColors.surface,
+        borderRadius: PGRadius.radiusM,
+        border: Border.all(color: PGColors.divider, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section title - tappable to expand/collapse
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minSize: 0,
+            onPressed: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.section.title,
+                        style: PGTypography.headline.copyWith(
+                          color: PGColors.brand,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      SizedBox(height: PGSpacing.xs),
+                      Text(
+                        widget.section.knowledgePoint,
+                        style: PGTypography.subheadline.copyWith(
+                          color: PGColors.textTertiary,
+                          fontStyle: FontStyle.italic,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  _isExpanded ? CupertinoIcons.chevron_up : CupertinoIcons.chevron_down,
+                  size: 20,
+                  color: PGColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: PGSpacing.m),
+
+          // Audio Player
+          if (widget.audioUrl != null)
+            Container(
+              padding: EdgeInsets.all(PGSpacing.m),
+              decoration: BoxDecoration(
+                color: PGColors.gray100,
+                borderRadius: BorderRadius.circular(PGRadius.s),
+              ),
+              child: Row(
+                children: [
+                  // Play/Pause Button
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
+                    onPressed: _togglePlayPause,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: PGColors.brand,
+                        shape: BoxShape.circle,
+                      ),
+                      child: _isLoading
+                          ? Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CupertinoActivityIndicator(color: PGColors.white),
+                              ),
+                            )
+                          : Icon(
+                              _isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                              color: PGColors.white,
+                              size: 20,
+                            ),
+                    ),
+                  ),
+                  SizedBox(width: PGSpacing.m),
+                  // Progress info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Progress bar (simplified since we can't use Slider easily)
+                        Container(
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: PGColors.gray300,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                          child: FractionallySizedBox(
+                            alignment: Alignment.centerLeft,
+                            widthFactor: _duration.inMilliseconds > 0
+                                ? _position.inMilliseconds / _duration.inMilliseconds
+                                : 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: PGColors.brand,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _formatDuration(_position),
+                              style: PGTypography.caption2.copyWith(
+                                color: PGColors.textTertiary,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            Text(
+                              _duration.inSeconds > 0
+                                  ? _formatDuration(_duration)
+                                  : _formatDuration(Duration(seconds: widget.section.estimatedDurationSeconds)),
+                              style: PGTypography.caption2.copyWith(
+                                color: PGColors.textTertiary,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Transcript text (only when expanded)
+          if (_isExpanded) ...[
+            SizedBox(height: PGSpacing.m),
+            Text(
+              widget.section.transcript,
+              style: PGTypography.body.copyWith(
+                color: PGColors.textSecondary,
+                height: 1.5,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -166,6 +166,7 @@ class PGBackButton extends StatelessWidget {
               label!,
               style: PGTypography.body.copyWith(
                 color: PGColors.brand,
+                decoration: TextDecoration.none,
               ),
             ),
         ],
@@ -201,6 +202,7 @@ class PGNavButton extends StatelessWidget {
                   label!,
                   style: PGTypography.body.copyWith(
                     color: PGColors.brand,
+                    decoration: TextDecoration.none,
                   ),
                 ),
               ],

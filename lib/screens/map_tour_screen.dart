@@ -590,19 +590,12 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
+    return Scaffold(
       backgroundColor: PGColors.background,
-      navigationBar: PGNavigationBar(
-        title: widget.isActiveMode ? 'Active Tour' : 'Tour Preview',
-        leading: PGBackButton(),
-        trailing: widget.tourDetail.itinerary.length > 1
-            ? _buildDaySelector()
-            : null,
-      ),
-      child: SafeArea(
-        child: Stack(
-          children: [
-            FlutterMap(
+      body: Stack(
+        children: [
+          // Fullscreen map
+          FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _calculateCenter(),
@@ -634,6 +627,42 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
               ),
             ],
           ),
+
+          // Back button overlay (top left)
+          Positioned(
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: Container(
+                margin: EdgeInsets.all(PGSpacing.m),
+                decoration: BoxDecoration(
+                  color: PGColors.surface.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: PGBackButton(),
+              ),
+            ),
+          ),
+
+          // Day selector overlay (top right)
+          if (widget.tourDetail.itinerary.length > 1)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: Container(
+                  margin: EdgeInsets.all(PGSpacing.m),
+                  child: _buildDaySelector(),
+                ),
+              ),
+            ),
 
           // Permission denied warning (only show critical errors)
           if (widget.isActiveMode && _permissionDenied)
@@ -690,8 +719,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                 ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
