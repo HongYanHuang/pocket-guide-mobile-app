@@ -24,7 +24,7 @@ class PGTypography {
   // Titles
   static const title1 = TextStyle(
     fontSize: 28,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w800,
     letterSpacing: 0.36,
     height: 1.25,
     color: PGColors.textPrimary,

@@ -599,9 +599,10 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
             ? _buildDaySelector()
             : null,
       ),
-      child: Stack(
-        children: [
-          FlutterMap(
+      child: SafeArea(
+        child: Stack(
+          children: [
+            FlutterMap(
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _calculateCenter(),
@@ -689,7 +690,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
