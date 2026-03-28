@@ -1307,49 +1307,55 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
           ),
         ],
       ),
-          // Floating map button with gradient background
+          // Floating map button with gradient background overlay
           if (!_loading && _error == null)
             Positioned(
-              bottom: 24,
+              bottom: 0,
               left: 0,
               right: 0,
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(PGRadius.l),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.black.withOpacity(0.7),
-                            Colors.black.withOpacity(0.5),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(PGRadius.l),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
-                          width: 1,
-                        ),
+              child: Container(
+                height: 120,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.3),
+                      Colors.black.withOpacity(0.6),
+                    ],
+                    stops: [0.0, 0.5, 1.0],
+                  ),
+                ),
+                child: Center(
+                  child: Container(
+                    margin: EdgeInsets.only(bottom: 24),
+                    child: CupertinoButton(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: PGSpacing.xl,
+                        vertical: PGSpacing.m,
                       ),
-                      child: CupertinoButton(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: PGSpacing.xl * 2,
-                          vertical: PGSpacing.m,
-                        ),
-                        borderRadius: BorderRadius.circular(PGRadius.l),
-                        onPressed: _openMapPreview,
-                        child: Text(
-                          'Map',
-                          style: PGTypography.body.copyWith(
+                      color: PGColors.brand,
+                      borderRadius: BorderRadius.circular(PGRadius.l),
+                      onPressed: _openMapPreview,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.map_fill,
                             color: PGColors.white,
-                            fontWeight: FontWeight.w600,
-                            decoration: TextDecoration.none,
-                            fontSize: 17,
+                            size: 20,
                           ),
-                        ),
+                          SizedBox(width: PGSpacing.s),
+                          Text(
+                            'Map',
+                            style: PGTypography.body.copyWith(
+                              color: PGColors.white,
+                              fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
