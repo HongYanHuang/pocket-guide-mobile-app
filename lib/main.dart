@@ -15,6 +15,7 @@ import 'package:pocket_guide_mobile/design_system/spacing.dart';
 import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart';
 import 'package:pocket_guide_mobile/design_system/components/pg_button.dart';
 import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
+import 'package:pocket_guide_mobile/widgets/network_image_with_fallback.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 
 void main() {
@@ -1265,6 +1266,21 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
               ),
             ),
           ),
+          // Cover image (when available)
+          // TODO: Uncomment when API includes images field
+          // if (_tourDetail?.images?.cover != null)
+          //   Padding(
+          //     padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
+          //     child: ClipRRect(
+          //       borderRadius: PGRadius.radiusM,
+          //       child: Image.network(
+          //         '${ApiService.baseUrl}${_tourDetail!.images!.cover!.url}',
+          //         height: 200,
+          //         width: double.infinity,
+          //         fit: BoxFit.cover,
+          //       ),
+          //     ),
+          //   ),
           Expanded(
             child: _loading
             ? Center(

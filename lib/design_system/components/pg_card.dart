@@ -54,6 +54,7 @@ class PGTourCard extends StatelessWidget {
   final int? poiCount;
   final VoidCallback onTap;
   final bool isPrivate;
+  final String? coverImageUrl;
 
   const PGTourCard({
     super.key,
@@ -63,6 +64,7 @@ class PGTourCard extends StatelessWidget {
     this.poiCount,
     required this.onTap,
     this.isPrivate = false,
+    this.coverImageUrl,
   });
 
   @override
@@ -71,26 +73,47 @@ class PGTourCard extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          // Icon container
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: PGColors.gray100,
-              borderRadius: PGRadius.radiusS,
-              border: Border.all(
-                color: PGColors.border,
-                width: 1,
+          // Image or Icon container
+          ClipRRect(
+            borderRadius: PGRadius.radiusS,
+            child: Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: PGColors.gray100,
+                border: Border.all(
+                  color: PGColors.border,
+                  width: 1,
+                ),
+                borderRadius: PGRadius.radiusS,
               ),
-            ),
-            child: Center(
-              child: Icon(
-                isPrivate
-                    ? CupertinoIcons.lock_fill
-                    : CupertinoIcons.map_fill,
-                color: PGColors.brand,
-                size: 28,
-              ),
+              child: coverImageUrl != null && coverImageUrl!.isNotEmpty
+                  ? Image.network(
+                      coverImageUrl!,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Icon(
+                            isPrivate
+                                ? CupertinoIcons.lock_fill
+                                : CupertinoIcons.map_fill,
+                            color: PGColors.brand,
+                            size: 28,
+                          ),
+                        );
+                      },
+                    )
+                  : Center(
+                      child: Icon(
+                        isPrivate
+                            ? CupertinoIcons.lock_fill
+                            : CupertinoIcons.map_fill,
+                        color: PGColors.brand,
+                        size: 28,
+                      ),
+                    ),
             ),
           ),
 
