@@ -719,6 +719,54 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                 ),
               ),
             ),
+
+          // Start Tour button (only show in preview mode)
+          if (!widget.isActiveMode)
+            Positioned(
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: CupertinoButton(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: PGSpacing.xl,
+                    vertical: PGSpacing.m,
+                  ),
+                  color: PGColors.brand,
+                  borderRadius: BorderRadius.circular(PGRadius.l),
+                  onPressed: () {
+                    // Switch to active mode
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => MapTourScreen(
+                          tourDetail: widget.tourDetail,
+                          isActiveMode: true,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        CupertinoIcons.play_fill,
+                        color: PGColors.white,
+                        size: 20,
+                      ),
+                      SizedBox(width: PGSpacing.s),
+                      Text(
+                        'Start Tour',
+                        style: PGTypography.body.copyWith(
+                          color: PGColors.white,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

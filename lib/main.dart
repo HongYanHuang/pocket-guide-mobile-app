@@ -1194,7 +1194,9 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
     return CupertinoPageScaffold(
       backgroundColor: PGColors.background,
-      child: Column(
+      child: Stack(
+        children: [
+          Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Large title navigation bar
@@ -1258,50 +1260,6 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     ),
                     SizedBox(width: PGSpacing.s),
                   ],
-                  PGNavButton(
-                    icon: CupertinoIcons.map,
-                    onPressed: () {
-                      showCupertinoModalPopup(
-                        context: context,
-                        builder: (context) => CupertinoActionSheet(
-                          title: Text(
-                            'Map View',
-                            style: TextStyle(decoration: TextDecoration.none),
-                          ),
-                          actions: [
-                            CupertinoActionSheetAction(
-                              child: Text(
-                                'Preview in Map',
-                                style: TextStyle(decoration: TextDecoration.none),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _openMapPreview();
-                              },
-                            ),
-                            CupertinoActionSheetAction(
-                              child: Text(
-                                'Start Tour',
-                                style: TextStyle(decoration: TextDecoration.none),
-                              ),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _startTour();
-                              },
-                            ),
-                          ],
-                          cancelButton: CupertinoActionSheetAction(
-                            isDefaultAction: true,
-                            child: Text(
-                              'Cancel',
-                              style: TextStyle(decoration: TextDecoration.none),
-                            ),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                 ],
               ),
             ),
@@ -1346,6 +1304,24 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                   )
                 : _buildTourContent(),
           ),
+        ],
+      ),
+          // Floating map button
+          if (!_loading && _error == null)
+            Positioned(
+              bottom: 20,
+              right: 20,
+              child: FloatingActionButton(
+                onPressed: _openMapPreview,
+                backgroundColor: PGColors.brand,
+                elevation: 8,
+                child: Icon(
+                  CupertinoIcons.map_fill,
+                  size: 28,
+                  color: PGColors.white,
+                ),
+              ),
+            ),
         ],
       ),
     );
