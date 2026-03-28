@@ -253,97 +253,56 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: PGColors.background,
-      navigationBar: PGNavigationBar(
-        title: 'Tours',
-        trailing: PGNavButton(
-          icon: CupertinoIcons.paintbrush,
-          onPressed: () {
-            Navigator.push(
-              context,
-              CupertinoPageRoute(
-                builder: (context) => const DesignSystemPreview(),
-              ),
-            );
-          },
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Destination selector
-            Padding(
-              padding: PGSpacing.paddingL,
-              child: CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _showCitySelector,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: PGSpacing.l,
-                    vertical: PGSpacing.m,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Large title header
+          PGLargeNavigationBar(
+            title: _selectedCity ?? 'Select City',
+            showChevron: true,
+            onTitleTap: _showCitySelector,
+            trailing: PGNavButton(
+              icon: CupertinoIcons.paintbrush,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  CupertinoPageRoute(
+                    builder: (context) => const DesignSystemPreview(),
                   ),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: PGColors.border),
-                    borderRadius: PGRadius.radiusM,
-                    color: PGColors.surface,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        CupertinoIcons.location_solid,
-                        size: 20,
-                        color: PGColors.brand,
-                      ),
-                      SizedBox(width: PGSpacing.s),
-                      Text(
-                        _selectedCity ?? 'Select Destination',
-                        style: (_selectedCity != null
-                                ? PGTypography.headline
-                                : PGTypography.body)
-                            .copyWith(
-                          color: _selectedCity != null
-                              ? PGColors.textPrimary
-                              : PGColors.textSecondary,
+                );
+              },
+            ),
+          ),
+          // Tours list
+          Expanded(
+            child: _selectedCity == null
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          CupertinoIcons.map,
+                          size: 80,
+                          color: PGColors.gray300,
                         ),
-                      ),
-                      SizedBox(width: PGSpacing.xs),
-                      Icon(
-                        CupertinoIcons.chevron_down,
-                        size: 16,
-                        color: PGColors.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Tours list
-            Expanded(
-              child: _selectedCity == null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            CupertinoIcons.map,
-                            size: 80,
-                            color: PGColors.gray300,
+                        SizedBox(height: PGSpacing.l),
+                        Text(
+                          'Select a destination to view tours',
+                          style: PGTypography.body.copyWith(
+                            color: PGColors.textSecondary,
                           ),
-                          SizedBox(height: PGSpacing.l),
-                          Text(
-                            'Select a destination to view tours',
-                            style: PGTypography.body.copyWith(
-                              color: PGColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ToursList(city: _selectedCity!),
-            ),
-          ],
-        ),
+                        ),
+                        SizedBox(height: PGSpacing.m),
+                        PGButtonText(
+                          text: 'Choose City',
+                          onPressed: _showCitySelector,
+                        ),
+                      ],
+                    ),
+                  )
+                : ToursList(city: _selectedCity!),
+          ),
+        ],
       ),
     );
   }
@@ -631,31 +590,18 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: PGSpacing.paddingL,
-          child: CupertinoSlidingSegmentedControl<int>(
-            groupValue: _tabController.index,
-            children: {
-              0: Padding(
-                padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
-                child: Text('My Tours', style: PGTypography.callout),
-              ),
-              1: Padding(
-                padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
-                child: Text('Public Tours', style: PGTypography.callout),
-              ),
-            },
-            onValueChanged: (value) {
-              if (value != null) {
-                setState(() {
-                  _tabController.index = value;
-                });
-              }
-            },
-            thumbColor: PGColors.brand,
-            backgroundColor: PGColors.gray100,
+        // Text-based tabs with underline
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
+          child: Row(
+            children: [
+              _buildTextTab('My Tours', 0),
+              SizedBox(width: PGSpacing.xl),
+              _buildTextTab('Public Tours', 1),
+            ],
           ),
         ),
+        SizedBox(height: PGSpacing.m),
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -666,6 +612,35 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildTextTab(String label, int index) {
+    final isSelected = _tabController.index == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _tabController.index = index;
+        });
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: PGTypography.title3.copyWith(
+              color: isSelected ? PGColors.textPrimary : PGColors.textSecondary,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          SizedBox(height: PGSpacing.xs),
+          Container(
+            height: 2,
+            width: 40,
+            color: isSelected ? PGColors.brand : Colors.transparent,
+          ),
+        ],
+      ),
     );
   }
 
@@ -938,18 +913,22 @@ class _AccountsScreenState extends State<AccountsScreen> {
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       backgroundColor: PGColors.background,
-      navigationBar: PGNavigationBar(
-        title: 'Account',
-      ),
-      child: SafeArea(
-        child: _loading
-            ? Center(
-                child: CupertinoActivityIndicator(color: PGColors.brand),
-              )
-            : ListView(
-                padding: PGSpacing.screen,
-                children: [
-                  SizedBox(height: PGSpacing.l),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Large title header
+          PGLargeNavigationBar(
+            title: 'Account',
+          ),
+          Expanded(
+            child: _loading
+                ? Center(
+                    child: CupertinoActivityIndicator(color: PGColors.brand),
+                  )
+                : ListView(
+                    padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
+                    children: [
+                      SizedBox(height: PGSpacing.l),
                   // Logout button
                   CupertinoButton(
                     padding: EdgeInsets.zero,
@@ -983,6 +962,8 @@ class _AccountsScreenState extends State<AccountsScreen> {
                   ),
                 ],
               ),
+          ),
+        ],
       ),
     );
   }
@@ -1283,54 +1264,88 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  color: isSwapped ? Colors.yellow.shade50 : null,
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.blue.shade100,
-                      child: Text(
-                        '${poiIndex + 1}',
-                        style: TextStyle(
-                          color: Colors.blue.shade900,
-                          fontWeight: FontWeight.bold,
+                  color: isSwapped ? PGColors.warningLight : null,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: PGSpacing.l,
+                    vertical: PGSpacing.m,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Serial number as plain text
+                      SizedBox(
+                        width: 32,
+                        child: Text(
+                          '${poiIndex + 1}',
+                          style: PGTypography.title2.copyWith(
+                            color: PGColors.textSecondary,
+                          ),
                         ),
                       ),
-                    ),
-                    title: Text(
-                      currentPOI,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Row(
-                      children: [
-                        Icon(Icons.access_time, size: 14, color: Colors.grey.shade600),
-                        const SizedBox(width: 4),
-                        Text('${poi.estimatedHours.toStringAsFixed(1)} hours'),
-                      ],
-                    ),
-                    trailing: Builder(
-                      builder: (context) {
-                        final hasBackups = _tourDetail!.backupPois != null &&
-                                          _tourDetail!.backupPois!.containsKey(poi.poi);
-
-                        if (!hasBackups) return const SizedBox.shrink();
-
-                        return TextButton.icon(
-                          icon: Icon(Icons.swap_horiz, size: 16, color: Colors.blue.shade700),
-                          label: Text(
-                            'Alternatives',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.blue.shade700,
+                      SizedBox(width: PGSpacing.m),
+                      // Content
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              currentPOI,
+                              style: PGTypography.headline,
                             ),
-                          ),
-                          onPressed: () => _showAlternatives(poi, currentPOI, dayNumber, poiIndex, isSwapped),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        );
-                      },
-                    ),
+                            SizedBox(height: PGSpacing.xs),
+                            Row(
+                              children: [
+                                Icon(
+                                  CupertinoIcons.time,
+                                  size: 14,
+                                  color: PGColors.textTertiary,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  '${poi.estimatedHours.toStringAsFixed(1)} hours',
+                                  style: PGTypography.subheadline,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Alternatives button
+                      Builder(
+                        builder: (context) {
+                          final hasBackups = _tourDetail!.backupPois != null &&
+                                            _tourDetail!.backupPois!.containsKey(poi.poi);
+
+                          if (!hasBackups) return const SizedBox.shrink();
+
+                          return CupertinoButton(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: PGSpacing.s,
+                              vertical: PGSpacing.xs,
+                            ),
+                            minSize: 0,
+                            onPressed: () => _showAlternatives(poi, currentPOI, dayNumber, poiIndex, isSwapped),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  CupertinoIcons.arrow_2_squarepath,
+                                  size: 16,
+                                  color: PGColors.brand,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Swap',
+                                  style: PGTypography.caption1.copyWith(
+                                    color: PGColors.brand,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
                 _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city, poi),

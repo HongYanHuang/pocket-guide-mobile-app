@@ -3,7 +3,7 @@ import '../colors.dart';
 import '../typography.dart';
 import '../spacing.dart';
 
-/// Minimalist iOS-style navigation bar
+/// Minimalist iOS-style navigation bar (centered title for detail pages)
 class PGNavigationBar extends StatelessWidget implements ObstructingPreferredSizeWidget {
   final String title;
   final Widget? leading;
@@ -73,6 +73,67 @@ class PGNavigationBar extends StatelessWidget implements ObstructingPreferredSiz
 
   @override
   bool shouldFullyObstruct(BuildContext context) => true;
+}
+
+/// iOS-style large title navigation bar (left-aligned for main screens)
+class PGLargeNavigationBar extends StatelessWidget {
+  final String title;
+  final Widget? trailing;
+  final VoidCallback? onTitleTap;
+  final bool showChevron;
+
+  const PGLargeNavigationBar({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.onTitleTap,
+    this.showChevron = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: PGSpacing.l,
+          right: PGSpacing.l,
+          top: PGSpacing.s,
+          bottom: PGSpacing.m,
+        ),
+        child: Row(
+          children: [
+            // Large title (left-aligned)
+            Expanded(
+              child: GestureDetector(
+                onTap: onTitleTap,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: PGTypography.largeTitle,
+                    ),
+                    if (showChevron) ...[
+                      SizedBox(width: PGSpacing.xs),
+                      Icon(
+                        CupertinoIcons.chevron_down,
+                        size: 20,
+                        color: PGColors.textPrimary,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Trailing
+            if (trailing != null) trailing!,
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Back button for navigation
