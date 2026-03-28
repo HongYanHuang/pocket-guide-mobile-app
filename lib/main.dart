@@ -1302,15 +1302,98 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
         final dayNumber = day.day;
         final pois = day.pois.toList();
 
-        return ExpansionTile(
+        return _DaySection(
+          dayNumber: dayNumber,
           initiallyExpanded: dayIndex == 0,
-          title: Text('Day $dayNumber', style: const TextStyle(fontWeight: FontWeight.bold)),
-          children: pois.asMap().entries.map((entry) {
+          pois: pois,
+          tourDetail: _tourDetail!,
+          pendingSwaps: _pendingSwaps,
+          onShowAlternatives: _showAlternatives,
+          onFetchSectionedTranscript: _fetchSectionedTranscript,
+        );
+      },
+    );
+  }
+}
+
+class _DaySection extends StatefulWidget {
+  final int dayNumber;
+  final bool initiallyExpanded;
+  final List<TourPOI> pois;
+  final TourDetail tourDetail;
+  final Map<String, POISwap> pendingSwaps;
+  final Function(TourPOI, String, int, int, bool) onShowAlternatives;
+  final Future<SectionedTranscriptData?> Function(String, String) onFetchSectionedTranscript;
+
+  const _DaySection({
+    required this.dayNumber,
+    required this.initiallyExpanded,
+    required this.pois,
+    required this.tourDetail,
+    required this.pendingSwaps,
+    required this.onShowAlternatives,
+    required this.onFetchSectionedTranscript,
+  });
+
+  @override
+  State<_DaySection> createState() => _DaySectionState();
+}
+
+class _DaySectionState extends State<_DaySection> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = widget.initiallyExpanded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Day header
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () {
+            setState(() {
+              _isExpanded = !_isExpanded;
+            });
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: PGSpacing.l,
+              vertical: PGSpacing.m,
+            ),
+            color: PGColors.gray100,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Day ${widget.dayNumber}',
+                    style: PGTypography.title2,
+                  ),
+                ),
+                Icon(
+                  _isExpanded
+                      ? CupertinoIcons.chevron_up
+                      : CupertinoIcons.chevron_down,
+                  size: 20,
+                  color: PGColors.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // POIs list
+        if (_isExpanded)
+          ...widget.pois.asMap().entries.map((entry) {
             final poiIndex = entry.key;
             final poi = entry.value;
-            final poiKey = '$dayNumber-$poiIndex';
-            final isSwapped = _pendingSwaps.containsKey(poiKey);
-            final currentPOI = isSwapped ? _pendingSwaps[poiKey]!.replacementPoi : poi.poi;
+            final poiKey = '${widget.dayNumber}-$poiIndex';
+            final isSwapped = widget.pendingSwaps.containsKey(poiKey);
+            final currentPOI = isSwapped ? widget.pendingSwaps[poiKey]!.replacementPoi : poi.poi;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1364,8 +1447,8 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                       // Alternatives button
                       Builder(
                         builder: (context) {
-                          final hasBackups = _tourDetail!.backupPois != null &&
-                                            _tourDetail!.backupPois!.containsKey(poi.poi);
+                          final hasBackups = widget.tourDetail.backupPois != null &&
+                                            widget.tourDetail.backupPois!.containsKey(poi.poi);
 
                           if (!hasBackups) return const SizedBox.shrink();
 
@@ -1375,7 +1458,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                               vertical: PGSpacing.xs,
                             ),
                             minSize: 0,
-                            onPressed: () => _showAlternatives(poi, currentPOI, dayNumber, poiIndex, isSwapped),
+                            onPressed: () => widget.onShowAlternatives(poi, currentPOI, widget.dayNumber, poiIndex, isSwapped),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1399,29 +1482,28 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     ],
                   ),
                 ),
-                _buildInlineTranscript(currentPOI, _tourDetail!.metadata!.city, poi),
-                if (poiIndex < pois.length - 1)
-                  Divider(height: 1, color: Colors.grey.shade300),
+                _buildInlineTranscript(currentPOI, widget.tourDetail.metadata!.city, poi),
+                if (poiIndex < widget.pois.length - 1)
+                  Divider(height: 1, color: PGColors.divider),
               ],
             );
           }).toList(),
-        );
-      },
+      ],
     );
   }
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
     return FutureBuilder<SectionedTranscriptData?>(
-      future: _fetchSectionedTranscript(poiName, city),
+      future: widget.onFetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            padding: const EdgeInsets.all(16),
-            child: const Center(
+            padding: PGSpacing.paddingL,
+            child: Center(
               child: SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CupertinoActivityIndicator(color: PGColors.brand),
               ),
             ),
           );
@@ -1432,49 +1514,43 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
         }
 
         final sectionedData = snapshot.data!;
-        final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
 
         return Container(
-          padding: const EdgeInsets.all(12),
-          color: Colors.grey.shade50,
+          padding: PGSpacing.paddingL,
+          color: PGColors.gray100,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.headphones, size: 16, color: Colors.blue.shade700),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Audio Guide (${sectionedData.totalSections} sections • ${(sectionedData.estimatedDurationSeconds / 60).toStringAsFixed(0)} min)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade900,
+            children: sectionedData.sections.map((section) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: PGSpacing.m),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (section.sectionTitle != null) ...[
+                      Text(
+                        section.sectionTitle!,
+                        style: PGTypography.headline.copyWith(
+                          color: PGColors.brand,
+                        ),
+                      ),
+                      SizedBox(height: PGSpacing.xs),
+                    ],
+                    Text(
+                      section.content,
+                      style: PGTypography.body.copyWith(
+                        color: PGColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ...sectionedData.sections.map((section) {
-                // Use POI audio URL for "Full Narrative" section if available
-                String? audioUrl;
-                if (section.title == 'Full Narrative' && poi.audioAvailable == true && poi.audioUrl != null) {
-                  audioUrl = '${ApiService.baseUrl}${poi.audioUrl}';
-                } else if (section.audioFile != null) {
-                  audioUrl = _apiService.getAudioUrl(city, poiId, section.audioFile!);
-                }
-
-                return _SectionCard(
-                  section: section,
-                  audioUrl: audioUrl,
-                );
-              }).toList(),
-            ],
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         );
       },
     );
   }
+}
 
   Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
     try {
