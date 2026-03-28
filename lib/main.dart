@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
@@ -1306,19 +1307,52 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
           ),
         ],
       ),
-          // Floating map button
+          // Floating map button with gradient background
           if (!_loading && _error == null)
             Positioned(
-              bottom: 20,
-              right: 20,
-              child: FloatingActionButton(
-                onPressed: _openMapPreview,
-                backgroundColor: PGColors.brand,
-                elevation: 8,
-                child: Icon(
-                  CupertinoIcons.map_fill,
-                  size: 28,
-                  color: PGColors.white,
+              bottom: 24,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(PGRadius.l),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.black.withOpacity(0.7),
+                            Colors.black.withOpacity(0.5),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(PGRadius.l),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: CupertinoButton(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: PGSpacing.xl * 2,
+                          vertical: PGSpacing.m,
+                        ),
+                        borderRadius: BorderRadius.circular(PGRadius.l),
+                        onPressed: _openMapPreview,
+                        child: Text(
+                          'Map',
+                          style: PGTypography.body.copyWith(
+                            color: PGColors.white,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.none,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
