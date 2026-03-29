@@ -1677,7 +1677,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   }
 }
 
-class _DaySection extends StatelessWidget {
+class _DaySection extends StatefulWidget {
   final TourDay day;
   final bool isExpanded;
   final VoidCallback onToggle;
@@ -1698,8 +1698,17 @@ class _DaySection extends StatelessWidget {
   });
 
   @override
+  State<_DaySection> createState() => _DaySectionState();
+}
+
+class _DaySectionState extends State<_DaySection> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // Keep widget alive across parent rebuilds
+
+  @override
   Widget build(BuildContext context) {
-    print('🟢 Day ${day.day} build called - isExpanded: $isExpanded');
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    print('🟢 Day ${widget.day.day} build called - isExpanded: ${widget.isExpanded}');
     return _buildContent();
   }
 
@@ -1733,8 +1742,8 @@ class _DaySection extends StatelessWidget {
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () {
-            print('🔴 Day ${day.day} button pressed - toggling from $isExpanded to ${!isExpanded}');
-            onToggle();
+            print('🔴 Day ${widget.day.day} button pressed - toggling from ${widget.isExpanded} to ${!widget.isExpanded}');
+            widget.onToggle();
           },
           child: Container(
             padding: EdgeInsets.symmetric(
@@ -1749,7 +1758,7 @@ class _DaySection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Day ${day.day}',
+                        'Day ${widget.day.day}',
                         style: PGTypography.title2.copyWith(
                           decoration: TextDecoration.none,
                         ),
@@ -1764,7 +1773,7 @@ class _DaySection extends StatelessWidget {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            _formatDuration(day.totalHours.toDouble()),
+                            _formatDuration(widget.day.totalHours.toDouble()),
                             style: PGTypography.caption1.copyWith(
                               decoration: TextDecoration.none,
                             ),
@@ -1777,7 +1786,7 @@ class _DaySection extends StatelessWidget {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            _formatWalkingDistance(day.totalWalkingKm.toDouble()),
+                            _formatWalkingDistance(widget.day.totalWalkingKm.toDouble()),
                             style: PGTypography.caption1.copyWith(
                               decoration: TextDecoration.none,
                             ),
@@ -1788,7 +1797,7 @@ class _DaySection extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  isExpanded
+                  widget.isExpanded
                       ? CupertinoIcons.chevron_up
                       : CupertinoIcons.chevron_down,
                   size: 20,
@@ -1799,13 +1808,13 @@ class _DaySection extends StatelessWidget {
           ),
         ),
         // POIs list
-        if (isExpanded)
-          ...day.pois.asMap().entries.map((entry) {
+        if (widget.isExpanded)
+          ...widget.day.pois.asMap().entries.map((entry) {
             final poiIndex = entry.key;
             final poi = entry.value;
-            final poiKey = '${day.day}-$poiIndex';
-            final isSwapped = pendingSwaps.containsKey(poiKey);
-            final currentPOI = isSwapped ? pendingSwaps[poiKey]!.replacementPoi : poi.poi;
+            final poiKey = '${widget.day.day}-$poiIndex';
+            final isSwapped = widget.pendingSwaps.containsKey(poiKey);
+            final currentPOI = isSwapped ? widget.pendingSwaps[poiKey]!.replacementPoi : poi.poi;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1864,8 +1873,8 @@ class _DaySection extends StatelessWidget {
                       // Alternatives button
                       Builder(
                         builder: (context) {
-                          final hasBackups = tourDetail.backupPois != null &&
-                                            tourDetail.backupPois!.containsKey(poi.poi);
+                          final hasBackups = widget.tourDetail.backupPois != null &&
+                                            widget.tourDetail.backupPois!.containsKey(poi.poi);
 
                           if (!hasBackups) return const SizedBox.shrink();
 
@@ -1875,7 +1884,7 @@ class _DaySection extends StatelessWidget {
                               vertical: PGSpacing.xs,
                             ),
                             minSize: 0,
-                            onPressed: () => onShowAlternatives(poi, currentPOI, day.day, poiIndex, isSwapped),
+                            onPressed: () => widget.onShowAlternatives(poi, currentPOI, widget.day.day, poiIndex, isSwapped),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1900,8 +1909,8 @@ class _DaySection extends StatelessWidget {
                     ],
                   ),
                 ),
-                _buildInlineTranscript(currentPOI, tourDetail.metadata!.city, poi),
-                if (poiIndex < day.pois.length - 1)
+                _buildInlineTranscript(currentPOI, widget.tourDetail.metadata!.city, poi),
+                if (poiIndex < widget.day.pois.length - 1)
                   Divider(height: 1, color: PGColors.divider),
               ],
             );
@@ -1914,7 +1923,7 @@ class _DaySection extends StatelessWidget {
     print('📄 Building transcript widget for: $poiName');
     return FutureBuilder<SectionedTranscriptData?>(
       key: ValueKey('transcript-$city-$poiName'), // Stable key to prevent recreation
-      future: onFetchSectionedTranscript(poiName, city),
+      future: widget.onFetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           print('⏳ Transcript waiting for: $poiName');
