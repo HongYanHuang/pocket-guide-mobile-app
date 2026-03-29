@@ -8,7 +8,7 @@ class PGTypography {
   static const largeTitle = TextStyle(
     fontSize: 34,
     fontWeight: FontWeight.w700,
-    letterSpacing: -0.5,
+    letterSpacing: -0.9,
     height: 1.2,
     color: PGColors.textPrimary,
   );
@@ -16,7 +16,7 @@ class PGTypography {
   static const largeTitleEmphasized = TextStyle(
     fontSize: 34,
     fontWeight: FontWeight.w800,
-    letterSpacing: -0.5,
+    letterSpacing: -0.9,
     height: 1.2,
     color: PGColors.textPrimary,
   );
@@ -25,7 +25,7 @@ class PGTypography {
   static const title1 = TextStyle(
     fontSize: 28,
     fontWeight: FontWeight.w800,
-    letterSpacing: -0.5,
+    letterSpacing: -0.9,
     height: 1.25,
     color: PGColors.textPrimary,
   );
@@ -33,7 +33,7 @@ class PGTypography {
   static const title2 = TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.w600,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
     height: 1.27,
     color: PGColors.textPrimary,
   );
@@ -41,7 +41,7 @@ class PGTypography {
   static const title3 = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w600,
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
     height: 1.3,
     color: PGColors.textPrimary,
   );
