@@ -1465,6 +1465,11 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                   childCount: _tourDetail!.itinerary.length,
                 ),
               ),
+
+              // Bottom padding to prevent floating button from blocking content
+              SliverPadding(
+                padding: EdgeInsets.only(bottom: 160),
+              ),
             ],
           ),
 
