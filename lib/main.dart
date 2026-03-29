@@ -1384,10 +1384,11 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                         _tourDetail?.metadata?.titleDisplay ?? 'Tour',
                         style: PGTypography.title1,
                       ),
-                      SizedBox(height: PGSpacing.xs),
                       // City, duration, and walking distance in one row
-                      Row(
-                        children: [
+                      Padding(
+                        padding: EdgeInsets.symmetric(vertical: PGSpacing.m),
+                        child: Row(
+                          children: [
                           // City
                           Icon(
                             CupertinoIcons.location_solid,
@@ -1438,6 +1439,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                             ),
                           ],
                         ],
+                        ),
                       ),
                     ],
                   ),
