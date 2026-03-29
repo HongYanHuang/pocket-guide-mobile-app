@@ -1670,6 +1670,19 @@ class _DaySectionState extends State<_DaySection> {
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
+    print('🔵 Day ${widget.day.day} initState called - initiallyExpanded: ${widget.initiallyExpanded}');
+  }
+
+  @override
+  void didUpdateWidget(_DaySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    print('🟡 Day ${widget.day.day} didUpdateWidget called - current _isExpanded: $_isExpanded');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('🟢 Day ${widget.day.day} build called - _isExpanded: $_isExpanded');
+    return _buildContent();
   }
 
   // Get or create cached future for a POI transcript
@@ -1680,6 +1693,8 @@ class _DaySectionState extends State<_DaySection> {
     }
     return _transcriptFutures[key]!;
   }
+
+  Widget _buildContent() {
 
   // Helper to format duration from hours to readable string
   // For per-day durations, always show hours (showDays=false in day headers)
@@ -1703,8 +1718,7 @@ class _DaySectionState extends State<_DaySection> {
     return '${km.toStringAsFixed(2)} km';
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1712,6 +1726,7 @@ class _DaySectionState extends State<_DaySection> {
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () {
+            print('🔴 Day ${widget.day.day} button pressed - toggling from $_isExpanded to ${!_isExpanded}');
             setState(() {
               _isExpanded = !_isExpanded;
             });
