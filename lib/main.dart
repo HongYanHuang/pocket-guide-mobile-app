@@ -1058,6 +1058,10 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   // Store day section expanded/collapsed state to survive widget recreation
   final Map<int, bool> _dayExpandedStates = {};
 
+  // Store resolved transcript data for instant display
+  final Map<String, SectionedTranscriptData> _transcriptData = {};
+  bool _transcriptsLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -1096,12 +1100,58 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
         _tourDetail = tourDetail;
         _loading = false;
       });
+
+      // Pre-fetch all transcripts for instant display
+      _prefetchAllTranscripts();
     } catch (e) {
       setState(() {
         _error = 'Failed to load tour: $e';
         _loading = false;
       });
     }
+  }
+
+  // Pre-fetch all transcripts when page loads
+  Future<void> _prefetchAllTranscripts() async {
+    if (_tourDetail == null) return;
+
+    setState(() {
+      _transcriptsLoading = true;
+    });
+
+    print('🚀 Pre-fetching all transcripts...');
+
+    final futures = <Future<void>>[];
+
+    for (final day in _tourDetail!.itinerary) {
+      for (final poi in day.pois) {
+        final poiId = poi.poi.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+        final city = _tourDetail!.metadata!.city;
+        final cacheKey = '${widget.tourId}/$city/$poiId';
+
+        // Skip if already cached
+        if (_transcriptData.containsKey(cacheKey)) continue;
+
+        final future = _fetchSectionedTranscript(poi.poi, city).then((data) {
+          if (data != null) {
+            _transcriptData[cacheKey] = data;
+            print('✅ Pre-loaded transcript for: ${poi.poi}');
+          }
+        }).catchError((e) {
+          print('❌ Failed to pre-load transcript for: ${poi.poi}');
+        });
+
+        futures.add(future);
+      }
+    }
+
+    await Future.wait(futures);
+
+    setState(() {
+      _transcriptsLoading = false;
+    });
+
+    print('🎉 All transcripts pre-loaded!');
   }
 
   Future<void> _applyChanges() async {
@@ -1469,7 +1519,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                       tourDetail: _tourDetail!,
                       pendingSwaps: _pendingSwaps,
                       onShowAlternatives: _showAlternatives,
-                      onFetchSectionedTranscript: _fetchSectionedTranscript,
+                      transcriptData: _transcriptData,
                     );
                   },
                   childCount: _tourDetail!.itinerary.length,
@@ -1684,7 +1734,7 @@ class _DaySection extends StatefulWidget {
   final TourDetail tourDetail;
   final Map<String, POISwap> pendingSwaps;
   final Function(TourPOI, String, int, int, bool) onShowAlternatives;
-  final Future<SectionedTranscriptData?> Function(String, String) onFetchSectionedTranscript;
+  final Map<String, SectionedTranscriptData> transcriptData; // Pre-loaded data
 
   const _DaySection({
     super.key,
@@ -1694,7 +1744,7 @@ class _DaySection extends StatefulWidget {
     required this.tourDetail,
     required this.pendingSwaps,
     required this.onShowAlternatives,
-    required this.onFetchSectionedTranscript,
+    required this.transcriptData,
   });
 
   @override
@@ -1920,47 +1970,30 @@ class _DaySectionState extends State<_DaySection> with AutomaticKeepAliveClientM
   }
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
-    print('📄 Building transcript widget for: $poiName');
-    return FutureBuilder<SectionedTranscriptData?>(
-      key: ValueKey('transcript-$city-$poiName'), // Stable key to prevent recreation
-      future: widget.onFetchSectionedTranscript(poiName, city),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          print('⏳ Transcript waiting for: $poiName');
-          return Container(
-            padding: PGSpacing.paddingL,
-            child: Center(
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CupertinoActivityIndicator(color: PGColors.brand),
-              ),
-            ),
+    final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+    final cacheKey = '${widget.tourDetail.metadata!.tourId}/$city/$poiId';
+
+    // Get pre-loaded transcript data
+    final sectionedData = widget.transcriptData[cacheKey];
+
+    if (sectionedData == null) {
+      // Still loading or failed to load
+      return const SizedBox.shrink();
+    }
+
+    // Display pre-loaded data instantly
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: PGSpacing.l, vertical: PGSpacing.m),
+      color: PGColors.gray100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: sectionedData.sections.map((section) {
+          return _SectionCardExpanded(
+            section: section,
+            audioUrl: section.audioFile,
           );
-        }
-
-        if (snapshot.hasError || snapshot.data == null) {
-          print('❌ Transcript error/null for: $poiName');
-          return const SizedBox.shrink();
-        }
-
-        print('✅ Transcript loaded for: $poiName');
-        final sectionedData = snapshot.data!;
-
-        return Container(
-          padding: EdgeInsets.symmetric(horizontal: PGSpacing.l, vertical: PGSpacing.m),
-          color: PGColors.gray100,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: sectionedData.sections.map((section) {
-              return _SectionCardExpanded(
-                section: section,
-                audioUrl: section.audioFile,
-              );
-            }).toList(),
-          ),
-        );
-      },
+        }).toList(),
+      ),
     );
   }
 }
