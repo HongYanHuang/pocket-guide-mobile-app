@@ -1454,6 +1454,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     final day = itinerary[dayIndex];
 
                     return _DaySection(
+                      key: ValueKey('day-${day.day}'),
                       day: day,
                       initiallyExpanded: dayIndex == 0,
                       tourDetail: _tourDetail!,
