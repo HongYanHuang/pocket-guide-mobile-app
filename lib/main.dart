@@ -1058,6 +1058,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   @override
   void initState() {
     super.initState();
+    print('🔵 PARENT (_TourWithTranscriptScreenState) initState called');
     _fetchTourDetails();
   }
 
@@ -1301,6 +1302,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('🟠 PARENT (_TourWithTranscriptScreenState) build called');
     final hasPendingChanges = _pendingSwaps.isNotEmpty;
     final coverImageUrl = _tourDetail != null ? _getCoverImageUrl(_tourDetail!) : null;
 
