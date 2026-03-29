@@ -17,10 +17,10 @@ class ApiService {
   static String get baseUrl {
     if (kIsWeb) {
       // For web development, use Cloudflare Tunnel
-      return 'https://donate-fashion-acdbentity-parade.trycloudflare.com';
+      return 'https://edit-templates-crown-camel.trycloudflare.com';
     } else {
       // For mobile apps, use Cloudflare Tunnel
-      return 'https://donate-fashion-acdbentity-parade.trycloudflare.com';
+      return 'https://edit-templates-crown-camel.trycloudflare.com';
     }
   }
 
