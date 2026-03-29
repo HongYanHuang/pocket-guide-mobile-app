@@ -1388,8 +1388,26 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                 ),
 
               // Tour content
-              SliverToBoxAdapter(
-                child: _buildTourContent(),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, dayIndex) {
+                    final itinerary = _tourDetail!.itinerary.toList();
+                    final day = itinerary[dayIndex];
+                    final dayNumber = day.day;
+                    final pois = day.pois.toList();
+
+                    return _DaySection(
+                      dayNumber: dayNumber,
+                      initiallyExpanded: dayIndex == 0,
+                      pois: pois,
+                      tourDetail: _tourDetail!,
+                      pendingSwaps: _pendingSwaps,
+                      onShowAlternatives: _showAlternatives,
+                      onFetchSectionedTranscript: _fetchSectionedTranscript,
+                    );
+                  },
+                  childCount: _tourDetail!.itinerary.length,
+                ),
               ),
             ],
           ),
