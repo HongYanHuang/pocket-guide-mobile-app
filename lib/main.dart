@@ -1245,7 +1245,13 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   }
 
   // Helper to format duration from hours to readable string
-  String _formatDuration(double hours) {
+  // For per-day durations, always show hours (showDays=false in day headers)
+  String _formatDuration(double hours, {bool showDays = false}) {
+    if (showDays && hours > 24) {
+      final days = (hours / 24).round();
+      return '$days ${days == 1 ? 'day' : 'days'}';
+    }
+
     final totalMinutes = (hours * 60).round();
     final h = totalMinutes ~/ 60;
     final m = totalMinutes % 60;
@@ -1379,16 +1385,28 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                         style: PGTypography.title1,
                       ),
                       SizedBox(height: PGSpacing.xs),
-                      Text(
-                        '${_tourDetail?.metadata?.city ?? ''} · ${_tourDetail?.itinerary.length ?? 0} days',
-                        style: PGTypography.subheadline,
-                      ),
-                      SizedBox(height: PGSpacing.m),
-                      // Tour statistics
+                      // City, duration, and walking distance in one row
                       Row(
                         children: [
+                          // City
+                          Icon(
+                            CupertinoIcons.location_solid,
+                            size: 16,
+                            color: PGColors.textTertiary,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            _tourDetail?.metadata?.city ?? '',
+                            style: PGTypography.caption1,
+                          ),
                           // Duration
                           if (_getTotalDurationHours() != null) ...[
+                            SizedBox(width: PGSpacing.m),
+                            Text(
+                              '·',
+                              style: PGTypography.caption1,
+                            ),
+                            SizedBox(width: PGSpacing.m),
                             Icon(
                               CupertinoIcons.time,
                               size: 16,
@@ -1396,20 +1414,18 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                             ),
                             SizedBox(width: 4),
                             Text(
-                              _formatDuration(_getTotalDurationHours()!),
+                              _formatDuration(_getTotalDurationHours()!, showDays: true),
                               style: PGTypography.caption1,
                             ),
                           ],
                           // Walking distance
                           if (_getTotalWalkingKm() != null) ...[
-                            if (_getTotalDurationHours() != null) ...[
-                              SizedBox(width: PGSpacing.m),
-                              Text(
-                                '·',
-                                style: PGTypography.caption1,
-                              ),
-                              SizedBox(width: PGSpacing.m),
-                            ],
+                            SizedBox(width: PGSpacing.m),
+                            Text(
+                              '·',
+                              style: PGTypography.caption1,
+                            ),
+                            SizedBox(width: PGSpacing.m),
                             Icon(
                               CupertinoIcons.arrow_right_arrow_left,
                               size: 16,
@@ -1647,7 +1663,13 @@ class _DaySectionState extends State<_DaySection> {
   }
 
   // Helper to format duration from hours to readable string
-  String _formatDuration(double hours) {
+  // For per-day durations, always show hours (showDays=false in day headers)
+  String _formatDuration(double hours, {bool showDays = false}) {
+    if (showDays && hours > 24) {
+      final days = (hours / 24).round();
+      return '$days ${days == 1 ? 'day' : 'days'}';
+    }
+
     final totalMinutes = (hours * 60).round();
     final h = totalMinutes ~/ 60;
     final m = totalMinutes % 60;
