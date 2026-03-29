@@ -31,8 +31,8 @@ class ApiService {
 
     _dio = Dio(BaseOptions(
       baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 120), // 2 minutes for tour generation
     ));
 
     final serializers = standardSerializers;
@@ -557,6 +557,19 @@ class ApiService {
     String? startDate,
   }) async {
     try {
+      print('🎨 Generating tour: $city, $days days');
+      print('   Request payload:');
+      print('     - city: $city');
+      print('     - days: $days');
+      print('     - interests: $interests');
+      print('     - must_see: $mustSee');
+      print('     - pace: ${pace ?? 'normal'}');
+      print('     - walking: ${walking ?? 'moderate'}');
+      print('     - language: ${language ?? 'en'}');
+      print('     - start_location: $startLocation');
+      print('     - end_location: $endLocation');
+      print('     - start_date: $startDate');
+
       // Set authorization header
       _dio.options.headers['Authorization'] = 'Bearer $accessToken';
 
@@ -578,10 +591,18 @@ class ApiService {
         },
       );
 
+      print('✅ Tour generated successfully');
       return response.data as Map<String, dynamic>;
     } catch (e) {
-      print('Error generating tour: $e');
+      print('❌ Error generating tour: $e');
+      if (e is DioException) {
+        print('   Status code: ${e.response?.statusCode}');
+        print('   Response data: ${e.response?.data}');
+      }
       rethrow;
+    } finally {
+      // Always clean up authorization header
+      _dio.options.headers.remove('Authorization');
     }
   }
 
