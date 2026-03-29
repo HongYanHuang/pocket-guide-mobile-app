@@ -12,15 +12,15 @@ class ApiService {
   Dio get dio => _dio;
 
   // Base URL configuration based on platform
-  // Web (Chrome debug): Use localhost backend
+  // Web (Chrome debug): Use Cloudflare Tunnel for testing
   // Mobile (iOS/Android): Use Cloudflare Tunnel for remote testing
   static String get baseUrl {
     if (kIsWeb) {
-      // For web development, connect to local backend
-      return 'http://localhost:8000';
+      // For web development, use Cloudflare Tunnel
+      return 'https://donate-fashion-acdbentity-parade.trycloudflare.com';
     } else {
       // For mobile apps, use Cloudflare Tunnel
-      return 'https://fed-designer-combine-tied.trycloudflare.com';
+      return 'https://donate-fashion-acdbentity-parade.trycloudflare.com';
     }
   }
 
