@@ -1334,7 +1334,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     children: [
                       Text(
                         _tourDetail?.metadata?.titleDisplay ?? 'Tour',
-                        style: PGTypography.largeTitle,
+                        style: PGTypography.title1,
                       ),
                       SizedBox(height: PGSpacing.xs),
                       Text(
