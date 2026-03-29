@@ -1911,10 +1911,13 @@ class _DaySection extends StatelessWidget {
   }
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
+    print('📄 Building transcript widget for: $poiName');
     return FutureBuilder<SectionedTranscriptData?>(
+      key: ValueKey('transcript-$city-$poiName'), // Stable key to prevent recreation
       future: onFetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⏳ Transcript waiting for: $poiName');
           return Container(
             padding: PGSpacing.paddingL,
             child: Center(
@@ -1928,9 +1931,11 @@ class _DaySection extends StatelessWidget {
         }
 
         if (snapshot.hasError || snapshot.data == null) {
+          print('❌ Transcript error/null for: $poiName');
           return const SizedBox.shrink();
         }
 
+        print('✅ Transcript loaded for: $poiName');
         final sectionedData = snapshot.data!;
 
         return Container(
