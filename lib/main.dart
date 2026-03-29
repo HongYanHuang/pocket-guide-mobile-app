@@ -1649,6 +1649,7 @@ class _DaySection extends StatefulWidget {
   final Future<SectionedTranscriptData?> Function(String, String) onFetchSectionedTranscript;
 
   const _DaySection({
+    super.key,
     required this.day,
     required this.initiallyExpanded,
     required this.tourDetail,
