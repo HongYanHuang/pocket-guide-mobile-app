@@ -8,6 +8,9 @@ class ApiService {
   late final AuthenticationApi _authApi;
   late final Dio _dio;
 
+  // Expose Dio instance for raw API calls (e.g., for images)
+  Dio get dio => _dio;
+
   // Base URL configuration based on platform
   // Web (Chrome debug): Use localhost backend
   // Mobile (iOS/Android): Use Cloudflare Tunnel for remote testing

@@ -731,6 +731,23 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
       separatorBuilder: (context, index) => SizedBox(height: PGSpacing.m),
       itemBuilder: (context, index) {
         final tour = _myTours[index] as Map<String, dynamic>;
+
+        // Extract cover image URL if available
+        String? coverImageUrl;
+        try {
+          if (tour['images'] != null) {
+            final images = tour['images'] as Map<String, dynamic>;
+            if (images['cover'] != null) {
+              final cover = images['cover'] as Map<String, dynamic>;
+              if (cover['url'] != null) {
+                coverImageUrl = '${ApiService.baseUrl}${cover['url']}';
+              }
+            }
+          }
+        } catch (e) {
+          // Silently ignore if image extraction fails
+        }
+
         return _buildTourCard(
           context,
           tourId: tour['tour_id'] as String,
@@ -738,6 +755,7 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
           days: tour['duration_days'] as int,
           city: tour['city'] as String,
           totalPois: tour['total_pois'] as int,
+          coverImageUrl: coverImageUrl,
         );
       },
     );
@@ -833,12 +851,14 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
     required int days,
     required String city,
     required int totalPois,
+    String? coverImageUrl,
   }) {
     return PGTourCard(
       title: title,
       subtitle: city,
       duration: '$days days',
       poiCount: totalPois,
+      coverImageUrl: coverImageUrl,
       onTap: () {
         Navigator.push(
           context,
@@ -1026,6 +1046,7 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   final ApiService _apiService = ApiService();
   final AuthService _authService = AuthService();
   TourDetail? _tourDetail;
+  Map<String, dynamic>? _rawTourData; // Store raw API response for images
   bool _loading = true;
   String? _error;
 
@@ -1047,6 +1068,22 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
         widget.tourId,
         accessToken: accessToken,
       );
+
+      // Fetch raw tour data to extract images (not typed in generated API)
+      try {
+        final dio = _apiService.dio;
+        if (accessToken != null) {
+          dio.options.headers['Authorization'] = 'Bearer $accessToken';
+        }
+        final rawResponse = await dio.get(
+          '/tours/${widget.tourId}',
+          queryParameters: {'language': 'en'},
+        );
+        _rawTourData = rawResponse.data as Map<String, dynamic>;
+      } catch (e) {
+        print('Failed to fetch raw tour data: $e');
+        _rawTourData = null;
+      }
 
       setState(() {
         _tourDetail = tourDetail;
@@ -1160,6 +1197,27 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     }
   }
 
+  // Helper to extract cover image URL from tour detail
+  String? _getCoverImageUrl(TourDetail tourDetail) {
+    if (_rawTourData == null) return null;
+
+    try {
+      // Access the images field from raw API response data
+      if (_rawTourData!['images'] != null) {
+        final images = _rawTourData!['images'] as Map<String, dynamic>;
+        if (images['cover'] != null) {
+          final cover = images['cover'] as Map<String, dynamic>;
+          if (cover['url'] != null) {
+            return '${ApiService.baseUrl}${cover['url']}';
+          }
+        }
+      }
+    } catch (e) {
+      print('Error extracting cover image URL: $e');
+    }
+    return null;
+  }
+
   // Open map in preview mode (no GPS tracking)
   void _openMapPreview() {
     if (_tourDetail == null) return;
@@ -1267,20 +1325,20 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
             ),
           ),
           // Cover image (when available)
-          // TODO: Uncomment when API includes images field
-          // if (_tourDetail?.images?.cover != null)
-          //   Padding(
-          //     padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
-          //     child: ClipRRect(
-          //       borderRadius: PGRadius.radiusM,
-          //       child: Image.network(
-          //         '${ApiService.baseUrl}${_tourDetail!.images!.cover!.url}',
-          //         height: 200,
-          //         width: double.infinity,
-          //         fit: BoxFit.cover,
-          //       ),
-          //     ),
-          //   ),
+          if (_tourDetail != null && _getCoverImageUrl(_tourDetail!) != null)
+            Padding(
+              padding: EdgeInsets.only(
+                left: PGSpacing.l,
+                right: PGSpacing.l,
+                bottom: PGSpacing.m,
+              ),
+              child: NetworkImageWithFallback(
+                imageUrl: _getCoverImageUrl(_tourDetail!),
+                height: 200,
+                borderRadius: PGRadius.radiusM,
+                fallbackIcon: CupertinoIcons.photo_on_rectangle,
+              ),
+            ),
           Expanded(
             child: _loading
             ? Center(
