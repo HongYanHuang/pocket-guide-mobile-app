@@ -1664,11 +1664,21 @@ class _DaySection extends StatefulWidget {
 
 class _DaySectionState extends State<_DaySection> {
   late bool _isExpanded;
+  final Map<String, Future<SectionedTranscriptData?>> _transcriptFutures = {};
 
   @override
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
+  }
+
+  // Get or create cached future for a POI transcript
+  Future<SectionedTranscriptData?> _getTranscriptFuture(String poiName, String city) {
+    final key = '$city/$poiName';
+    if (!_transcriptFutures.containsKey(key)) {
+      _transcriptFutures[key] = widget.onFetchSectionedTranscript(poiName, city);
+    }
+    return _transcriptFutures[key]!;
   }
 
   // Helper to format duration from hours to readable string
@@ -1882,7 +1892,7 @@ class _DaySectionState extends State<_DaySection> {
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
     return FutureBuilder<SectionedTranscriptData?>(
-      future: widget.onFetchSectionedTranscript(poiName, city),
+      future: _getTranscriptFuture(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
