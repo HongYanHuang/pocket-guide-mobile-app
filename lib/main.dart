@@ -1055,6 +1055,9 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   // Cache transcript futures to prevent redundant API calls
   final Map<String, Future<SectionedTranscriptData?>> _transcriptCache = {};
 
+  // Store day section expanded/collapsed state to survive widget recreation
+  final Map<int, bool> _dayExpandedStates = {};
+
   @override
   void initState() {
     super.initState();
@@ -1461,7 +1464,8 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                     return _DaySection(
                       key: ValueKey('day-${day.day}'),
                       day: day,
-                      initiallyExpanded: dayIndex == 0,
+                      isExpanded: _isDayExpanded(day.day),
+                      onToggle: () => _toggleDayExpanded(day.day),
                       tourDetail: _tourDetail!,
                       pendingSwaps: _pendingSwaps,
                       onShowAlternatives: _showAlternatives,
@@ -1658,11 +1662,25 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
       ),
     );
   }
+
+  // Toggle day expanded/collapsed state
+  void _toggleDayExpanded(int dayNumber) {
+    setState(() {
+      _dayExpandedStates[dayNumber] = !(_dayExpandedStates[dayNumber] ?? (dayNumber == 1));
+      print('🔄 Toggled Day $dayNumber to: ${_dayExpandedStates[dayNumber]}');
+    });
+  }
+
+  // Get day expanded state (default: Day 1 expanded, others collapsed)
+  bool _isDayExpanded(int dayNumber) {
+    return _dayExpandedStates[dayNumber] ?? (dayNumber == 1);
+  }
 }
 
-class _DaySection extends StatefulWidget {
+class _DaySection extends StatelessWidget {
   final TourDay day;
-  final bool initiallyExpanded;
+  final bool isExpanded;
+  final VoidCallback onToggle;
   final TourDetail tourDetail;
   final Map<String, POISwap> pendingSwaps;
   final Function(TourPOI, String, int, int, bool) onShowAlternatives;
@@ -1671,7 +1689,8 @@ class _DaySection extends StatefulWidget {
   const _DaySection({
     super.key,
     required this.day,
-    required this.initiallyExpanded,
+    required this.isExpanded,
+    required this.onToggle,
     required this.tourDetail,
     required this.pendingSwaps,
     required this.onShowAlternatives,
@@ -1679,28 +1698,8 @@ class _DaySection extends StatefulWidget {
   });
 
   @override
-  State<_DaySection> createState() => _DaySectionState();
-}
-
-class _DaySectionState extends State<_DaySection> {
-  late bool _isExpanded;
-
-  @override
-  void initState() {
-    super.initState();
-    _isExpanded = widget.initiallyExpanded;
-    print('🔵 Day ${widget.day.day} initState called - initiallyExpanded: ${widget.initiallyExpanded}');
-  }
-
-  @override
-  void didUpdateWidget(_DaySection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    print('🟡 Day ${widget.day.day} didUpdateWidget called - current _isExpanded: $_isExpanded');
-  }
-
-  @override
   Widget build(BuildContext context) {
-    print('🟢 Day ${widget.day.day} build called - _isExpanded: $_isExpanded');
+    print('🟢 Day ${day.day} build called - isExpanded: $isExpanded');
     return _buildContent();
   }
 
@@ -1734,10 +1733,8 @@ class _DaySectionState extends State<_DaySection> {
         CupertinoButton(
           padding: EdgeInsets.zero,
           onPressed: () {
-            print('🔴 Day ${widget.day.day} button pressed - toggling from $_isExpanded to ${!_isExpanded}');
-            setState(() {
-              _isExpanded = !_isExpanded;
-            });
+            print('🔴 Day ${day.day} button pressed - toggling from $isExpanded to ${!isExpanded}');
+            onToggle();
           },
           child: Container(
             padding: EdgeInsets.symmetric(
@@ -1752,7 +1749,7 @@ class _DaySectionState extends State<_DaySection> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Day ${widget.day.day}',
+                        'Day ${day.day}',
                         style: PGTypography.title2.copyWith(
                           decoration: TextDecoration.none,
                         ),
@@ -1767,7 +1764,7 @@ class _DaySectionState extends State<_DaySection> {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            _formatDuration(widget.day.totalHours.toDouble()),
+                            _formatDuration(day.totalHours.toDouble()),
                             style: PGTypography.caption1.copyWith(
                               decoration: TextDecoration.none,
                             ),
@@ -1780,7 +1777,7 @@ class _DaySectionState extends State<_DaySection> {
                           ),
                           SizedBox(width: 4),
                           Text(
-                            _formatWalkingDistance(widget.day.totalWalkingKm.toDouble()),
+                            _formatWalkingDistance(day.totalWalkingKm.toDouble()),
                             style: PGTypography.caption1.copyWith(
                               decoration: TextDecoration.none,
                             ),
@@ -1791,7 +1788,7 @@ class _DaySectionState extends State<_DaySection> {
                   ),
                 ),
                 Icon(
-                  _isExpanded
+                  isExpanded
                       ? CupertinoIcons.chevron_up
                       : CupertinoIcons.chevron_down,
                   size: 20,
@@ -1802,13 +1799,13 @@ class _DaySectionState extends State<_DaySection> {
           ),
         ),
         // POIs list
-        if (_isExpanded)
-          ...widget.day.pois.asMap().entries.map((entry) {
+        if (isExpanded)
+          ...day.pois.asMap().entries.map((entry) {
             final poiIndex = entry.key;
             final poi = entry.value;
-            final poiKey = '${widget.day.day}-$poiIndex';
-            final isSwapped = widget.pendingSwaps.containsKey(poiKey);
-            final currentPOI = isSwapped ? widget.pendingSwaps[poiKey]!.replacementPoi : poi.poi;
+            final poiKey = '${day.day}-$poiIndex';
+            final isSwapped = pendingSwaps.containsKey(poiKey);
+            final currentPOI = isSwapped ? pendingSwaps[poiKey]!.replacementPoi : poi.poi;
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1878,7 +1875,7 @@ class _DaySectionState extends State<_DaySection> {
                               vertical: PGSpacing.xs,
                             ),
                             minSize: 0,
-                            onPressed: () => widget.onShowAlternatives(poi, currentPOI, widget.day.day, poiIndex, isSwapped),
+                            onPressed: () => onShowAlternatives(poi, currentPOI, day.day, poiIndex, isSwapped),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1903,8 +1900,8 @@ class _DaySectionState extends State<_DaySection> {
                     ],
                   ),
                 ),
-                _buildInlineTranscript(currentPOI, widget.tourDetail.metadata!.city, poi),
-                if (poiIndex < widget.day.pois.length - 1)
+                _buildInlineTranscript(currentPOI, tourDetail.metadata!.city, poi),
+                if (poiIndex < day.pois.length - 1)
                   Divider(height: 1, color: PGColors.divider),
               ],
             );
@@ -1915,7 +1912,7 @@ class _DaySectionState extends State<_DaySection> {
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
     return FutureBuilder<SectionedTranscriptData?>(
-      future: widget.onFetchSectionedTranscript(poiName, city),
+      future: onFetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
