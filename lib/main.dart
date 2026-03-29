@@ -1864,8 +1864,8 @@ class _DaySection extends StatelessWidget {
                       // Alternatives button
                       Builder(
                         builder: (context) {
-                          final hasBackups = widget.tourDetail.backupPois != null &&
-                                            widget.tourDetail.backupPois!.containsKey(poi.poi);
+                          final hasBackups = tourDetail.backupPois != null &&
+                                            tourDetail.backupPois!.containsKey(poi.poi);
 
                           if (!hasBackups) return const SizedBox.shrink();
 
