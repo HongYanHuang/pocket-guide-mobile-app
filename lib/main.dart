@@ -1218,6 +1218,48 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     return null;
   }
 
+  // Helper to extract total duration hours from raw data
+  double? _getTotalDurationHours() {
+    if (_rawTourData == null) return null;
+    try {
+      if (_rawTourData!['total_duration_hours'] != null) {
+        return (_rawTourData!['total_duration_hours'] as num).toDouble();
+      }
+    } catch (e) {
+      print('Error extracting total duration hours: $e');
+    }
+    return null;
+  }
+
+  // Helper to extract total walking km from raw data
+  double? _getTotalWalkingKm() {
+    if (_rawTourData == null) return null;
+    try {
+      if (_rawTourData!['total_walking_km'] != null) {
+        return (_rawTourData!['total_walking_km'] as num).toDouble();
+      }
+    } catch (e) {
+      print('Error extracting total walking km: $e');
+    }
+    return null;
+  }
+
+  // Helper to format duration from hours to readable string
+  String _formatDuration(double hours) {
+    final totalMinutes = (hours * 60).round();
+    final h = totalMinutes ~/ 60;
+    final m = totalMinutes % 60;
+    if (m == 0) {
+      return '$h hours';
+    }
+    return '$h hours $m min';
+  }
+
+  // Helper to format walking distance
+  String _formatWalkingDistance(double km) {
+    return '${km.toStringAsFixed(2)} km';
+  }
+
   // Open map in preview mode (no GPS tracking)
   void _openMapPreview() {
     if (_tourDetail == null) return;
@@ -1341,6 +1383,46 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                         '${_tourDetail?.metadata?.city ?? ''} · ${_tourDetail?.itinerary.length ?? 0} days',
                         style: PGTypography.subheadline,
                       ),
+                      SizedBox(height: PGSpacing.m),
+                      // Tour statistics
+                      Row(
+                        children: [
+                          // Duration
+                          if (_getTotalDurationHours() != null) ...[
+                            Icon(
+                              CupertinoIcons.time,
+                              size: 16,
+                              color: PGColors.textTertiary,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              _formatDuration(_getTotalDurationHours()!),
+                              style: PGTypography.caption1,
+                            ),
+                          ],
+                          // Walking distance
+                          if (_getTotalWalkingKm() != null) ...[
+                            if (_getTotalDurationHours() != null) ...[
+                              SizedBox(width: PGSpacing.m),
+                              Text(
+                                '·',
+                                style: PGTypography.caption1,
+                              ),
+                              SizedBox(width: PGSpacing.m),
+                            ],
+                            Icon(
+                              CupertinoIcons.arrow_right_arrow_left,
+                              size: 16,
+                              color: PGColors.textTertiary,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              _formatWalkingDistance(_getTotalWalkingKm()!),
+                              style: PGTypography.caption1,
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1352,13 +1434,10 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
                   (context, dayIndex) {
                     final itinerary = _tourDetail!.itinerary.toList();
                     final day = itinerary[dayIndex];
-                    final dayNumber = day.day;
-                    final pois = day.pois.toList();
 
                     return _DaySection(
-                      dayNumber: dayNumber,
+                      day: day,
                       initiallyExpanded: dayIndex == 0,
-                      pois: pois,
                       tourDetail: _tourDetail!,
                       pendingSwaps: _pendingSwaps,
                       onShowAlternatives: _showAlternatives,
@@ -1561,18 +1640,16 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 }
 
 class _DaySection extends StatefulWidget {
-  final int dayNumber;
+  final TourDay day;
   final bool initiallyExpanded;
-  final List<TourPOI> pois;
   final TourDetail tourDetail;
   final Map<String, POISwap> pendingSwaps;
   final Function(TourPOI, String, int, int, bool) onShowAlternatives;
   final Future<SectionedTranscriptData?> Function(String, String) onFetchSectionedTranscript;
 
   const _DaySection({
-    required this.dayNumber,
+    required this.day,
     required this.initiallyExpanded,
-    required this.pois,
     required this.tourDetail,
     required this.pendingSwaps,
     required this.onShowAlternatives,
@@ -1590,6 +1667,22 @@ class _DaySectionState extends State<_DaySection> {
   void initState() {
     super.initState();
     _isExpanded = widget.initiallyExpanded;
+  }
+
+  // Helper to format duration from hours to readable string
+  String _formatDuration(double hours) {
+    final totalMinutes = (hours * 60).round();
+    final h = totalMinutes ~/ 60;
+    final m = totalMinutes % 60;
+    if (m == 0) {
+      return '$h hours';
+    }
+    return '$h hours $m min';
+  }
+
+  // Helper to format walking distance
+  String _formatWalkingDistance(double km) {
+    return '${km.toStringAsFixed(2)} km';
   }
 
   @override
@@ -1614,11 +1707,46 @@ class _DaySectionState extends State<_DaySection> {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(
-                    'Day ${widget.dayNumber}',
-                    style: PGTypography.title2.copyWith(
-                      decoration: TextDecoration.none,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Day ${widget.day.day}',
+                        style: PGTypography.title2.copyWith(
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.time,
+                            size: 14,
+                            color: PGColors.textTertiary,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatDuration(widget.day.totalHours.toDouble()),
+                            style: PGTypography.caption1.copyWith(
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                          SizedBox(width: PGSpacing.m),
+                          Icon(
+                            CupertinoIcons.arrow_right_arrow_left,
+                            size: 14,
+                            color: PGColors.textTertiary,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            _formatWalkingDistance(widget.day.totalWalkingKm.toDouble()),
+                            style: PGTypography.caption1.copyWith(
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
                 Icon(
@@ -1634,10 +1762,10 @@ class _DaySectionState extends State<_DaySection> {
         ),
         // POIs list
         if (_isExpanded)
-          ...widget.pois.asMap().entries.map((entry) {
+          ...widget.day.pois.asMap().entries.map((entry) {
             final poiIndex = entry.key;
             final poi = entry.value;
-            final poiKey = '${widget.dayNumber}-$poiIndex';
+            final poiKey = '${widget.day.day}-$poiIndex';
             final isSwapped = widget.pendingSwaps.containsKey(poiKey);
             final currentPOI = isSwapped ? widget.pendingSwaps[poiKey]!.replacementPoi : poi.poi;
 
@@ -1709,7 +1837,7 @@ class _DaySectionState extends State<_DaySection> {
                               vertical: PGSpacing.xs,
                             ),
                             minSize: 0,
-                            onPressed: () => widget.onShowAlternatives(poi, currentPOI, widget.dayNumber, poiIndex, isSwapped),
+                            onPressed: () => widget.onShowAlternatives(poi, currentPOI, widget.day.day, poiIndex, isSwapped),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
