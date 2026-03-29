@@ -1702,8 +1702,6 @@ class _DaySectionState extends State<_DaySection> {
     return _buildContent();
   }
 
-  Widget _buildContent() {
-
   // Helper to format duration from hours to readable string
   // For per-day durations, always show hours (showDays=false in day headers)
   String _formatDuration(double hours, {bool showDays = false}) {
