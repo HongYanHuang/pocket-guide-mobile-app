@@ -1571,29 +1571,6 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
     );
   }
 
-  Widget _buildTourContent() {
-    final itinerary = _tourDetail!.itinerary.toList();
-
-    return ListView.builder(
-      itemCount: itinerary.length,
-      itemBuilder: (context, dayIndex) {
-        final day = itinerary[dayIndex];
-        final dayNumber = day.day;
-        final pois = day.pois.toList();
-
-        return _DaySection(
-          dayNumber: dayNumber,
-          initiallyExpanded: dayIndex == 0,
-          pois: pois,
-          tourDetail: _tourDetail!,
-          pendingSwaps: _pendingSwaps,
-          onShowAlternatives: _showAlternatives,
-          onFetchSectionedTranscript: _fetchSectionedTranscript,
-        );
-      },
-    );
-  }
-
   Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
     try {
       final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
@@ -1863,7 +1840,7 @@ class _DaySectionState extends State<_DaySection> {
                   ),
                 ),
                 _buildInlineTranscript(currentPOI, widget.tourDetail.metadata!.city, poi),
-                if (poiIndex < widget.pois.length - 1)
+                if (poiIndex < widget.day.pois.length - 1)
                   Divider(height: 1, color: PGColors.divider),
               ],
             );
