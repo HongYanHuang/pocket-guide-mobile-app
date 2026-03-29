@@ -304,8 +304,21 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
         .toList();
 
     if (validLocations.isEmpty) {
-      // Default to Rome if no valid coordinates
-      return LatLng(41.9028, 12.4964);
+      // Try to get first POI from first day as fallback
+      if (widget.tourDetail.itinerary.isNotEmpty) {
+        final firstDayPois = widget.tourDetail.itinerary[0].pois.toList();
+        for (final poi in firstDayPois) {
+          final location = _getPoiLocation(poi);
+          if (location != null) {
+            print('📍 Map center fallback: Using first POI coordinates: $location');
+            return location;
+          }
+        }
+      }
+
+      // Ultimate fallback if no coordinates found at all
+      print('⚠️  No valid coordinates found in tour, using default center');
+      return LatLng(0.0, 0.0);
     }
 
     final avgLat = validLocations.map((l) => l.latitude).reduce((a, b) => a + b) / validLocations.length;
