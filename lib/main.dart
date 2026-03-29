@@ -1052,6 +1052,9 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
 
   Map<String, POISwap> _pendingSwaps = {};
 
+  // Cache transcript futures to prevent redundant API calls
+  final Map<String, Future<SectionedTranscriptData?>> _transcriptCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -1596,15 +1599,30 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   }
 
   Future<SectionedTranscriptData?> _fetchSectionedTranscript(String poiName, String city) async {
+    final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
+    final cacheKey = '${widget.tourId}/$city/$poiId';
+
+    // Return cached future if exists
+    if (_transcriptCache.containsKey(cacheKey)) {
+      print('✅ Using cached transcript for: $city/$poiId');
+      return _transcriptCache[cacheKey]!;
+    }
+
+    // Create and cache new future
+    print('🆕 Fetching sectioned transcript for: $city/$poiId (tour: ${widget.tourId}, language: en)');
+    final future = _fetchTranscriptFromAPI(poiId, city);
+    _transcriptCache[cacheKey] = future;
+    return future;
+  }
+
+  Future<SectionedTranscriptData?> _fetchTranscriptFromAPI(String poiId, String city) async {
     try {
-      final poiId = poiName.toLowerCase().replaceAll(' ', '-').replaceAll("'", '');
-      final tourId = widget.tourId;
       String language = 'en';
       if (_tourDetail?.metadata?.languages != null && _tourDetail!.metadata!.languages!.isNotEmpty) {
         language = _tourDetail!.metadata!.languages!.first;
       }
 
-      final response = await _apiService.fetchSectionedTranscript(city, poiId, tourId, language);
+      final response = await _apiService.fetchSectionedTranscript(city, poiId, widget.tourId, language);
       return response;
     } catch (e) {
       print('Error fetching sectioned transcript: $e');
@@ -1664,7 +1682,6 @@ class _DaySection extends StatefulWidget {
 
 class _DaySectionState extends State<_DaySection> {
   late bool _isExpanded;
-  final Map<String, Future<SectionedTranscriptData?>> _transcriptFutures = {};
 
   @override
   void initState() {
@@ -1683,15 +1700,6 @@ class _DaySectionState extends State<_DaySection> {
   Widget build(BuildContext context) {
     print('🟢 Day ${widget.day.day} build called - _isExpanded: $_isExpanded');
     return _buildContent();
-  }
-
-  // Get or create cached future for a POI transcript
-  Future<SectionedTranscriptData?> _getTranscriptFuture(String poiName, String city) {
-    final key = '$city/$poiName';
-    if (!_transcriptFutures.containsKey(key)) {
-      _transcriptFutures[key] = widget.onFetchSectionedTranscript(poiName, city);
-    }
-    return _transcriptFutures[key]!;
   }
 
   Widget _buildContent() {
@@ -1907,7 +1915,7 @@ class _DaySectionState extends State<_DaySection> {
 
   Widget _buildInlineTranscript(String poiName, String city, TourPOI poi) {
     return FutureBuilder<SectionedTranscriptData?>(
-      future: _getTranscriptFuture(poiName, city),
+      future: widget.onFetchSectionedTranscript(poiName, city),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
