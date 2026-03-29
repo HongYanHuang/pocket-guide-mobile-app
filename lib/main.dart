@@ -1251,136 +1251,210 @@ class _TourWithTranscriptScreenState extends State<TourWithTranscriptScreen> {
   @override
   Widget build(BuildContext context) {
     final hasPendingChanges = _pendingSwaps.isNotEmpty;
+    final coverImageUrl = _tourDetail != null ? _getCoverImageUrl(_tourDetail!) : null;
 
-    return CupertinoPageScaffold(
-      backgroundColor: PGColors.background,
-      child: Stack(
-        children: [
-          Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Large title navigation bar
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: PGSpacing.l,
-                right: PGSpacing.l,
-                top: PGSpacing.s,
-                bottom: PGSpacing.s,
-              ),
-              child: Row(
-                children: [
-                  PGBackButton(),
-                  SizedBox(width: PGSpacing.s),
-                  Expanded(
-                    child: Text(
-                      _tourDetail?.metadata?.titleDisplay ?? 'Tour',
-                      style: PGTypography.title1.copyWith(
-                        decoration: TextDecoration.none,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+    if (_loading) {
+      return CupertinoPageScaffold(
+        backgroundColor: PGColors.background,
+        child: Center(
+          child: CupertinoActivityIndicator(color: PGColors.brand),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return CupertinoPageScaffold(
+        backgroundColor: PGColors.background,
+        child: Center(
+          child: Padding(
+            padding: PGSpacing.screen,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  CupertinoIcons.exclamationmark_triangle,
+                  size: 60,
+                  color: PGColors.error,
+                ),
+                SizedBox(height: PGSpacing.l),
+                Text(
+                  'Failed to load tour',
+                  style: PGTypography.headline.copyWith(
+                    color: PGColors.error,
+                    decoration: TextDecoration.none,
                   ),
-                  if (hasPendingChanges) ...[
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      minSize: 0,
-                      onPressed: _applyChanges,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: PGSpacing.m,
-                          vertical: PGSpacing.xs,
+                ),
+                SizedBox(height: PGSpacing.s),
+                Text(
+                  _error!,
+                  style: PGTypography.footnote.copyWith(
+                    color: PGColors.textSecondary,
+                    decoration: TextDecoration.none,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: PGColors.background,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              // Collapsing header with cover image
+              if (coverImageUrl != null)
+                SliverAppBar(
+                  expandedHeight: 400,
+                  pinned: false,
+                  backgroundColor: Colors.transparent,
+                  automaticallyImplyLeading: false,
+                  flexibleSpace: FlexibleSpaceBar(
+                    background: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Cover image
+                        NetworkImageWithFallback(
+                          imageUrl: coverImageUrl,
+                          fit: BoxFit.cover,
+                          fallbackIcon: CupertinoIcons.photo_on_rectangle,
                         ),
-                        decoration: BoxDecoration(
-                          color: PGColors.brand,
-                          borderRadius: BorderRadius.circular(PGRadius.s),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              CupertinoIcons.cloud_upload,
-                              size: 14,
-                              color: PGColors.white,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              'Apply ${_pendingSwaps.length}',
-                              style: PGTypography.caption1.copyWith(
-                                color: PGColors.white,
-                                fontWeight: FontWeight.w600,
-                                decoration: TextDecoration.none,
+                        // Gradient overlay at bottom
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Container(
+                            height: 200,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
+                        // Tour title overlay
+                        Positioned(
+                          bottom: 20,
+                          left: PGSpacing.l,
+                          right: PGSpacing.l,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _tourDetail?.metadata?.titleDisplay ?? 'Tour',
+                                style: PGTypography.largeTitle.copyWith(
+                                  color: Colors.white,
+                                  decoration: TextDecoration.none,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w700,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: PGSpacing.xs),
+                              Text(
+                                '${_tourDetail?.metadata?.city ?? ''} · ${_tourDetail?.itinerary.length ?? 0} days',
+                                style: PGTypography.body.copyWith(
+                                  color: Colors.white.withOpacity(0.9),
+                                  decoration: TextDecoration.none,
+                                  shadows: [
+                                    Shadow(
+                                      color: Colors.black.withOpacity(0.5),
+                                      blurRadius: 8,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: PGSpacing.s),
-                  ],
-                ],
+                  ),
+                ),
+
+              // Tour content
+              SliverToBoxAdapter(
+                child: _buildTourContent(),
+              ),
+            ],
+          ),
+
+          // Back button overlay
+          Positioned(
+            top: 0,
+            left: 0,
+            child: SafeArea(
+              child: Container(
+                margin: EdgeInsets.all(PGSpacing.m),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: PGBackButton(),
               ),
             ),
           ),
-          // Cover image (when available)
-          if (_tourDetail != null && _getCoverImageUrl(_tourDetail!) != null)
-            Padding(
-              padding: EdgeInsets.only(
-                left: PGSpacing.l,
-                right: PGSpacing.l,
-                bottom: PGSpacing.m,
-              ),
-              child: NetworkImageWithFallback(
-                imageUrl: _getCoverImageUrl(_tourDetail!),
-                height: 200,
-                borderRadius: PGRadius.radiusM,
-                fallbackIcon: CupertinoIcons.photo_on_rectangle,
-              ),
-            ),
-          Expanded(
-            child: _loading
-            ? Center(
-                child: CupertinoActivityIndicator(color: PGColors.brand),
-              )
-            : _error != null
-                ? Center(
-                    child: Padding(
-                      padding: PGSpacing.screen,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+
+          // Apply changes button (if needed)
+          if (hasPendingChanges)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: Container(
+                  margin: EdgeInsets.all(PGSpacing.m),
+                  child: CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minSize: 0,
+                    onPressed: _applyChanges,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: PGSpacing.m,
+                        vertical: PGSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: PGColors.brand,
+                        borderRadius: BorderRadius.circular(PGRadius.s),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            CupertinoIcons.exclamationmark_triangle,
-                            size: 60,
-                            color: PGColors.error,
+                            CupertinoIcons.cloud_upload,
+                            size: 14,
+                            color: PGColors.white,
                           ),
-                          SizedBox(height: PGSpacing.l),
+                          SizedBox(width: 4),
                           Text(
-                            'Failed to load tour',
-                            style: PGTypography.headline.copyWith(
-                              color: PGColors.error,
+                            'Apply ${_pendingSwaps.length}',
+                            style: PGTypography.caption1.copyWith(
+                              color: PGColors.white,
+                              fontWeight: FontWeight.w600,
                               decoration: TextDecoration.none,
                             ),
-                          ),
-                          SizedBox(height: PGSpacing.s),
-                          Text(
-                            _error!,
-                            style: PGTypography.footnote.copyWith(
-                              color: PGColors.textSecondary,
-                              decoration: TextDecoration.none,
-                            ),
-                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
-                  )
-                : _buildTourContent(),
-          ),
-        ],
-      ),
+                  ),
+                ),
+              ),
+            ),
           // Floating map button with gradient background overlay
           if (!_loading && _error == null)
             Positioned(
