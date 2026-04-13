@@ -8,7 +8,6 @@ import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
-import 'package:pocket_guide_mobile/design_system/preview_screen.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -263,17 +262,6 @@ class _HomeScreenState extends State<HomeScreen> {
             title: _selectedCity ?? 'Select City',
             showChevron: true,
             onTitleTap: _showCitySelector,
-            trailing: PGNavButton(
-              icon: CupertinoIcons.paintbrush,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  CupertinoPageRoute(
-                    builder: (context) => const DesignSystemPreview(),
-                  ),
-                );
-              },
-            ),
           ),
           // Tours list
           Expanded(
