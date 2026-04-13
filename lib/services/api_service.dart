@@ -12,12 +12,12 @@ class ApiService {
   Dio get dio => _dio;
 
   // Base URL configuration based on platform
-  // Web (Chrome debug): Use Cloudflare Tunnel for testing
+  // Web (Chrome debug): Use localhost for local development
   // Mobile (iOS/Android): Use Cloudflare Tunnel for remote testing
   static String get baseUrl {
     if (kIsWeb) {
-      // For web development, use Cloudflare Tunnel
-      return 'https://edit-templates-crown-camel.trycloudflare.com';
+      // For web development, use localhost (backend must be running locally)
+      return 'http://localhost:8000';
     } else {
       // For mobile apps, use Cloudflare Tunnel
       return 'https://edit-templates-crown-camel.trycloudflare.com';
