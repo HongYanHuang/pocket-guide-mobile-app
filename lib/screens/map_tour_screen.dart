@@ -601,6 +601,217 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     }
   }
 
+  // Handle "Start Tour" button press with location check
+  Future<void> _onStartTourPressed() async {
+    print('🚀 Start Tour button pressed');
+
+    // Step 1: Check and request location permission
+    print('📍 Checking location permission...');
+    final hasPermission = await _locationService.hasPermission();
+
+    if (!hasPermission) {
+      print('⚠️  No location permission, requesting...');
+      final granted = await _locationService.requestPermission();
+
+      if (!granted) {
+        print('❌ Location permission denied');
+        _showPermissionDeniedDialog();
+        return;
+      }
+      print('✅ Location permission granted');
+    }
+
+    // Step 2: Get current location
+    print('📍 Getting current location...');
+    Position? currentPosition;
+    try {
+      currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+      print('✅ Current location: ${currentPosition.latitude}, ${currentPosition.longitude}');
+    } catch (e) {
+      print('❌ Failed to get current location: $e');
+      _showLocationServiceDisabledDialog();
+      return;
+    }
+
+    // Step 3: Get first POI location
+    if (widget.tourDetail.itinerary.isEmpty ||
+        widget.tourDetail.itinerary[0].pois.isEmpty) {
+      print('⚠️  No POIs in tour, starting anyway');
+      _startTourAnyway();
+      return;
+    }
+
+    final firstPoi = widget.tourDetail.itinerary[0].pois.first;
+    final firstPoiLocation = _getPoiLocation(firstPoi);
+
+    if (firstPoiLocation == null) {
+      print('⚠️  First POI has no coordinates, starting anyway');
+      _startTourAnyway();
+      return;
+    }
+
+    print('📍 First POI location: ${firstPoiLocation.latitude}, ${firstPoiLocation.longitude}');
+
+    // Step 4: Calculate distance
+    final distanceInMeters = Geolocator.distanceBetween(
+      currentPosition.latitude,
+      currentPosition.longitude,
+      firstPoiLocation.latitude,
+      firstPoiLocation.longitude,
+    );
+
+    final distanceInKm = distanceInMeters / 1000;
+    print('📏 Distance to first POI: ${distanceInKm.toStringAsFixed(2)} km');
+
+    // Step 5: Check if user is at start point (within 1km)
+    const maxDistanceKm = 1.0; // 1km threshold (accounting for GPS precision)
+
+    if (distanceInKm > maxDistanceKm) {
+      print('⚠️  User is ${distanceInKm.toStringAsFixed(2)}km away from start point');
+      _showNotAtStartPointDialog(firstPoiLocation, firstPoi.poi);
+    } else {
+      print('✅ User is at start point (${distanceInKm.toStringAsFixed(2)}km away)');
+      _startTourAnyway();
+    }
+  }
+
+  // Start tour without location check
+  void _startTourAnyway() {
+    print('🎬 Starting tour...');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => MapTourScreen(
+          tourDetail: widget.tourDetail,
+          isActiveMode: true,
+        ),
+      ),
+    );
+  }
+
+  // Show dialog when user is not at start point
+  void _showNotAtStartPointDialog(LatLng firstPoiLocation, String poiName) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('You seem not at start point'),
+        content: Text(
+          'You are more than 1km away from the first POI: $poiName\n\n'
+          'Would you like to get directions or start the tour anyway?',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _showNavigationAppDialog(firstPoiLocation, poiName);
+            },
+            child: const Text('Direct to Start Point'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _startTourAnyway();
+            },
+            child: const Text('Start Tour Anyway'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show dialog to choose navigation app
+  void _showNavigationAppDialog(LatLng destination, String poiName) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Choose Navigation App'),
+        content: Text('Get directions to $poiName'),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _openNavigationApp('google', destination, poiName);
+            },
+            child: const Text('Google Maps'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () {
+              Navigator.pop(context);
+              _openNavigationApp('apple', destination, poiName);
+            },
+            child: const Text('Apple Maps'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Open navigation app with directions
+  Future<void> _openNavigationApp(String app, LatLng destination, String poiName) async {
+    final lat = destination.latitude;
+    final lng = destination.longitude;
+
+    Uri? uri;
+
+    if (app == 'google') {
+      // Google Maps URL (works on both iOS and Android)
+      uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
+      print('🗺️  Opening Google Maps: $uri');
+    } else if (app == 'apple') {
+      // Apple Maps URL (works on iOS, falls back to web on Android)
+      uri = Uri.parse('http://maps.apple.com/?daddr=$lat,$lng&dirflg=d');
+      print('🗺️  Opening Apple Maps: $uri');
+    }
+
+    if (uri != null) {
+      try {
+        final canLaunch = await canLaunchUrl(uri);
+        if (canLaunch) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          print('✅ Navigation app opened successfully');
+        } else {
+          print('❌ Cannot launch URL: $uri');
+          _showNavigationErrorDialog(app);
+        }
+      } catch (e) {
+        print('❌ Error opening navigation app: $e');
+        _showNavigationErrorDialog(app);
+      }
+    }
+  }
+
+  // Show error dialog when navigation app cannot be opened
+  void _showNavigationErrorDialog(String app) {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Cannot Open Navigation'),
+        content: Text(
+          'Unable to open ${app == 'google' ? 'Google Maps' : 'Apple Maps'}. '
+          'Please make sure the app is installed on your device.',
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -747,17 +958,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                   ),
                   color: PGColors.brand,
                   borderRadius: BorderRadius.circular(PGRadius.l),
-                  onPressed: () {
-                    // Switch to active mode
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (context) => MapTourScreen(
-                          tourDetail: widget.tourDetail,
-                          isActiveMode: true,
-                        ),
-                      ),
-                    );
-                  },
+                  onPressed: _onStartTourPressed,
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
