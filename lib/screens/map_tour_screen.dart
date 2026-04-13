@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/services/location_service.dart';
 import 'package:pocket_guide_mobile/services/tour_progress_service.dart';
