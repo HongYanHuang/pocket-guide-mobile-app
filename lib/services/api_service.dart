@@ -19,8 +19,8 @@ class ApiService {
       // For web development, use localhost (backend must be running locally)
       return 'http://localhost:8000';
     } else {
-      // For mobile apps, use Cloudflare Tunnel
-      return 'https://edit-templates-crown-camel.trycloudflare.com';
+      // For mobile apps, use stable production API
+      return 'https://api.rrawi.com';
     }
   }
 
