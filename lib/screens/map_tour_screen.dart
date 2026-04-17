@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -10,7 +11,10 @@ import 'package:pocket_guide_mobile/services/tour_progress_service.dart';
 import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:pocket_guide_mobile/services/geofence_service.dart';
+import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
+import 'package:pocket_guide_mobile/models/geofence_event.dart';
 import 'package:pocket_guide_mobile/widgets/poi_map_bottom_sheet.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
@@ -39,6 +43,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
   late TourProgressService _progressService;
   TrailUploadManager? _trailManager;
   ProgressManager? _progressManager;
+  GeofenceService? _geofenceService;
+  StreamSubscription<GeofenceEvent>? _geofenceSubscription;
 
   int _selectedDay = 1;
   Position? _userPosition;
@@ -104,10 +110,48 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       // The backend will create progress data on the first POST /progress call
     }
 
+    // Initialize geofence service (active mode only)
+    if (widget.isActiveMode) {
+      _geofenceService = GeofenceService(
+        progressManager: _progressManager!,
+        apiService: ApiService(),
+        tourId: widget.tourDetail.metadata.tourId,
+        language: _getTourLanguage(),
+        city: widget.tourDetail.metadata.city,
+      );
+      _geofenceSubscription = _geofenceService!.events.listen((event) {
+        if (!mounted) return;
+        setState(() {}); // Refresh marker colours on enter/complete
+        if (event.type == GeofenceEventType.poiEntered) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.headphones, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Now playing: ${event.poiName}')),
+                ],
+              ),
+              duration: const Duration(seconds: 4),
+              backgroundColor: PGColors.brand,
+            ),
+          );
+        }
+      });
+    }
+
     // Trigger rebuild to update marker colors
     if (mounted) {
       setState(() {});
     }
+  }
+
+  String _getTourLanguage() {
+    final languages = widget.tourDetail.metadata.languages;
+    if (languages != null && languages.isNotEmpty) {
+      return languages.first;
+    }
+    return 'en';
   }
 
   void _showTokenExpiredDialog() {
@@ -179,6 +223,9 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
           timestamp: DateTime.now(),
         ));
       });
+
+      // Check geofences for current day's POIs
+      _geofenceService?.onLocationUpdate(position);
     };
 
     // Start tracking
@@ -189,6 +236,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       _showLocationServiceDisabledDialog();
     } else {
       print('✅ GPS tracking started');
+      // Seed initial POI list for geofencing
+      _geofenceService?.updateActiveDay(_selectedDay, _getPoisForDay(_selectedDay));
     }
   }
 
@@ -259,6 +308,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
       print('   📍 Switching to 30s GPS intervals + 1min batch uploads');
       print('   🎵 Audio will continue playing in background');
       _locationService.enterBackgroundMode();
+      // Save section progress so user can resume after returning
+      _geofenceService?.saveProgressSnapshot();
     } else if (state == AppLifecycleState.resumed) {
       // App comes to foreground - switch to 5s intervals with immediate upload
       print('📱 App resuming to foreground');
@@ -1041,6 +1092,11 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                       });
                       // Re-center map on new day's POIs
                       _mapController.move(_calculateCenter(), _calculateZoom());
+                      // Update geofence service to monitor new day's POIs
+                      _geofenceService?.updateActiveDay(
+                        index + 1,
+                        _getPoisForDay(index + 1),
+                      );
                     },
                     scrollController: FixedExtentScrollController(
                       initialItem: _selectedDay - 1,
@@ -1087,6 +1143,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     _locationService.dispose();
     _trailManager?.dispose();
     _progressManager?.dispose();
+    _geofenceSubscription?.cancel();
+    _geofenceService?.dispose();
     _mapController.dispose();
     super.dispose();
   }
