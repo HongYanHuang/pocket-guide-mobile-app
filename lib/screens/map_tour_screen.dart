@@ -118,7 +118,10 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
         tourId: widget.tourDetail.metadata.tourId,
         language: _getTourLanguage(),
         city: widget.tourDetail.metadata.city,
+        accessToken: accessToken,
       );
+      // Load prior section progress so geofencing resumes from correct section
+      await _geofenceService!.loadAudioProgress();
       _geofenceSubscription = _geofenceService!.events.listen((event) {
         if (!mounted) return;
         setState(() {}); // Refresh marker colours on enter/complete

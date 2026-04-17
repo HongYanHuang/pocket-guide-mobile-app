@@ -43,17 +43,24 @@ class GeofenceService {
   final _eventController = StreamController<GeofenceEvent>.broadcast();
   Stream<GeofenceEvent> get events => _eventController.stream;
 
+  final String _accessToken;
+
+  // Total sections per POI — needed for progress POST after sections are cleared
+  final Map<String, int> _totalSections = {};
+
   GeofenceService({
     required ProgressManager progressManager,
     required ApiService apiService,
     required String tourId,
     required String language,
     required String city,
+    required String accessToken,
   })  : _progressManager = progressManager,
         _apiService = apiService,
         _tourId = tourId,
         _language = language,
-        _city = city;
+        _city = city,
+        _accessToken = accessToken;
 
   /// Update which day is active and which POIs to monitor.
   /// Called by MapTourScreen on init and when user switches days.
@@ -102,13 +109,63 @@ class GeofenceService {
     }
   }
 
-  /// Save section progress — call on AppLifecycleState.paused so backend
-  /// can restore state next session. Currently saves to in-memory cache.
-  /// Backend sync can be wired here once the endpoint is available.
+  /// Save in-progress section state to backend.
+  /// Called on AppLifecycleState.paused so progress survives app restart.
   void saveProgressSnapshot() {
     if (_currentPoiId == null) return;
-    print('💾 Saving section progress: $_currentPoiId @ index $_currentSectionIndex');
-    // TODO: POST to /tours/{tourId}/audio-progress when backend endpoint is ready
+    final total = _totalSections[_currentPoiId!] ?? _currentSections.length;
+    if (total == 0) return;
+    print('💾 Saving progress snapshot: $_currentPoiId @ index $_currentSectionIndex');
+    _postAudioProgress(
+      poiId: _currentPoiId!,
+      day: _activeDay,
+      lastSectionIndex: _currentSectionIndex,
+      totalSections: total,
+      allSectionsCompleted: false,
+    );
+  }
+
+  /// Load audio section progress from backend on session start.
+  /// Seeds _sectionProgress so geofence auto-resumes from the right section.
+  Future<void> loadAudioProgress() async {
+    final records = await _apiService.getAudioProgress(
+      accessToken: _accessToken,
+      tourId: _tourId,
+    );
+    for (final record in records) {
+      final poiId = record['poi_id'] as String;
+      final lastIndex = record['last_section_index'] as int;
+      final allDone = record['all_sections_completed'] as bool;
+      if (!allDone) {
+        _sectionProgress[poiId] = lastIndex;
+        print('📖 Restored section progress: $poiId → resume at index $lastIndex');
+      }
+    }
+    if (records.isNotEmpty) {
+      print('✅ Audio progress loaded for ${records.length} POIs');
+    }
+  }
+
+  /// POST audio section progress to backend (fire and forget, fails silently).
+  void _postAudioProgress({
+    required String poiId,
+    required int day,
+    required int lastSectionIndex,
+    required int totalSections,
+    required bool allSectionsCompleted,
+  }) {
+    final completedSections = List<int>.generate(lastSectionIndex + 1, (i) => i + 1);
+    _apiService.saveAudioProgress(
+      accessToken: _accessToken,
+      tourId: _tourId,
+      poiId: poiId,
+      day: day,
+      lastSectionIndex: lastSectionIndex,
+      completedSections: completedSections,
+      totalSections: totalSections,
+      allSectionsCompleted: allSectionsCompleted,
+    );
+    // Intentionally not awaited — fire and forget
   }
 
   Future<void> _triggerPOIAudio(TourPOI poi, String poiId) async {
@@ -163,6 +220,7 @@ class GeofenceService {
 
       _sectionCache[poiId] = data;
       _currentSections = data.sections.toList();
+      _totalSections[poiId] = _currentSections.length;
 
       // Resume from saved section index, or start from beginning
       _currentSectionIndex = _sectionProgress[poiId] ?? 0;
@@ -236,6 +294,17 @@ class GeofenceService {
 
     _audioSubscription?.cancel();
     _audioSubscription = null;
+
+    final total = _totalSections[poiId] ?? _currentSections.length;
+
+    // Sync audio section progress to backend
+    _postAudioProgress(
+      poiId: poiId,
+      day: _activeDay,
+      lastSectionIndex: total - 1,
+      totalSections: total,
+      allSectionsCompleted: true,
+    );
 
     // Mark POI complete — syncs to backend via existing progress endpoint
     _progressManager.updatePOICompletion(

@@ -695,4 +695,57 @@ class ApiService {
       rethrow;
     }
   }
+
+  /// Save audio section progress for a POI (geofencing feature)
+  /// Called when: all sections complete, app goes background, app killed
+  Future<void> saveAudioProgress({
+    required String accessToken,
+    required String tourId,
+    required String poiId,
+    required int day,
+    required int lastSectionIndex,
+    required List<int> completedSections,
+    required int totalSections,
+    required bool allSectionsCompleted,
+  }) async {
+    try {
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+      await _dio.post(
+        '/tours/$tourId/audio-progress',
+        data: {
+          'poi_id': poiId,
+          'day': day,
+          'last_section_index': lastSectionIndex,
+          'completed_sections': completedSections,
+          'total_sections': totalSections,
+          'all_sections_completed': allSectionsCompleted,
+        },
+      );
+      print('💾 Audio progress saved: $poiId (section $lastSectionIndex, complete=$allSectionsCompleted)');
+    } catch (e) {
+      // Fail silently — audio playback is the core feature, progress sync is secondary
+      print('⚠️  Failed to save audio progress for $poiId: $e');
+    } finally {
+      _dio.options.headers.remove('Authorization');
+    }
+  }
+
+  /// Fetch all audio section progress for a tour (geofencing feature)
+  /// Called once on session start to seed the local resume cache
+  Future<List<Map<String, dynamic>>> getAudioProgress({
+    required String accessToken,
+    required String tourId,
+  }) async {
+    try {
+      _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+      final response = await _dio.get('/tours/$tourId/audio-progress');
+      final data = response.data as Map<String, dynamic>;
+      return List<Map<String, dynamic>>.from(data['audio_progress'] as List);
+    } catch (e) {
+      print('⚠️  Failed to load audio progress: $e (will start fresh)');
+      return [];
+    } finally {
+      _dio.options.headers.remove('Authorization');
+    }
+  }
 }
