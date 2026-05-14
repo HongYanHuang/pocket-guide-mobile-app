@@ -870,9 +870,46 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     );
   }
 
+  /// Shows "End the tour?" confirmation dialog.
+  /// Pops the screen on Finish, does nothing on Dismiss.
+  Future<void> _onBackPressed() async {
+    if (!widget.isActiveMode) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final finish = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('End the tour?'),
+        actions: [
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Finish'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Dismiss'),
+          ),
+        ],
+      ),
+    );
+
+    if (finish == true && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false, // Intercept system back gesture / Android hardware back
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onBackPressed();
+      },
+      child: Scaffold(
       backgroundColor: PGColors.background,
       body: Stack(
         children: [
@@ -928,7 +965,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                     ),
                   ],
                 ),
-                child: PGBackButton(),
+                child: PGBackButton(onPressed: _onBackPressed),
               ),
             ),
           ),
@@ -1041,7 +1078,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
             ),
         ],
       ),
-    );
+    ), // Scaffold
+    ); // PopScope
   }
 
   // Center map on user's current location and enable auto-follow
