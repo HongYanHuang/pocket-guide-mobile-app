@@ -12,6 +12,7 @@ import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/geofence_service.dart';
+import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
 import 'package:pocket_guide_mobile/models/geofence_event.dart';
@@ -120,6 +121,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
         city: widget.tourDetail.metadata.city,
         accessToken: accessToken,
       );
+      // Request notification permission so POI-entry banners appear even when backgrounded
+      await NotificationService.instance.requestPermission();
       // Load prior section progress so geofencing resumes from correct section
       await _geofenceService!.loadAudioProgress();
       _geofenceSubscription = _geofenceService!.events.listen((event) {

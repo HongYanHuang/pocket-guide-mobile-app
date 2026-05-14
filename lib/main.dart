@@ -1,9 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
+import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
@@ -17,7 +19,13 @@ import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
 import 'package:pocket_guide_mobile/widgets/network_image_with_fallback.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Initialise notification plugin early so it's ready before tour start.
+  // Only on real devices — skip for web (unsupported).
+  if (!kIsWeb) {
+    await NotificationService.instance.initialize();
+  }
   runApp(const PocketGuideApp());
 }
 

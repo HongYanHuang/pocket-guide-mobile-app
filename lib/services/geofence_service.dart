@@ -5,6 +5,7 @@ import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/models/geofence_event.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
+import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 
 class GeofenceService {
@@ -16,7 +17,7 @@ class GeofenceService {
 
   // Trigger radius and GPS accuracy guard
   static const double _radiusMeters = 80.0;
-  static const double _maxAccuracyMeters = 50.0;
+  static const double _maxAccuracyMeters = 100.0; // Relaxed: coastal/urban GPS often reports 50–80m
 
   // Active day state
   int _activeDay = 1;
@@ -75,7 +76,10 @@ class GeofenceService {
   /// Only active when tour is in active mode.
   void onLocationUpdate(Position position) {
     // Ignore poor GPS readings (urban canyon drift)
-    if (position.accuracy > _maxAccuracyMeters) return;
+    if (position.accuracy > _maxAccuracyMeters) {
+      print('📍 Geofence: skipping location (accuracy ${position.accuracy.toStringAsFixed(0)}m > ${_maxAccuracyMeters.toStringAsFixed(0)}m guard)');
+      return;
+    }
     if (_poisForDay.isEmpty) return;
 
     _triggeredByDay[_activeDay] ??= {};
@@ -191,12 +195,17 @@ class GeofenceService {
     _currentPoiId = poiId;
     _currentPoiName = poi.poi;
 
-    // Notify map screen immediately (shows snackbar)
+    // Notify map screen immediately (shows snackbar when app is foreground)
     _eventController.add(GeofenceEvent(
       type: GeofenceEventType.poiEntered,
       poiId: poiId,
       poiName: poi.poi,
     ));
+
+    // Show native iOS notification (visible even when app is backgrounded)
+    NotificationService.instance.showPOIEnteredNotification(
+      poiName: poi.poi,
+    );
 
     try {
       // Use cached transcript or fetch from API
