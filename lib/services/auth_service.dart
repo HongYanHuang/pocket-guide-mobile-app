@@ -473,30 +473,59 @@ class AuthService {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Optimistic auth: decode JWT locally to avoid a network round-trip on every
+  // app launch. JWTs embed their own expiry — no server call needed to check it.
+  // ---------------------------------------------------------------------------
+
+  /// Returns true if the JWT is expired or cannot be decoded.
+  bool _isJwtExpired(String jwt) {
+    try {
+      final parts = jwt.split('.');
+      if (parts.length != 3) return true;
+
+      // Base64url → pad to multiple of 4 before decoding
+      var payload = parts[1].replaceAll('-', '+').replaceAll('_', '/');
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '=';  break;
+      }
+
+      final decoded = utf8.decode(base64.decode(payload));
+      final claims = json.decode(decoded) as Map<String, dynamic>;
+      final exp = claims['exp'];
+      if (exp == null) return false; // no expiry claim → treat as valid
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch((exp as int) * 1000);
+      return DateTime.now().isAfter(expiry);
+    } catch (_) {
+      return true; // unparseable → treat as expired
+    }
+  }
+
   // Check if user is authenticated
   Future<bool> isAuthenticated() async {
     final hasTokens = await _storageService.hasTokens();
-    if (!hasTokens) {
-      return false;
+    if (!hasTokens) return false;
+
+    final accessToken = await _storageService.getAccessToken();
+
+    // Fast path: token still valid — no network call needed
+    if (accessToken != null && !_isJwtExpired(accessToken)) {
+      print('✅ Auth: token valid (local check)');
+      return true;
     }
 
-    // Try to get user info to validate token
-    try {
-      final user = await getCurrentUser();
-      return user != null;
-    } catch (e) {
-      // If getting user fails, try to refresh token
-      final refreshed = await refreshAccessToken();
-      if (refreshed) {
-        try {
-          final user = await getCurrentUser();
-          return user != null;
-        } catch (e) {
-          return false;
-        }
-      }
-      return false;
+    // Slow path: access token expired — try silent refresh before giving up
+    print('🔄 Auth: access token expired, attempting silent refresh...');
+    final refreshed = await refreshAccessToken();
+    if (refreshed) {
+      print('✅ Auth: silently refreshed');
+      return true;
     }
+
+    print('❌ Auth: refresh failed — user must log in again');
+    return false;
   }
 
   // Get current user info

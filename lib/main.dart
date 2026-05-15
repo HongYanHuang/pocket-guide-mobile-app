@@ -83,8 +83,10 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
   }
 
   Future<void> _checkAuth() async {
-    // Small delay for splash effect
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Short delay so the splash logo renders at least one frame.
+    // Previously 500ms to mask a network round-trip; now auth is a local JWT
+    // decode so 150ms is enough to avoid a visual flash.
+    await Future.delayed(const Duration(milliseconds: 150));
 
     final isAuthenticated = await _authService.isAuthenticated();
 
