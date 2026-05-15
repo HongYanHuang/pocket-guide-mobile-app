@@ -11,6 +11,7 @@ import 'package:pocket_guide_mobile/services/tour_progress_service.dart';
 import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:pocket_guide_mobile/services/active_tour_service.dart';
 import 'package:pocket_guide_mobile/services/geofence_service.dart';
 import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
@@ -25,11 +26,13 @@ import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart'
 class MapTourScreen extends StatefulWidget {
   final TourDetail tourDetail;
   final bool isActiveMode; // true = active mode (with GPS), false = preview mode
+  final int initialDay;    // which day to show on open (default 1)
 
   const MapTourScreen({
     super.key,
     required this.tourDetail,
     this.isActiveMode = false,
+    this.initialDay = 1,
   });
 
   @override
@@ -58,8 +61,8 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize with first day
-    _selectedDay = 1;
+    // Initialize with the day that was active when the tour was saved
+    _selectedDay = widget.initialDay;
 
     // Initialize everything in proper order
     _initializeMap();
@@ -109,6 +112,14 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
 
       // Don't show error dialog for 404 - it's expected for new tours
       // The backend will create progress data on the first POST /progress call
+    }
+
+    // Persist active tour so the user is restored here after an iOS app kill
+    if (widget.isActiveMode) {
+      await ActiveTourService().saveActiveTour(
+        tourId: widget.tourDetail.metadata.tourId,
+        day: _selectedDay,
+      );
     }
 
     // Initialize geofence service (active mode only)
@@ -898,6 +909,7 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
     );
 
     if (finish == true && mounted) {
+      await ActiveTourService().clearActiveTour();
       Navigator.of(context).pop();
     }
   }
@@ -1141,6 +1153,10 @@ class _MapTourScreenState extends State<MapTourScreen> with WidgetsBindingObserv
                         index + 1,
                         _getPoisForDay(index + 1),
                       );
+                      // Keep persisted day in sync
+                      if (widget.isActiveMode) {
+                        ActiveTourService().updateActiveDay(index + 1);
+                      }
                     },
                     scrollController: FixedExtentScrollController(
                       initialItem: _selectedDay - 1,

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
+import 'package:pocket_guide_mobile/services/active_tour_service.dart';
 import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
@@ -87,13 +88,53 @@ class _AuthCheckScreenState extends State<AuthCheckScreen> {
 
     final isAuthenticated = await _authService.isAuthenticated();
 
+    if (!mounted) return;
+
+    if (!isAuthenticated) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      return;
+    }
+
+    // Check if user was in an active tour when the app was killed.
+    // If so, restore them directly to the tour map — feels like it never stopped.
+    final activeTourId = await ActiveTourService().getActiveTourId();
+
+    if (activeTourId != null) {
+      try {
+        final apiService = ApiService();
+        final accessToken = await _authService.getAccessToken();
+        final tourDetail = await apiService.getTourById(
+          activeTourId,
+          accessToken: accessToken,
+        );
+        if (tourDetail == null) throw Exception('Tour not found');
+        final savedDay = await ActiveTourService().getActiveDay();
+
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => MapTourScreen(
+                tourDetail: tourDetail,
+                isActiveMode: true,
+                initialDay: savedDay,
+              ),
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        // Tour fetch failed (deleted / network error) — clear stale state
+        // and fall through to MainScreen.
+        print('⚠️  Could not restore active tour ($activeTourId): $e');
+        await ActiveTourService().clearActiveTour();
+      }
+    }
+
     if (mounted) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => isAuthenticated
-              ? const MainScreen()
-              : const LoginScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const MainScreen()),
       );
     }
   }
