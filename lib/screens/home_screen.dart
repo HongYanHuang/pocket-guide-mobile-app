@@ -366,6 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // ── Loading state ────────────────────────────────
           if (_loadingTours)
             const SliverFillRemaining(
+              hasScrollBody: false,
               child: Center(child: CupertinoActivityIndicator()),
             ),
 
