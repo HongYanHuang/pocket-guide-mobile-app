@@ -50,12 +50,14 @@ class TourCardCompact extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: gradient,
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: gradient,
+                          ),
                         ),
                       ),
                     ),

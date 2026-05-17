@@ -31,7 +31,6 @@ class ContinueWalkingBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final gradient = _gradient();
-    final stops = tour.totalStops ?? tour.totalPois;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),

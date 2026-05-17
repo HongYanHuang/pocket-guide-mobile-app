@@ -30,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<City> _cities = [];
   List<TourSummary> _tours = [];
-  bool _loadingCities = true;
   bool _loadingTours = true;
 
   /// Slug of the currently selected city; null = Nearby / show all.
@@ -54,18 +53,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadCities() async {
     final cities = await _api.getCityObjects();
-    if (mounted) setState(() { _cities = cities; _loadingCities = false; });
+    if (mounted)
+      setState(() {
+        _cities = cities;
+      });
   }
 
   Future<void> _loadTours() async {
     final tours = await _api.getAllTours();
-    if (mounted) setState(() { _tours = tours; _loadingTours = false; });
+    if (mounted)
+      setState(() {
+        _tours = tours;
+        _loadingTours = false;
+      });
   }
 
   Future<void> _loadActiveTour() async {
-    final id = await ActiveTourService().getActiveTourId();
-    final day = await ActiveTourService().getActiveDay();
-    if (mounted) setState(() { _activeTourId = id; _activeTourDay = day; });
+    try {
+      final id = await ActiveTourService().getActiveTourId();
+      final day = await ActiveTourService().getActiveDay();
+      if (mounted)
+        setState(() {
+          _activeTourId = id;
+          _activeTourDay = day;
+        });
+    } catch (e) {
+      print('Failed to load active tour state: $e');
+    }
   }
 
   // ── Computed properties ──────────────────────────────────────────
@@ -84,8 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     City? selectedCity;
     if (_selectedCitySlug != null) {
       try {
-        selectedCity =
-            _cities.firstWhere((c) => c.slug == _selectedCitySlug);
+        selectedCity = _cities.firstWhere((c) => c.slug == _selectedCitySlug);
       } catch (_) {
         selectedCity = null;
       }
@@ -106,9 +119,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
 
     // Personalised tours float to the top
-    result.sort((a, b) =>
-        ((b.isPersonalized ?? false) ? 1 : 0) -
-        ((a.isPersonalized ?? false) ? 1 : 0));
+    result.sort(
+      (a, b) =>
+          ((b.isPersonalized ?? false) ? 1 : 0) -
+          ((a.isPersonalized ?? false) ? 1 : 0),
+    );
     return result;
   }
 
@@ -179,233 +194,230 @@ class _HomeScreenState extends State<HomeScreen> {
     final cityName = _selectedCitySlug == null
         ? 'Nearby'
         : (_cities
-                .where((c) => c.slug == _selectedCitySlug)
-                .map((c) => c.name)
-                .firstOrNull ??
-            'Nearby');
+                  .where((c) => c.slug == _selectedCitySlug)
+                  .map((c) => c.name)
+                  .firstOrNull ??
+              'Nearby');
 
     return ColoredBox(
       color: PGColors.rawiPaper,
-      child: Stack(
-        children: [
-          // ── Scrollable content ─────────────────────────────────
-          CustomScrollView(
-            slivers: [
-              // Status bar spacer
-              SliverToBoxAdapter(
-                child: SizedBox(height: topPadding),
-              ),
+      child: CustomScrollView(
+        slivers: [
+          // Status bar spacer
+          SliverToBoxAdapter(child: SizedBox(height: topPadding)),
 
-              // ── City pill + avatar row ────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
-                  child: Row(
-                    children: [
-                      // City pill
-                      GestureDetector(
-                        onTap: _showCityPicker,
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
-                          decoration: BoxDecoration(
-                            color: PGColors.rawiInk,
-                            borderRadius:
-                                BorderRadius.circular(PGRadius.pill),
-                            boxShadow: [
-                              BoxShadow(
-                                color: PGColors.rawiInk.withOpacity(0.18),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+          // ── City pill + avatar row ────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 18),
+              child: Row(
+                children: [
+                  // City pill
+                  GestureDetector(
+                    onTap: _showCityPicker,
+                    child: Container(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
+                      decoration: BoxDecoration(
+                        color: PGColors.rawiInk,
+                        borderRadius: BorderRadius.circular(PGRadius.pill),
+                        boxShadow: [
+                          BoxShadow(
+                            color: PGColors.rawiInk.withOpacity(0.18),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _cityIcon(cityName),
-                                style: const TextStyle(fontSize: 17),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(cityName,
-                                  style: RawiTypography.cityPill()),
-                              const SizedBox(width: 6),
-                              const Icon(CupertinoIcons.chevron_down,
-                                  size: 11,
-                                  color: PGColors.rawiPaper),
-                            ],
-                          ),
-                        ),
+                        ],
                       ),
-                      const Spacer(),
-                      // User avatar placeholder
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFC9A67A), Color(0xFF6E5733)],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _cityIcon(cityName),
+                            style: const TextStyle(fontSize: 17),
                           ),
-                          border: Border.all(
-                              color: PGColors.rawiHair, width: 0.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Category rail ────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: CategoryRail(
-                    categories: categories,
-                    activeIndex: _activeCategoryIndex
-                        .clamp(0, (categories.length - 1).clamp(0, 999)),
-                    onChanged: (i) =>
-                        setState(() => _activeCategoryIndex = i),
-                  ),
-                ),
-              ),
-
-              // ── Continue walking (if active) ────────────────
-              if (activeTour != null)
-                SliverToBoxAdapter(
-                  child: ContinueWalkingBanner(
-                    tour: activeTour,
-                    currentDay: _activeTourDay,
-                    onTap: _resumeActiveTour,
-                  ),
-                ),
-
-              // ── Nearby / Featured rail (no active tour) ─────
-              if (activeTour == null && filteredTours.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: _NearbyRail(
-                    cityName: cityName,
-                    tours: filteredTours.take(3).toList(),
-                    onTap: (id) => _openTour(id),
-                  ),
-                ),
-
-              // ── Tour count + "Personalized" header ──────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '${filteredTours.length}',
-                                style: RawiTypography.sectionTitle(
-                                    color: PGColors.rawiAccent),
-                              ),
-                              TextSpan(
-                                text: filteredTours.length == 1
-                                    ? ' tour found'
-                                    : ' tours found',
-                                style:
-                                    RawiTypography.sectionTitle(),
-                              ),
-                            ],
+                          const SizedBox(width: 8),
+                          Text(cityName, style: RawiTypography.cityPill()),
+                          const SizedBox(width: 6),
+                          const Icon(
+                            CupertinoIcons.chevron_down,
+                            size: 11,
+                            color: PGColors.rawiPaper,
                           ),
-                        ),
-                      ),
-                      // Personalized shortcut button
-                      GestureDetector(
-                        onTap: _openCreateTour,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            borderRadius:
-                                BorderRadius.circular(PGRadius.pill),
-                            border: Border.all(
-                                color: PGColors.rawiAccent, width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('Personalized',
-                                  style: RawiTypography.meta(
-                                      color: PGColors.rawiAccent)
-                                    ..copyWith(fontWeight: FontWeight.w600)),
-                              const SizedBox(width: 4),
-                              const Text('🔒',
-                                  style: TextStyle(fontSize: 13)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // ── Loading state ────────────────────────────────
-              if (_loadingTours)
-                const SliverFillRemaining(
-                  child: Center(
-                    child: CupertinoActivityIndicator(),
-                  ),
-                ),
-
-              // ── Empty state ──────────────────────────────────
-              if (!_loadingTours && filteredTours.isEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 40),
-                    child: Center(
-                      child: Text(
-                        'No tours found for this filter.',
-                        style: RawiTypography.place(),
-                        textAlign: TextAlign.center,
+                        ],
                       ),
                     ),
                   ),
-                ),
+                  const Spacer(),
+                  // User avatar placeholder
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFC9A67A), Color(0xFF6E5733)],
+                      ),
+                      border: Border.all(color: PGColors.rawiHair, width: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-              // ── Tour cards ───────────────────────────────────
-              if (!_loadingTours)
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) {
-                        if (i < filteredTours.length) {
-                          return Padding(
-                            padding:
-                                const EdgeInsets.only(bottom: 24),
-                            child: TourCardLarge(
-                              tour: filteredTours[i],
-                              onTap: () =>
-                                  _openTour(filteredTours[i].tourId),
+          // ── Category rail ────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: CategoryRail(
+                categories: categories,
+                activeIndex: _activeCategoryIndex.clamp(
+                  0,
+                  (categories.length - 1).clamp(0, 999),
+                ),
+                onChanged: (i) => setState(() => _activeCategoryIndex = i),
+              ),
+            ),
+          ),
+
+          // ── Continue walking (if active) ────────────────
+          if (activeTour != null)
+            SliverToBoxAdapter(
+              child: ContinueWalkingBanner(
+                tour: activeTour,
+                currentDay: _activeTourDay,
+                onTap: _resumeActiveTour,
+              ),
+            ),
+
+          // ── Nearby / Featured rail (no active tour) ─────
+          if (activeTour == null && filteredTours.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _NearbyRail(
+                cityName: cityName,
+                tours: filteredTours.take(3).toList(),
+                onTap: (id) => _openTour(id),
+              ),
+            ),
+
+          // ── Tour count + "Personalized" header ──────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${filteredTours.length}',
+                            style: RawiTypography.sectionTitle(
+                              color: PGColors.rawiAccent,
                             ),
-                          );
-                        }
-                        // CTA at end of list
-                        return _CreateTourCTA(onTap: _openCreateTour);
-                      },
-                      childCount:
-                          filteredTours.isEmpty ? 0 : filteredTours.length + 1,
+                          ),
+                          TextSpan(
+                            text: filteredTours.length == 1
+                                ? ' tour found'
+                                : ' tours found',
+                            style: RawiTypography.sectionTitle(),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-
-              // Bottom safe area
-              SliverToBoxAdapter(
-                child: SizedBox(
-                    height: MediaQuery.of(context).padding.bottom + 100),
+                  // Personalized shortcut button
+                  GestureDetector(
+                    onTap: _openCreateTour,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(PGRadius.pill),
+                        border: Border.all(
+                          color: PGColors.rawiAccent,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Personalized',
+                            style: RawiTypography.meta(
+                              color: PGColors.rawiAccent,
+                            ).copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('🔒', style: TextStyle(fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ),
+
+          // ── Loading state ────────────────────────────────
+          if (_loadingTours)
+            const SliverFillRemaining(
+              child: Center(child: CupertinoActivityIndicator()),
+            ),
+
+          // ── Empty state ──────────────────────────────────
+          if (!_loadingTours && filteredTours.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 40,
+                ),
+                child: Center(
+                  child: Text(
+                    'No tours found for this filter.',
+                    style: RawiTypography.place(),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Tour cards ───────────────────────────────────
+          if (!_loadingTours)
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                    if (i < filteredTours.length) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 24),
+                        child: TourCardLarge(
+                          tour: filteredTours[i],
+                          onTap: () => _openTour(filteredTours[i].tourId),
+                        ),
+                      );
+                    }
+                    // CTA at end of list
+                    return _CreateTourCTA(onTap: _openCreateTour);
+                  },
+                  childCount: filteredTours.isEmpty
+                      ? 0
+                      : filteredTours.length + 1,
+                ),
+              ),
+            ),
+
+          // Bottom safe area
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: MediaQuery.of(context).padding.bottom + 100,
+            ),
           ),
         ],
       ),
@@ -449,8 +461,7 @@ class _NearbyRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        cityName == 'Nearby' ? 'Near you' : 'Featured in $cityName';
+    final title = cityName == 'Nearby' ? 'Near you' : 'Featured in $cityName';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
@@ -462,16 +473,20 @@ class _NearbyRail extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Text(title,
-                      style: RawiTypography.sectionTitle(),
-                      overflow: TextOverflow.ellipsis),
+                  child: Text(
+                    title,
+                    style: RawiTypography.sectionTitle(),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 GestureDetector(
                   onTap: () {}, // TODO: open map view
-                  child: Text('Map',
-                      style: RawiTypography.meta(
-                          color: PGColors.rawiAccent)
-                        ..copyWith(fontWeight: FontWeight.w600)),
+                  child: Text(
+                    'Map',
+                    style: RawiTypography.meta(
+                      color: PGColors.rawiAccent,
+                    ).copyWith(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ],
             ),
@@ -529,8 +544,7 @@ class _CreateTourCTA extends StatelessWidget {
           GestureDetector(
             onTap: onTap,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 color: PGColors.rawiAccent,
                 borderRadius: BorderRadius.circular(12),
@@ -538,14 +552,17 @@ class _CreateTourCTA extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(CupertinoIcons.add,
-                      size: 14, color: PGColors.rawiPaper),
+                  const Icon(
+                    CupertinoIcons.add,
+                    size: 14,
+                    color: PGColors.rawiPaper,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Create your personalized tour',
-                    style: RawiTypography.meta(color: PGColors.rawiPaper)
-                      ..copyWith(
-                          fontWeight: FontWeight.w600, fontSize: 14),
+                    style: RawiTypography.meta(
+                      color: PGColors.rawiPaper,
+                    ).copyWith(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                 ],
               ),

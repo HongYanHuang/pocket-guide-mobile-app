@@ -25,12 +25,6 @@ class TourCardLarge extends StatelessWidget {
     return _kGradients[tour.tourId.hashCode.abs() % _kGradients.length];
   }
 
-  String _formatHours(num h) {
-    final d = h.toDouble();
-    if (d == d.floorToDouble()) return '${d.toInt()} hr';
-    return '${d.toStringAsFixed(1)} hr';
-  }
-
   @override
   Widget build(BuildContext context) {
     final gradient = _gradient();
@@ -52,12 +46,14 @@ class TourCardLarge extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: gradient,
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: gradient,
+                          ),
                         ),
                       ),
                     ),
