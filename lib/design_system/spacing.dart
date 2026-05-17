@@ -57,6 +57,11 @@ class PGRadius {
   static const double xl = 24.0;
   static const double xxl = 32.0;
 
+  // Rawi-specific radii
+  static const double pill     = 99.0; // fully-rounded pill shape
+  static const double rawiCard = 18.0; // large card corners
+  static const double rawiChip = 14.0; // category chip corners
+
   // Common border radius
   static final BorderRadius radiusXS = BorderRadius.circular(xs);
   static final BorderRadius radiusS = BorderRadius.circular(s);

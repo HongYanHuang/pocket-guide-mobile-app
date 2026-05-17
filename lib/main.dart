@@ -11,6 +11,7 @@ import 'package:pocket_guide_mobile/screens/login_screen.dart';
 import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
+import 'package:pocket_guide_mobile/screens/home_screen.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -184,20 +185,29 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const AccountsScreen(),
-  ];
+  void _navigateToTour(BuildContext context, String tourId) {
+    Navigator.push(
+      context,
+      CupertinoPageRoute(
+        builder: (_) => TourWithTranscriptScreen(tourId: tourId),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = <Widget>[
+      HomeScreen(onTourTap: (id) => _navigateToTour(context, id)),
+      const AccountsScreen(),
+    ];
+
     return Stack(
       children: [
         Scaffold(
           backgroundColor: PGColors.background,
           body: IndexedStack(
             index: _currentIndex,
-            children: _screens,
+            children: screens,
           ),
           bottomNavigationBar: PGTabBar(
             currentIndex: _currentIndex,
@@ -243,111 +253,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-// Home Screen
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
 
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  String? _selectedCity;
-  final ApiService _apiService = ApiService();
-  List<String> _cities = [];
-  bool _loadingCities = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCities();
-  }
-
-  Future<void> _loadCities() async {
-    setState(() => _loadingCities = true);
-    try {
-      final cities = await _apiService.getCities();
-      setState(() {
-        _cities = cities;
-        _loadingCities = false;
-      });
-    } catch (e) {
-      setState(() => _loadingCities = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to load cities: $e')),
-        );
-      }
-    }
-  }
-
-  void _showCitySelector() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => CitySelectionBottomSheet(
-        cities: _cities,
-        loading: _loadingCities,
-        onCitySelected: (city) {
-          setState(() {
-            _selectedCity = city;
-          });
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: PGColors.background,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Large title header
-          PGLargeNavigationBar(
-            title: _selectedCity ?? 'Select City',
-            showChevron: true,
-            onTitleTap: _showCitySelector,
-          ),
-          // Tours list
-          Expanded(
-            child: _selectedCity == null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          CupertinoIcons.map,
-                          size: 80,
-                          color: PGColors.gray300,
-                        ),
-                        SizedBox(height: PGSpacing.l),
-                        Text(
-                          'Select a destination to view tours',
-                          style: PGTypography.body.copyWith(
-                            color: PGColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: PGSpacing.m),
-                        PGButtonText(
-                          text: 'Choose City',
-                          onPressed: _showCitySelector,
-                        ),
-                      ],
-                    ),
-                  )
-                : ToursList(city: _selectedCity!),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // City Selection Bottom Sheet
 class CitySelectionBottomSheet extends StatefulWidget {

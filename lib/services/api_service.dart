@@ -68,6 +68,28 @@ class ApiService {
     }
   }
 
+  /// Get list of cities with full details (name, slug, country, poi_count)
+  Future<List<City>> getCityObjects() async {
+    try {
+      final response = await _api.listCitiesCitiesGet();
+      return response.data?.toList() ?? [];
+    } catch (e) {
+      print('Error fetching city objects: $e');
+      return [];
+    }
+  }
+
+  /// Get all tours without city filter (returns full TourSummary with home feed fields)
+  Future<List<TourSummary>> getAllTours() async {
+    try {
+      final response = await _api.listToursToursGet();
+      return response.data?.toList() ?? [];
+    } catch (e) {
+      print('Error fetching all tours: $e');
+      return [];
+    }
+  }
+
   /// Get list of tours for a specific city
   Future<List<TourSummary>> getToursByCity(String city) async {
     try {

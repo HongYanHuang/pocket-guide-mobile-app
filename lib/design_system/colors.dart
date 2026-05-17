@@ -55,4 +55,24 @@ class PGColors {
   static const shadowLight = Color(0x0A000000);  // Very subtle
   static const shadowMedium = Color(0x14000000); // Subtle
   static const shadowDark = Color(0x1F000000);   // Visible but soft
+
+  // ── Rawi warm-paper palette ──────────────────────────────────────
+  // Ivory surfaces
+  static const rawiPaper  = Color(0xFFF6F1E7); // main card / screen surface
+  static const rawiPaper2 = Color(0xFFEFE8D8); // elevated surface (narrator pill, etc.)
+  static const rawiPaper3 = Color(0xFFE7DEC9); // deep / pressed surface
+
+  // Warm ink (brownish-black, not pure black)
+  static const rawiInk    = Color(0xFF1B1915); // primary text & icons
+  static const rawiInk2   = Color(0xFF3C3730); // secondary text
+  static const rawiInk3   = Color(0xFF6B6459); // tertiary text / muted
+  static const rawiInk4   = Color(0xFF9A9285); // disabled / hint
+
+  // Hairline dividers (warm semi-transparent)
+  static const rawiHair     = Color(0x1F1B1915); // 12% warm ink
+  static const rawiHairSoft = Color(0x0F1B1915); // 6% warm ink
+
+  // Olive accent
+  static const rawiAccent     = Color(0xFF3A4A3A);
+  static const rawiAccentSoft = Color(0x1A3A4A3A); // 10% olive
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 /// Pocket Guide typography system
@@ -156,4 +157,93 @@ class PGTypography {
     height: 1.33,
     color: PGColors.white,
   );
+}
+
+/// Rawi design system typography — Source Sans 3
+/// Used exclusively by the rawi home page and its components.
+class RawiTypography {
+  // Section header  18 / w600 / -1%
+  static TextStyle sectionTitle({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.18,
+        color: color ?? PGColors.rawiInk,
+      );
+
+  // Large card title  16 / w600 / -1%
+  static TextStyle cardTitle({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.16,
+        height: 1.25,
+        color: color ?? PGColors.rawiInk,
+      );
+
+  // Compact card title  14 / w600 / -1%
+  static TextStyle cardTitleSmall({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.14,
+        height: 1.2,
+        color: color ?? PGColors.rawiInk,
+      );
+
+  // Place / subtitle  13 / w400
+  static TextStyle place({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        color: color ?? PGColors.rawiInk3,
+      );
+
+  // Meta row items (duration, stops, etc.)  12 / w400
+  static TextStyle meta({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: color ?? PGColors.rawiInk3,
+      );
+
+  // Rating number  13 / w600
+  static TextStyle ratingValue({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.1,
+        color: color ?? PGColors.rawiInk,
+      );
+
+  // Category chip  14 / w400 or w600 when active
+  static TextStyle chip({required bool active}) => GoogleFonts.sourceSans3(
+        fontSize: 14,
+        fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+        color: active ? PGColors.rawiPaper : PGColors.rawiInk2,
+      );
+
+  // City pill label  14 / w600
+  static TextStyle cityPill({Color? color}) => GoogleFonts.sourceSans3(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -0.14,
+        color: color ?? PGColors.rawiPaper,
+      );
+
+  // "Narrated by" label  12 / w400
+  static TextStyle narratorLabel() => GoogleFonts.sourceSans3(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: PGColors.rawiInk3,
+      );
+
+  // Narrator name  13 / w500
+  static TextStyle narratorName() => GoogleFonts.sourceSans3(
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+        color: PGColors.rawiInk,
+      );
+
+  // CTA body text  13 / w400  centered
+  static TextStyle ctaBody() => GoogleFonts.sourceSans3(
+        fontSize: 13,
+        fontWeight: FontWeight.w400,
+        height: 1.5,
+        color: PGColors.rawiInk3,
+      );
 }
