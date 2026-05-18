@@ -79,10 +79,10 @@ class ApiService {
     }
   }
 
-  /// Get all tours without city filter (returns full TourSummary with home feed fields)
-  Future<List<TourSummary>> getAllTours() async {
+  /// Get tours, optionally filtered by city slug and/or category slug.
+  Future<List<TourSummary>> getAllTours({String? city, String? category}) async {
     try {
-      final response = await _api.listToursToursGet();
+      final response = await _api.listToursToursGet(city: city, category: category);
       return response.data?.toList() ?? [];
     } catch (e) {
       print('Error fetching all tours: $e');
@@ -90,29 +90,14 @@ class ApiService {
     }
   }
 
-  /// Get list of tours for a specific city
-  Future<List<TourSummary>> getToursByCity(String city) async {
+  /// Get categories for the home feed rail, optionally scoped to a city.
+  Future<List<CategoryItem>> getCategories({String? city}) async {
     try {
-      print('Fetching tours for city: $city');
-      final response = await _api.listToursToursGet();
-      print('API response received: ${response.data?.length ?? 0} tours');
-
-      if (response.data == null) {
-        print('No tour data returned');
-        return [];
-      }
-
-      // Filter tours by city (case-insensitive)
-      final cityLower = city.toLowerCase();
-      final filteredTours = response.data!
-          .where((tour) => tour.city.toLowerCase() == cityLower)
-          .toList();
-
-      print('Filtered ${filteredTours.length} tours for $city');
-      return filteredTours;
+      final response = await _api.getTourCategoriesToursCategoriesGet(city: city);
+      return response.data?.categories.toList() ?? [];
     } catch (e) {
-      print('Error fetching tours: $e');
-      rethrow;
+      print('Error fetching categories: $e');
+      return [];
     }
   }
 

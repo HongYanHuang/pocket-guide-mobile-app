@@ -5,25 +5,6 @@ import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 
-// City emojis are a rawi design easter egg — one icon per known city.
-// Unknown cities fall back to a generic pin.
-const _kCityIcons = <String, String>{
-  'Rome': '🏛️',
-  'Kyoto': '⛩️',
-  'Lisbon': '🚋',
-  'Marrakech': '🕌',
-  'Taipei': '🏙️',
-  'Paris': '🗼',
-  'London': '🎡',
-  'Tokyo': '🗾',
-  'New York': '🗽',
-  'Barcelona': '🎨',
-  'Amsterdam': '🚲',
-  'Venice': '🚤',
-  'Florence': '🌻',
-  'Berlin': '🐻',
-};
-
 const _kNearby = 'Nearby';
 
 class CityPickerSheet extends StatelessWidget {
@@ -108,7 +89,7 @@ class CityPickerSheet extends StatelessWidget {
                 final city = cities[i];
                 final isActive = selectedSlug == city.slug;
                 return _CityRow(
-                  icon: _kCityIcons[city.name] ?? '📍',
+                  icon: city.emoji ?? '📍',
                   name: city.name,
                   subtitle: city.country ?? '',
                   isActive: isActive,

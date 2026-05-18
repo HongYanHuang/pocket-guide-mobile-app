@@ -3,6 +3,7 @@ import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'star_rating.dart';
 
 // Same gradient palette as the large card for consistency.
@@ -61,6 +62,16 @@ class TourCardCompact extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (tour.coverImageUrl != null &&
+                        tour.coverImageUrl!.isNotEmpty)
+                      Positioned.fill(
+                        child: Image.network(
+                          '${ApiService.baseUrl}${tour.coverImageUrl}',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) =>
+                              const SizedBox.shrink(),
+                        ),
+                      ),
                     // Duration overlay pill at bottom-left
                     Positioned(
                       bottom: 10,

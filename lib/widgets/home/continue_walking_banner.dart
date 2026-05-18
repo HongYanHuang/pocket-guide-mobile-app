@@ -3,6 +3,7 @@ import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
+import 'package:pocket_guide_mobile/services/api_service.dart';
 
 const _kGradients = [
   [Color(0xFFC9A67A), Color(0xFF6E5733)],
@@ -60,15 +61,30 @@ class ContinueWalkingBanner extends StatelessWidget {
                   // Thumbnail
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Container(
+                    child: SizedBox(
                       width: 54,
                       height: 54,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: gradient,
-                        ),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: gradient,
+                              ),
+                            ),
+                          ),
+                          if (tour.coverImageUrl != null &&
+                              tour.coverImageUrl!.isNotEmpty)
+                            Image.network(
+                              '${ApiService.baseUrl}${tour.coverImageUrl}',
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                                  const SizedBox.shrink(),
+                            ),
+                        ],
                       ),
                     ),
                   ),

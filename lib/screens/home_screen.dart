@@ -29,13 +29,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final _api = ApiService();
 
   List<City> _cities = [];
+  List<CategoryItem> _apiCategories = [];
   List<TourSummary> _tours = [];
   bool _loadingTours = true;
 
   /// Slug of the currently selected city; null = Nearby / show all.
   String? _selectedCitySlug;
 
-  int _activeCategoryIndex = 0;
+  /// Slug of the currently selected category; null = "All".
+  String? _selectedCategorySlug;
 
   /// Active tour state restored from SharedPreferences.
   String? _activeTourId;
@@ -47,20 +49,26 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadCities();
+    _loadCategories();
     _loadTours();
     _loadActiveTour();
   }
 
   Future<void> _loadCities() async {
     final cities = await _api.getCityObjects();
-    if (mounted)
-      setState(() {
-        _cities = cities;
-      });
+    if (mounted) setState(() => _cities = cities);
+  }
+
+  Future<void> _loadCategories() async {
+    final cats = await _api.getCategories(city: _selectedCitySlug);
+    if (mounted) setState(() => _apiCategories = cats);
   }
 
   Future<void> _loadTours() async {
-    final tours = await _api.getAllTours();
+    final tours = await _api.getAllTours(
+      city: _selectedCitySlug,
+      category: _selectedCategorySlug,
+    );
     if (mounted)
       setState(() {
         _tours = tours;
@@ -84,41 +92,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ── Computed properties ──────────────────────────────────────────
 
-  /// Unique sorted categories derived from tour data, prepended with "All".
-  List<String> get _categories {
-    final cats = <String>{};
-    for (final t in _tours) {
-      if (t.category != null) cats.add(t.category!);
-    }
-    return ['All', ...cats.toList()..sort()];
+  /// Labels for the category rail: "All" prepended, then API-sourced categories.
+  List<String> get _categoryLabels =>
+      ['All', ..._apiCategories.map((c) => c.label)];
+
+  /// Index of the active category pill (0 = "All").
+  int get _activeCategoryIndex {
+    if (_selectedCategorySlug == null) return 0;
+    final idx = _apiCategories.indexWhere((c) => c.slug == _selectedCategorySlug);
+    return idx < 0 ? 0 : idx + 1;
   }
 
-  /// Tours filtered by selected city + active category, personalised first.
+  /// Tours from the server (already filtered), personalised first.
   List<TourSummary> get _filteredTours {
-    City? selectedCity;
-    if (_selectedCitySlug != null) {
-      try {
-        selectedCity = _cities.firstWhere((c) => c.slug == _selectedCitySlug);
-      } catch (_) {
-        selectedCity = null;
-      }
-    }
-
-    var result = _tours.where((t) {
-      // City filter
-      if (selectedCity != null &&
-          t.city.toLowerCase() != selectedCity.name.toLowerCase()) {
-        return false;
-      }
-      // Category filter
-      if (_activeCategoryIndex > 0) {
-        final cat = _categories[_activeCategoryIndex];
-        if (t.category != cat) return false;
-      }
-      return true;
-    }).toList();
-
-    // Personalised tours float to the top
+    final result = List<TourSummary>.from(_tours);
     result.sort(
       (a, b) =>
           ((b.isPersonalized ?? false) ? 1 : 0) -
@@ -176,8 +163,11 @@ class _HomeScreenState extends State<HomeScreen> {
         onPick: (slug) {
           setState(() {
             _selectedCitySlug = slug;
-            _activeCategoryIndex = 0; // reset category on city change
+            _selectedCategorySlug = null; // reset category on city change
+            _loadingTours = true;
           });
+          _loadCategories();
+          _loadTours();
         },
       ),
     );
@@ -190,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final topPadding = MediaQuery.of(context).padding.top;
     final activeTour = _activeTour;
     final filteredTours = _filteredTours;
-    final categories = _categories;
+    final categories = _categoryLabels;
     final cityName = _selectedCitySlug == null
         ? 'Nearby'
         : (_cities
@@ -277,7 +267,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   0,
                   (categories.length - 1).clamp(0, 999),
                 ),
-                onChanged: (i) => setState(() => _activeCategoryIndex = i),
+                onChanged: (i) {
+                  final slug = i == 0 ? null : _apiCategories[i - 1].slug;
+                  if (slug == _selectedCategorySlug) return;
+                  setState(() {
+                    _selectedCategorySlug = slug;
+                    _loadingTours = true;
+                  });
+                  _loadTours();
+                },
               ),
             ),
           ),
@@ -425,25 +423,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String _cityIcon(String name) {
-    const icons = <String, String>{
-      'Nearby': '🧭',
-      'Rome': '🏛️',
-      'Kyoto': '⛩️',
-      'Lisbon': '🚋',
-      'Marrakech': '🕌',
-      'Taipei': '🏙️',
-      'Paris': '🗼',
-      'London': '🎡',
-      'Tokyo': '🗾',
-      'New York': '🗽',
-      'Barcelona': '🎨',
-      'Amsterdam': '🚲',
-      'Venice': '🚤',
-      'Florence': '🌻',
-      'Berlin': '🐻',
-    };
-    return icons[name] ?? '📍';
+  String _cityIcon(String cityName) {
+    if (cityName == 'Nearby') return '🧭';
+    return _cities
+            .where((c) => c.name == cityName)
+            .firstOrNull
+            ?.emoji ??
+        '📍';
   }
 }
 
