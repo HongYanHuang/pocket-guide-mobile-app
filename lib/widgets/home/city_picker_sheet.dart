@@ -32,15 +32,18 @@ class CityPickerSheet extends StatelessWidget {
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: PGColors.rawiHair,
-              borderRadius: BorderRadius.circular(PGRadius.pill),
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: PGColors.rawiHair,
+                borderRadius: BorderRadius.circular(PGRadius.pill),
+              ),
             ),
           ),
           // Header
@@ -56,6 +59,7 @@ class CityPickerSheet extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.12 * 11,
                     color: PGColors.rawiInk3,
+                    decoration: TextDecoration.none,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -84,6 +88,7 @@ class CityPickerSheet extends StatelessWidget {
             ),
             child: ListView.builder(
               shrinkWrap: true,
+              padding: EdgeInsets.zero,
               itemCount: cities.length,
               itemBuilder: (context, i) {
                 final city = cities[i];
@@ -146,7 +151,7 @@ class _CityRow extends StatelessWidget {
                     : PGColors.rawiPaper2,
               ),
               child: Center(
-                child: Text(icon, style: const TextStyle(fontSize: 19)),
+                child: Text(icon, style: const TextStyle(fontSize: 19, decoration: TextDecoration.none)),
               ),
             ),
             const SizedBox(width: 12),
@@ -161,6 +166,7 @@ class _CityRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                       letterSpacing: -0.01 * 16,
                       color: PGColors.rawiInk,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                   if (subtitle.isNotEmpty) ...[

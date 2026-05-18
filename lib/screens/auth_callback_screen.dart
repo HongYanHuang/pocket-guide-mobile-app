@@ -1,8 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthCallbackScreen extends StatefulWidget {
   const AuthCallbackScreen({super.key});
@@ -62,12 +61,12 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       if (success) {
         print('✅ AuthCallback: Token exchange successful!');
 
-        // On web, do a hard redirect to the root so AuthCheckScreen picks up
-        // the stored tokens and routes to MainScreen cleanly.
-        // Flutter Navigator.pushNamed from /auth/callback can leave stale
-        // URL state that causes a grey screen.
+        // On web, use launchUrl with '_self' to force a true browser navigation
+        // to '/' — same mechanism used for the Google OAuth redirect, so it
+        // bypasses Flutter's PathUrlStrategy and triggers a real page reload.
+        // This ensures AuthCheckScreen picks up the stored tokens cleanly.
         if (kIsWeb) {
-          html.window.location.replace('/');
+          await launchUrl(Uri.parse('/'), webOnlyWindowName: '_self');
           return;
         }
 

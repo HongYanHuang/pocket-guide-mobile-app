@@ -12,6 +12,7 @@ class PGTypography {
     letterSpacing: -0.9,
     height: 1.2,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   static const largeTitleEmphasized = TextStyle(
@@ -20,6 +21,7 @@ class PGTypography {
     letterSpacing: -0.9,
     height: 1.2,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   // Titles
@@ -29,6 +31,7 @@ class PGTypography {
     letterSpacing: -0.9,
     height: 1.25,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   static const title2 = TextStyle(
@@ -37,6 +40,7 @@ class PGTypography {
     letterSpacing: -0.8,
     height: 1.27,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   static const title3 = TextStyle(
@@ -45,6 +49,7 @@ class PGTypography {
     letterSpacing: -0.8,
     height: 1.3,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   // Headlines
@@ -54,6 +59,7 @@ class PGTypography {
     letterSpacing: -0.41,
     height: 1.35,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   // Body text
@@ -63,6 +69,7 @@ class PGTypography {
     letterSpacing: -0.41,
     height: 1.41,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   static const bodyEmphasized = TextStyle(
@@ -71,6 +78,7 @@ class PGTypography {
     letterSpacing: -0.41,
     height: 1.41,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   // Callout (slightly smaller than body)
@@ -80,6 +88,7 @@ class PGTypography {
     letterSpacing: -0.32,
     height: 1.38,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   static const calloutEmphasized = TextStyle(
@@ -88,6 +97,7 @@ class PGTypography {
     letterSpacing: -0.32,
     height: 1.38,
     color: PGColors.textPrimary,
+    decoration: TextDecoration.none,
   );
 
   // Subheadline
@@ -97,6 +107,7 @@ class PGTypography {
     letterSpacing: -0.24,
     height: 1.33,
     color: PGColors.textSecondary,
+    decoration: TextDecoration.none,
   );
 
   static const subheadlineEmphasized = TextStyle(
@@ -105,6 +116,7 @@ class PGTypography {
     letterSpacing: -0.24,
     height: 1.33,
     color: PGColors.textSecondary,
+    decoration: TextDecoration.none,
   );
 
   // Footnote
@@ -114,6 +126,7 @@ class PGTypography {
     letterSpacing: -0.08,
     height: 1.38,
     color: PGColors.textSecondary,
+    decoration: TextDecoration.none,
   );
 
   static const footnoteEmphasized = TextStyle(
@@ -122,6 +135,7 @@ class PGTypography {
     letterSpacing: -0.08,
     height: 1.38,
     color: PGColors.textSecondary,
+    decoration: TextDecoration.none,
   );
 
   // Caption (smallest)
@@ -131,6 +145,7 @@ class PGTypography {
     letterSpacing: 0,
     height: 1.33,
     color: PGColors.textTertiary,
+    decoration: TextDecoration.none,
   );
 
   static const caption2 = TextStyle(
@@ -139,6 +154,7 @@ class PGTypography {
     letterSpacing: 0.07,
     height: 1.27,
     color: PGColors.textTertiary,
+    decoration: TextDecoration.none,
   );
 
   // Button text
@@ -148,6 +164,7 @@ class PGTypography {
     letterSpacing: -0.41,
     height: 1.29,
     color: PGColors.white,
+    decoration: TextDecoration.none,
   );
 
   static const buttonSmall = TextStyle(
@@ -156,6 +173,7 @@ class PGTypography {
     letterSpacing: -0.24,
     height: 1.33,
     color: PGColors.white,
+    decoration: TextDecoration.none,
   );
 }
 
@@ -168,6 +186,7 @@ class RawiTypography {
         fontWeight: FontWeight.w600,
         letterSpacing: -0.18,
         color: color ?? PGColors.rawiInk,
+        decoration: TextDecoration.none,
       );
 
   // Large card title  16 / w600 / -1%
@@ -177,6 +196,7 @@ class RawiTypography {
         letterSpacing: -0.16,
         height: 1.25,
         color: color ?? PGColors.rawiInk,
+        decoration: TextDecoration.none,
       );
 
   // Compact card title  14 / w600 / -1%
@@ -186,6 +206,7 @@ class RawiTypography {
         letterSpacing: -0.14,
         height: 1.2,
         color: color ?? PGColors.rawiInk,
+        decoration: TextDecoration.none,
       );
 
   // Place / subtitle  13 / w400
@@ -193,6 +214,7 @@ class RawiTypography {
         fontSize: 13,
         fontWeight: FontWeight.w400,
         color: color ?? PGColors.rawiInk3,
+        decoration: TextDecoration.none,
       );
 
   // Meta row items (duration, stops, etc.)  12 / w400
@@ -200,6 +222,7 @@ class RawiTypography {
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: color ?? PGColors.rawiInk3,
+        decoration: TextDecoration.none,
       );
 
   // Rating number  13 / w600
@@ -208,6 +231,7 @@ class RawiTypography {
         fontWeight: FontWeight.w600,
         letterSpacing: -0.1,
         color: color ?? PGColors.rawiInk,
+        decoration: TextDecoration.none,
       );
 
   // Category chip  14 / w400 or w600 when active
@@ -215,6 +239,7 @@ class RawiTypography {
         fontSize: 14,
         fontWeight: active ? FontWeight.w600 : FontWeight.w400,
         color: active ? PGColors.rawiPaper : PGColors.rawiInk2,
+        decoration: TextDecoration.none,
       );
 
   // City pill label  14 / w600
@@ -223,6 +248,7 @@ class RawiTypography {
         fontWeight: FontWeight.w600,
         letterSpacing: -0.14,
         color: color ?? PGColors.rawiPaper,
+        decoration: TextDecoration.none,
       );
 
   // "Narrated by" label  12 / w400
@@ -230,6 +256,7 @@ class RawiTypography {
         fontSize: 12,
         fontWeight: FontWeight.w400,
         color: PGColors.rawiInk3,
+        decoration: TextDecoration.none,
       );
 
   // Narrator name  13 / w500
@@ -237,6 +264,7 @@ class RawiTypography {
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: PGColors.rawiInk,
+        decoration: TextDecoration.none,
       );
 
   // CTA body text  13 / w400  centered
@@ -245,5 +273,6 @@ class RawiTypography {
         fontWeight: FontWeight.w400,
         height: 1.5,
         color: PGColors.rawiInk3,
+        decoration: TextDecoration.none,
       );
 }
