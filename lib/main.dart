@@ -12,6 +12,7 @@ import 'package:pocket_guide_mobile/screens/auth_callback_screen.dart';
 import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/home_screen.dart';
+import 'package:pocket_guide_mobile/screens/tour_detail_screen.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -189,7 +190,7 @@ class _MainScreenState extends State<MainScreen> {
     Navigator.push(
       context,
       CupertinoPageRoute(
-        builder: (_) => TourWithTranscriptScreen(tourId: tourId),
+        builder: (_) => TourDetailScreen(tourId: tourId),
       ),
     );
   }
@@ -808,7 +809,7 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
         Navigator.push(
           context,
           CupertinoPageRoute(
-            builder: (context) => TourWithTranscriptScreen(tourId: tourId),
+            builder: (context) => TourDetailScreen(tourId: tourId),
           ),
         );
       },

@@ -737,6 +737,20 @@ class ApiService {
     }
   }
 
+  /// Get reviews for a tour
+  Future<List<TourReview>> getReviews(String tourId, {int limit = 10}) async {
+    try {
+      final response = await _api.getTourReviewsToursTourIdReviewsGet(
+        tourId: tourId,
+        limit: limit,
+      );
+      return response.data?.reviews.toList() ?? [];
+    } catch (e) {
+      print('Error fetching reviews for $tourId: $e');
+      return [];
+    }
+  }
+
   /// Fetch all audio section progress for a tour (geofencing feature)
   /// Called once on session start to seed the local resume cache
   Future<List<Map<String, dynamic>>> getAudioProgress({
