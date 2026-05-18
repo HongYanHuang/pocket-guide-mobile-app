@@ -4,11 +4,7 @@
 **Date:** 2026-05-18  
 **Status:** Open — awaiting backend implementation  
 
-This document catalogues every place in the mobile app where data is either hardcoded on the frontend or derived by the client from a larger payload, but should instead come from the backend. Grouped by priority.
-
 ---
-
-## P0 — Already requested, still not delivered
 
 ### 1. Tour cover image URL missing from `TourSummary`
 
@@ -99,16 +95,12 @@ Fields:
 | `label` | string | Human-readable display name for the pill |
 | `count` | int | Number of tours in this category; client may show/hide zero-count entries |
 
-**Also needed:** Support `?category=julius-caesar` filter on `GET /tours/` so the client can request a filtered list rather than fetching everything and filtering in memory.
-
 **Frontend behaviour after delivery:**
 - Call `GET /tours/categories` on home screen load (parallel with tours call)
 - Render the rail immediately from the category list, before tours finish loading
 - Pass the selected category slug as a query param to `GET /tours/`
 
 ---
-
-## P1 — Not previously documented, found in audit
 
 ### 3. City emoji icons hardcoded on frontend
 
@@ -156,123 +148,25 @@ City:
 
 ---
 
-### 4. Interest options for tour generation hardcoded on frontend
+### 6. All-tours fetch + client-side city/category filter (no server-side query params)
 
-**Current behaviour:** The "Create Tour" screen shows 10 interest chips that are a static list in Dart. Adding, renaming, or removing an interest category requires a mobile app release.
-
-**Where in code:**
-- `lib/screens/create_tour_screen.dart` — `_selectedInterests` map, lines 33–44
-
-```dart
-final Map<String, bool> _selectedInterests = {
-  'History': false,
-  'Architecture': false,
-  'Food & Dining': false,
-  'Art & Museums': false,
-  'Nature & Parks': false,
-  'Shopping': false,
-  'Nightlife': false,
-  'Local Culture': false,
-  'Religious Sites': false,
-  'Photography': false,
-};
-```
-
-**What backend needs to add:**
-
-New endpoint (or include in an existing config/metadata endpoint):
-
-```
-GET /config/interests
-```
-
-Optional query param: `?city=rome` if interests are city-specific in the future.
-
-Response:
-```json
-{
-  "interests": [
-    { "slug": "history",        "label": "History"        },
-    { "slug": "architecture",   "label": "Architecture"   },
-    { "slug": "food-dining",    "label": "Food & Dining"  },
-    { "slug": "art-museums",    "label": "Art & Museums"  },
-    { "slug": "nature-parks",   "label": "Nature & Parks" },
-    { "slug": "shopping",       "label": "Shopping"       },
-    { "slug": "nightlife",      "label": "Nightlife"      },
-    { "slug": "local-culture",  "label": "Local Culture"  },
-    { "slug": "religious-sites","label": "Religious Sites"},
-    { "slug": "photography",    "label": "Photography"    }
-  ]
-}
-```
-
-**Frontend behaviour after delivery:**
-- Fetch interests on `CreateTourScreen` init, alongside cities
-- Send `slug` values (not labels) in the tour generation request
-
----
-
-### 5. Pace and walking intensity enum values hardcoded on frontend
-
-**Current behaviour:** The "Preferences" section in CreateTourScreen uses hardcoded string literals for `pace` and `walking`. If the backend renames or adds an option, the mobile silently sends a value the backend no longer recognises.
-
-**Where in code:**
-- `lib/screens/create_tour_screen.dart` — `_buildPreferenceRow` calls, lines 394–408
-
-```dart
-_buildPreferenceRow('Pace', _pace, {
-  'relaxed': 'Relaxed',
-  'normal': 'Normal',
-  'fast': 'Fast',
-}, ...),
-_buildPreferenceRow('Walking', _walking, {
-  'light': 'Light',
-  'moderate': 'Moderate',
-  'intensive': 'Intensive',
-}, ...),
-```
-
-**What backend needs to add:**
-
-Include pace and walking options in the config endpoint from item 4 above (or a separate `GET /config/tour-options`):
-
-```json
-{
-  "pace_options": [
-    { "value": "relaxed",  "label": "Relaxed"  },
-    { "value": "normal",   "label": "Normal"   },
-    { "value": "fast",     "label": "Fast"     }
-  ],
-  "walking_options": [
-    { "value": "light",     "label": "Light"     },
-    { "value": "moderate",  "label": "Moderate"  },
-    { "value": "intensive", "label": "Intensive" }
-  ]
-}
-```
-
-Alternatively, these can be OpenAPI `enum` values on the tour generation request schema — the generated client enforces them at compile time.
-
----
-
-### 6. All-tours fetch + client-side city filter (no server-side `?city=` param)
-
-**Current behaviour:** `ApiService.getToursByCity(city)` calls `GET /tours/` (no params), receives **all** tours, then filters by city in Dart. This scales poorly as the tour library grows.
+**Current behaviour:** `ApiService.getToursByCity(city)` calls `GET /tours/` with no parameters, receives all tours, then filters by city in Dart. The home screen similarly filters by category in memory. This scales poorly as the tour library grows.
 
 **Where in code:**
 - `lib/services/api_service.dart` — `getToursByCity()`, lines 94–117
 
 ```dart
-final response = await _api.listToursToursGet();  // no city param
+final response = await _api.listToursToursGet();  // no city or category param
 // then filters in Dart...
 ```
 
 **What backend needs to add:**
 
-Support an optional `city` query parameter on the existing `GET /tours/` endpoint:
+Support optional `city` and `category` query parameters on the existing `GET /tours/` endpoint:
 
 ```
 GET /tours/?city=rome
+GET /tours/?city=rome&category=ancient-rome
 ```
 
 **OpenAPI spec change:**
@@ -295,79 +189,19 @@ GET /tours/?city=rome
 ```
 
 **Frontend behaviour after delivery:**
-- Pass `city` and `category` as query params; remove in-memory filtering from `_filteredTours` getter
+- Pass `city` and `category` as query params instead of fetching everything and filtering in Dart
+- Remove in-memory filtering from `ApiService.getToursByCity()` and the `_filteredTours` getter in `home_screen.dart`
 
 ---
 
-### 7. Supported languages hardcoded on frontend
+## Summary
 
-**Current behaviour:** `CreateTourScreen._setDefaultLanguage()` contains a hardcoded allowlist. When the backend adds a new supported language, the mobile app never detects it.
-
-**Where in code:**
-- `lib/screens/create_tour_screen.dart` — `_setDefaultLanguage()`, lines 101–114
-
-```dart
-if (['en', 'fr', 'es', 'ja', 'ko'].contains(languageCode)) {
-  _language = languageCode;
-}
-```
-
-**What backend needs to add:**
-
-Include in the config endpoint from item 4:
-
-```json
-{
-  "supported_languages": [
-    { "code": "en",    "label": "English"             },
-    { "code": "fr",    "label": "Français"            },
-    { "code": "es",    "label": "Español"             },
-    { "code": "ja",    "label": "日本語"              },
-    { "code": "ko",    "label": "한국어"              },
-    { "code": "zh-tw", "label": "繁體中文"            },
-    { "code": "zh-cn", "label": "简体中文"            },
-    { "code": "pt-br", "label": "Português (Brasil)"  }
-  ]
-}
-```
-
----
-
-## Summary Table
-
-| # | What | Where (mobile) | Backend change needed | Priority |
-|---|---|---|---|---|
-| 1 | Tour cover image URL | `tour_card_*.dart`, `continue_walking_banner.dart` | Add `cover_image_url` to `TourSummary` | P0 |
-| 2 | Category list for filter rail | `home_screen.dart:88` | New `GET /tours/categories` endpoint | P0 |
-| 3 | City emoji icons | `city_picker_sheet.dart:10` | Add `emoji` to `City` model | P1 |
-| 4 | Tour generation interests | `create_tour_screen.dart:33` | New `GET /config/interests` endpoint | P1 |
-| 5 | Pace & walking enum values | `create_tour_screen.dart:394` | Add to config endpoint or OpenAPI enum | P1 |
-| 6 | City/category filter on tour list | `api_service.dart:94` | Add `?city=` and `?category=` to `GET /tours/` | P1 |
-| 7 | Supported language codes | `create_tour_screen.dart:101` | Add to config endpoint | P2 |
-
----
-
-## Recommended config endpoint
-
-Items 4, 5, and 7 can all be served by a single lightweight endpoint:
-
-```
-GET /config
-```
-
-Response:
-```json
-{
-  "interests": [ { "slug": "...", "label": "..." } ],
-  "pace_options": [ { "value": "...", "label": "..." } ],
-  "walking_options": [ { "value": "...", "label": "..." } ],
-  "supported_languages": [ { "code": "...", "label": "..." } ]
-}
-```
-
-This endpoint is read-only, public (no auth), and can be cached aggressively (e.g. `Cache-Control: max-age=3600`).
-
----
+| # | What | Where (mobile) | Backend change needed |
+|---|---|---|---|
+| 1 | Tour cover image URL | `tour_card_*.dart`, `continue_walking_banner.dart` | Add `cover_image_url` to `TourSummary` |
+| 2 | Category list for filter rail | `home_screen.dart:88` | New `GET /tours/categories` endpoint |
+| 3 | City emoji icons | `city_picker_sheet.dart:10` | Add `emoji` to `City` model |
+| 6 | City/category filter on tour list | `api_service.dart:94` | Add `?city=` and `?category=` to `GET /tours/` |
 
 ## Frontend integration notes
 
@@ -377,4 +211,4 @@ This endpoint is read-only, public (no auth), and can be cached aggressively (e.
   2. Run `npm run update-api` to regenerate the Dart client
   3. Replace the hardcoded value with the API-sourced one
   4. Remove the now-dead hardcoded constant
-- Please notify the mobile team via the shared channel when each item ships so we can update accordingly
+- Please notify the mobile team when each item ships so we can update accordingly
