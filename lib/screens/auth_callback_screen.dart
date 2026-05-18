@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 class AuthCallbackScreen extends StatefulWidget {
   const AuthCallbackScreen({super.key});
@@ -59,20 +62,20 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       if (success) {
         print('✅ AuthCallback: Token exchange successful!');
 
-        // Navigate immediately - don't wait or use setState
-        // The widget might unmount during delays
-        print('🏠 AuthCallback: Navigating to /home...');
-        if (!mounted) {
-          print('❌ AuthCallback: Widget not mounted before navigation');
+        // On web, do a hard redirect to the root so AuthCheckScreen picks up
+        // the stored tokens and routes to MainScreen cleanly.
+        // Flutter Navigator.pushNamed from /auth/callback can leave stale
+        // URL state that causes a grey screen.
+        if (kIsWeb) {
+          html.window.location.replace('/');
           return;
         }
 
-        // Use Navigator immediately while we're still mounted
+        if (!mounted) return;
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/home',
           (route) => false,
         );
-        print('✅ AuthCallback: Navigation to /home completed');
       } else {
         print('❌ AuthCallback: Token exchange failed');
         setState(() {
