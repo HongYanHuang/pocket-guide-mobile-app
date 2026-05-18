@@ -522,7 +522,7 @@ class _ToursListState extends State<ToursList> with SingleTickerProviderStateMix
     });
 
     try {
-      final tours = await _apiService.getToursByCity(widget.city);
+      final tours = await _apiService.getAllTours(city: widget.city);
       setState(() {
         _publicTours = tours;
         _loadingPublicTours = false;
