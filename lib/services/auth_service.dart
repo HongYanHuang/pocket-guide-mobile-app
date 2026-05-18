@@ -374,9 +374,10 @@ class AuthService {
         throw Exception('Could not launch auth URL');
       }
 
-      // Note: This code won't execute because the page redirects
-      // The AuthCallbackScreen will handle the callback when Google redirects back
-      return true;
+      // On web, launchUrl returns immediately even though the browser is
+      // navigating away. Return false so the caller does NOT try to push
+      // MainScreen — the OAuth redirect will handle the rest.
+      return false;
     } catch (e, stackTrace) {
       print('');
       print('═══════════════════════════════════════════════════════════════');

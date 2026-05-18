@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthCallbackScreen extends StatefulWidget {
   const AuthCallbackScreen({super.key});
@@ -59,20 +61,20 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
       if (success) {
         print('✅ AuthCallback: Token exchange successful!');
 
-        // Navigate immediately - don't wait or use setState
-        // The widget might unmount during delays
-        print('🏠 AuthCallback: Navigating to /home...');
-        if (!mounted) {
-          print('❌ AuthCallback: Widget not mounted before navigation');
+        // On web, use launchUrl with '_self' to force a true browser navigation
+        // to '/' — same mechanism used for the Google OAuth redirect, so it
+        // bypasses Flutter's PathUrlStrategy and triggers a real page reload.
+        // This ensures AuthCheckScreen picks up the stored tokens cleanly.
+        if (kIsWeb) {
+          await launchUrl(Uri.parse('/'), webOnlyWindowName: '_self');
           return;
         }
 
-        // Use Navigator immediately while we're still mounted
+        if (!mounted) return;
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/home',
           (route) => false,
         );
-        print('✅ AuthCallback: Navigation to /home completed');
       } else {
         print('❌ AuthCallback: Token exchange failed');
         setState(() {
