@@ -664,6 +664,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Play button
           Container(
@@ -678,18 +679,52 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ),
           const SizedBox(width: 10),
+          // Title + knowledge point
           Expanded(
-            child: Text(
-              section.title,
-              style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: PGColors.rawiInk, decoration: TextDecoration.none,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  section.title,
+                  style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600,
+                    color: PGColors.rawiInk, decoration: TextDecoration.none,
+                  ),
+                ),
+                if (section.knowledgePoint != null && section.knowledgePoint!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    section.knowledgePoint!,
+                    style: const TextStyle(
+                      fontSize: 11, fontStyle: FontStyle.italic,
+                      color: PGColors.rawiInk3, decoration: TextDecoration.none,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+          // Duration
+          if (section.durationSeconds != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              _formatSectionDuration(section.durationSeconds!),
+              style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w500,
+                color: PGColors.rawiInk3, decoration: TextDecoration.none,
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _formatSectionDuration(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '$m:${s.toString().padLeft(2, '0')}';
   }
 
   Widget _buildStopArrow() {
