@@ -532,6 +532,37 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                 decoration: TextDecoration.none,
                               ),
                             ),
+                          ] else if (stop.summaryPoints != null && stop.summaryPoints!.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            if (!isOpen)
+                              Text(
+                                stop.summaryPoints!.first,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12, color: PGColors.rawiInk3,
+                                  height: 1.4, fontStyle: FontStyle.italic,
+                                  decoration: TextDecoration.none,
+                                ),
+                              )
+                            else
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (final point in stop.summaryPoints!)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 2),
+                                      child: Text(
+                                        '· $point',
+                                        style: const TextStyle(
+                                          fontSize: 12, color: PGColors.rawiInk3,
+                                          height: 1.4, fontStyle: FontStyle.italic,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                           ],
                           const SizedBox(height: 6),
                           // Meta row: time · chapters
