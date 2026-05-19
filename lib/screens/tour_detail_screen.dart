@@ -8,6 +8,7 @@ import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
+import 'package:pocket_guide_mobile/services/background_audio_service.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 
 // Warm gradient fallbacks keyed by index — used when no cover image is provided.
@@ -47,6 +48,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   String? _error;
   int _openStopIndex = 0;
   double _scrollOffset = 0;
+  String? _playingAudioUrl; // relative URL of the section currently playing
 
   List<TourPOI> get _allStops =>
       _detail?.itinerary.expand((day) => day.pois).toList() ?? [];
@@ -58,11 +60,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadData();
+    BackgroundAudioService.instance.playbackStateStream.listen((state) {
+      if (state == PlaybackState.completed && mounted) {
+        setState(() => _playingAudioUrl = null);
+      }
+    });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    BackgroundAudioService.instance.stop();
     super.dispose();
   }
 
@@ -72,6 +80,26 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       setState(() => _scrollOffset = offset);
     } else {
       _scrollOffset = offset;
+    }
+  }
+
+  Future<void> _toggleSection(TourPOISection section, String stopName) async {
+    final relativeUrl = section.audioUrl;
+    if (relativeUrl == null) return;
+    final fullUrl = '${ApiService.baseUrl}$relativeUrl';
+
+    if (_playingAudioUrl == relativeUrl) {
+      // Same section — pause
+      await BackgroundAudioService.instance.pause();
+      setState(() => _playingAudioUrl = null);
+    } else {
+      // New section — play
+      setState(() => _playingAudioUrl = relativeUrl);
+      await BackgroundAudioService.instance.play(
+        url: fullUrl,
+        title: section.title,
+        subtitle: stopName,
+      );
     }
   }
 
@@ -607,7 +635,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ),
           // Expanded: chapter list
-          if (isOpen && sections.isNotEmpty) _buildChapterList(sections, index == 0),
+          if (isOpen && sections.isNotEmpty) _buildChapterList(sections, stop.poi, index == 0),
         ],
       ),
     );
@@ -666,7 +694,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     );
   }
 
-  Widget _buildChapterList(List<TourPOISection> sections, bool isFirstStop) {
+  Widget _buildChapterList(List<TourPOISection> sections, String stopName, bool isFirstStop) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: const BoxDecoration(
@@ -678,15 +706,23 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           for (int j = 0; j < sections.length; j++)
             Padding(
               padding: EdgeInsets.only(bottom: j < sections.length - 1 ? 7 : 0),
-              child: _buildChapterRow(sections[j], isFirstStop && j == 0),
+              child: _buildChapterRow(sections[j], stopName, isFirstStop && j == 0),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildChapterRow(TourPOISection section, bool isFirstActive) {
-    return Container(
+  Widget _buildChapterRow(TourPOISection section, String stopName, bool isFirstActive) {
+    final isPlaying = _playingAudioUrl == section.audioUrl && section.audioUrl != null;
+    final hasAudio = section.audioUrl != null;
+    final buttonColor = isPlaying
+        ? PGColors.rawiAccent
+        : (isFirstActive ? PGColors.rawiAccent : PGColors.rawiInk);
+
+    return GestureDetector(
+      onTap: hasAudio ? () => _toggleSection(section, stopName) : null,
+      child: Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: PGColors.rawiPaper2,
@@ -696,16 +732,19 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Play button
+          // Play / pause button
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isFirstActive ? PGColors.rawiAccent : PGColors.rawiInk,
-              boxShadow: [BoxShadow(color: PGColors.rawiInk.withOpacity(0.10), blurRadius: 6, offset: const Offset(0, 2))],
+              color: hasAudio ? buttonColor : PGColors.rawiInk.withOpacity(0.3),
+              boxShadow: hasAudio ? [BoxShadow(color: PGColors.rawiInk.withOpacity(0.10), blurRadius: 6, offset: const Offset(0, 2))] : [],
             ),
-            child: const Center(
-              child: Icon(CupertinoIcons.play_fill, size: 10, color: Color(0xFFF6F1E7)),
+            child: Center(
+              child: Icon(
+                isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                size: 10, color: const Color(0xFFF6F1E7),
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -743,6 +782,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ],
         ],
+      ),
       ),
     );
   }
