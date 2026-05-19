@@ -312,8 +312,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     final meta = _meta;
     final stops = _allStops;
 
-    return Container(
-      margin: const EdgeInsets.only(top: -20),
+    return Transform.translate(
+      offset: const Offset(0, -20),
+      child: Container(
       decoration: const BoxDecoration(
         color: PGColors.rawiPaper,
         borderRadius: BorderRadius.only(
@@ -342,6 +343,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             _buildNarrator(),
           ],
         ],
+      ),
       ),
     );
   }
@@ -476,7 +478,8 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     final isOpen = _openStopIndex == index;
     final gradient = _stopGradient(index);
     final num = (index + 1).toString().padLeft(2, '0');
-    final chapterCount = stop.sectionCount ?? 0;
+    final sections = stop.sections?.toList() ?? [];
+    final chapterCount = sections.length;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -574,7 +577,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
             ),
           ),
           // Expanded: chapter list
-          if (isOpen && chapterCount > 0) _buildChapterList(chapterCount, index == 0),
+          if (isOpen && sections.isNotEmpty) _buildChapterList(sections, index == 0),
         ],
       ),
     );
@@ -633,7 +636,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     );
   }
 
-  Widget _buildChapterList(int count, bool isFirstStop) {
+  Widget _buildChapterList(List<TourPOISection> sections, bool isFirstStop) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       decoration: const BoxDecoration(
@@ -642,17 +645,17 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
       child: Column(
         children: [
           const SizedBox(height: 12),
-          for (int j = 0; j < count; j++)
+          for (int j = 0; j < sections.length; j++)
             Padding(
-              padding: EdgeInsets.only(bottom: j < count - 1 ? 7 : 0),
-              child: _buildChapterRow(j, isFirstStop && j == 0),
+              padding: EdgeInsets.only(bottom: j < sections.length - 1 ? 7 : 0),
+              child: _buildChapterRow(sections[j], isFirstStop && j == 0),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildChapterRow(int index, bool isFirstActive) {
+  Widget _buildChapterRow(TourPOISection section, bool isFirstActive) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -677,7 +680,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Chapter ${index + 1}',
+              section.title,
               style: const TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w600,
                 color: PGColors.rawiInk, decoration: TextDecoration.none,
