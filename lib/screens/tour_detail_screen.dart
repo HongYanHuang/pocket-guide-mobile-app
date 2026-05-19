@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart' show Colors, MaterialPageRoute;
+import 'package:flutter/material.dart' show Colors, MaterialPageRoute, ScaffoldMessenger, SnackBar;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
@@ -48,7 +48,9 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   String? _error;
   int _openStopIndex = 0;
   double _scrollOffset = 0;
-  String? _playingAudioUrl; // relative URL of the section currently playing
+  String? _playingAudioUrl;  // relative URL of the section currently loaded
+  bool _isPlaying = false;
+  bool _isBuffering = false;
 
   List<TourPOI> get _allStops =>
       _detail?.itinerary.expand((day) => day.pois).toList() ?? [];
@@ -61,9 +63,15 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     _scrollController.addListener(_onScroll);
     _loadData();
     BackgroundAudioService.instance.playbackStateStream.listen((state) {
-      if (state == PlaybackState.completed && mounted) {
-        setState(() => _playingAudioUrl = null);
-      }
+      if (!mounted) return;
+      setState(() {
+        _isPlaying = state == PlaybackState.playing;
+        _isBuffering = state == PlaybackState.buffering;
+        if (state == PlaybackState.completed) {
+          _playingAudioUrl = null;
+          _isPlaying = false;
+        }
+      });
     });
   }
 
@@ -86,20 +94,39 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   Future<void> _toggleSection(TourPOISection section, String stopName) async {
     final relativeUrl = section.audioUrl;
     if (relativeUrl == null) return;
-    final fullUrl = '${ApiService.baseUrl}$relativeUrl';
 
-    if (_playingAudioUrl == relativeUrl) {
-      // Same section — pause
-      await BackgroundAudioService.instance.pause();
-      setState(() => _playingAudioUrl = null);
-    } else {
-      // New section — play
-      setState(() => _playingAudioUrl = relativeUrl);
-      await BackgroundAudioService.instance.play(
-        url: fullUrl,
-        title: section.title,
-        subtitle: stopName,
-      );
+    try {
+      if (_playingAudioUrl == relativeUrl) {
+        if (_isPlaying) {
+          // Same section, currently playing → pause
+          await BackgroundAudioService.instance.pause();
+        } else {
+          // Same section, currently paused → resume from position
+          await BackgroundAudioService.instance.resume();
+        }
+      } else {
+        // Different section → load and play from start
+        setState(() {
+          _playingAudioUrl = relativeUrl;
+          _isBuffering = true;
+        });
+        await BackgroundAudioService.instance.play(
+          url: '${ApiService.baseUrl}$relativeUrl',
+          title: section.title,
+          subtitle: stopName,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _playingAudioUrl = null;
+          _isPlaying = false;
+          _isBuffering = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to play audio: $e')),
+        );
+      }
     }
   }
 
@@ -714,9 +741,11 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
   }
 
   Widget _buildChapterRow(TourPOISection section, String stopName, bool isFirstActive) {
-    final isPlaying = _playingAudioUrl == section.audioUrl && section.audioUrl != null;
+    final isThisSection = _playingAudioUrl == section.audioUrl && section.audioUrl != null;
+    final isPlaying = isThisSection && _isPlaying;
+    final isBuffering = isThisSection && _isBuffering;
     final hasAudio = section.audioUrl != null;
-    final buttonColor = isPlaying
+    final buttonColor = isThisSection
         ? PGColors.rawiAccent
         : (isFirstActive ? PGColors.rawiAccent : PGColors.rawiInk);
 
@@ -741,10 +770,12 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
               boxShadow: hasAudio ? [BoxShadow(color: PGColors.rawiInk.withOpacity(0.10), blurRadius: 6, offset: const Offset(0, 2))] : [],
             ),
             child: Center(
-              child: Icon(
-                isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
-                size: 10, color: const Color(0xFFF6F1E7),
-              ),
+              child: isBuffering
+                  ? const CupertinoActivityIndicator(radius: 8, color: Color(0xFFF6F1E7))
+                  : Icon(
+                      isPlaying ? CupertinoIcons.pause_fill : CupertinoIcons.play_fill,
+                      size: 10, color: const Color(0xFFF6F1E7),
+                    ),
             ),
           ),
           const SizedBox(width: 10),
