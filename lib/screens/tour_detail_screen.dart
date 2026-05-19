@@ -2,6 +2,7 @@ import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' show Colors, MaterialPageRoute;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -474,6 +475,19 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
     );
   }
 
+  // Source Sans 3 w300 italic — used for POI description and chapter knowledge points
+  TextStyle get _descItalic => GoogleFonts.sourceSans3(
+        fontSize: 12, fontWeight: FontWeight.w300,
+        fontStyle: FontStyle.italic, color: PGColors.rawiInk3,
+        height: 1.4, decoration: TextDecoration.none,
+      );
+
+  TextStyle get _knowledgeItalic => GoogleFonts.sourceSans3(
+        fontSize: 11, fontWeight: FontWeight.w300,
+        fontStyle: FontStyle.italic, color: PGColors.rawiInk3,
+        height: 1.3, decoration: TextDecoration.none,
+      );
+
   Widget _buildStopCard(TourPOI stop, int index) {
     final isOpen = _openStopIndex == index;
     final gradient = _stopGradient(index);
@@ -526,11 +540,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                               stop.blurb!,
                               maxLines: isOpen ? null : 1,
                               overflow: isOpen ? TextOverflow.visible : TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12, color: PGColors.rawiInk3,
-                                height: 1.4, fontStyle: FontStyle.italic,
-                                decoration: TextDecoration.none,
-                              ),
+                              style: _descItalic,
                             ),
                           ] else if (stop.summaryPoints != null && stop.summaryPoints!.isNotEmpty) ...[
                             const SizedBox(height: 2),
@@ -539,11 +549,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                 stop.summaryPoints!.first,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 12, color: PGColors.rawiInk3,
-                                  height: 1.4, fontStyle: FontStyle.italic,
-                                  decoration: TextDecoration.none,
-                                ),
+                                style: _descItalic,
                               )
                             else
                               Column(
@@ -552,14 +558,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                                   for (final point in stop.summaryPoints!)
                                     Padding(
                                       padding: const EdgeInsets.only(bottom: 2),
-                                      child: Text(
-                                        '· $point',
-                                        style: const TextStyle(
-                                          fontSize: 12, color: PGColors.rawiInk3,
-                                          height: 1.4, fontStyle: FontStyle.italic,
-                                          decoration: TextDecoration.none,
-                                        ),
-                                      ),
+                                      child: Text('· $point', style: _descItalic),
                                     ),
                                 ],
                               ),
@@ -726,11 +725,7 @@ class _TourDetailScreenState extends State<TourDetailScreen> {
                   const SizedBox(height: 2),
                   Text(
                     section.knowledgePoint!,
-                    style: const TextStyle(
-                      fontSize: 11, fontStyle: FontStyle.italic,
-                      color: PGColors.rawiInk3, decoration: TextDecoration.none,
-                      height: 1.3,
-                    ),
+                    style: _knowledgeItalic,
                   ),
                 ],
               ],
