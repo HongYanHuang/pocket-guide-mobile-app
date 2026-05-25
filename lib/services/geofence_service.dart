@@ -63,6 +63,58 @@ class GeofenceService {
         _city = city,
         _accessToken = accessToken;
 
+  // ── Public state accessors (for map UI) ──────────────────────────────────
+
+  /// ID of the POI currently playing audio (null = idle).
+  String? get currentPoiId => _currentPoiId;
+
+  /// Display name of the POI currently playing audio.
+  String? get currentPoiName => _currentPoiName;
+
+  /// 0-based index of the section currently playing.
+  int get currentSectionIndex => _currentSectionIndex;
+
+  /// Total number of sections for the current POI (0 if idle).
+  int get currentSectionTotal => _currentSections.length;
+
+  /// Title of the currently playing section (null if idle).
+  String? get currentSectionTitle =>
+      _currentSections.isNotEmpty && _currentSectionIndex < _currentSections.length
+          ? _currentSections[_currentSectionIndex].title
+          : null;
+
+  /// The TourPOI currently being played (null if idle).
+  TourPOI? get currentPoi {
+    if (_currentPoiId == null) return null;
+    try {
+      return _poisForDay.firstWhere(
+        (p) => _getPoiId(p) == _currentPoiId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Skip to the previous section within the current POI.
+  Future<void> playPreviousSection() async {
+    if (_currentPoiId == null || _currentSections.isEmpty) return;
+    if (_currentSectionIndex <= 0) return;
+    _currentSectionIndex--;
+    _sectionProgress[_currentPoiId!] = _currentSectionIndex;
+    await _playCurrentSection(_currentPoiId!);
+  }
+
+  /// Skip to the next section within the current POI.
+  Future<void> playNextSection() async {
+    if (_currentPoiId == null || _currentSections.isEmpty) return;
+    if (_currentSectionIndex >= _currentSections.length - 1) return;
+    _currentSectionIndex++;
+    _sectionProgress[_currentPoiId!] = _currentSectionIndex;
+    await _playCurrentSection(_currentPoiId!);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   /// Update which day is active and which POIs to monitor.
   /// Called by MapTourScreen on init and when user switches days.
   void updateActiveDay(int day, List<TourPOI> pois) {
