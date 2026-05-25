@@ -169,11 +169,13 @@ class _MapTourScreenState extends State<MapTourScreen>
       _geofenceService?.onLocationUpdate(position);
     };
 
+    final pois = _getPoisForDay(_selectedDay);
     final started =
         await _locationService.startTracking(isBackground: false);
     if (started) {
-      _geofenceService?.updateActiveDay(
-          _selectedDay, _getPoisForDay(_selectedDay));
+      _geofenceService?.updateActiveDay(_selectedDay, pois);
+      // Start playing the first non-completed chapter automatically
+      await _geofenceService?.startDefaultPlayback(pois, _selectedDay);
     } else {
       _showLocationServiceDisabledDialog();
     }

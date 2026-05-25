@@ -224,6 +224,52 @@ class GeofenceService {
     // Intentionally not awaited — fire and forget
   }
 
+  /// Start playing the first non-completed chapter of the first non-completed
+  /// stop for [day]. Called on active-mode init so something plays immediately
+  /// without requiring a physical geofence entry.
+  Future<void> startDefaultPlayback(List<TourPOI> pois, int day) async {
+    if (_currentPoiId != null ||
+        BackgroundAudioService.instance.isPlaying ||
+        _isFetchingSections) return;
+
+    // Find first non-completed POI
+    TourPOI? targetPoi;
+    String? targetPoiId;
+    for (final poi in pois) {
+      final id = _getPoiId(poi);
+      if (!_progressManager.isPOICompleted(id, day)) {
+        targetPoi = poi;
+        targetPoiId = id;
+        break;
+      }
+    }
+    if (targetPoi == null) {
+      print('✅ Default playback: all POIs completed for day $day');
+      return;
+    }
+
+    final resumeSection = (_sectionProgress[targetPoiId!] ?? 0) + 1;
+    print('▶️  Default playback: ${targetPoi.poi} (day $day, section $resumeSection)');
+
+    // Mark as triggered so the location-based geofence doesn't fire again
+    _triggeredByDay[day] ??= {};
+    _triggeredByDay[day]!.add(targetPoiId);
+
+    _isFetchingSections = true;
+    _currentPoiId = targetPoiId;
+    _currentPoiName = targetPoi.poi;
+
+    // Notify map screen so the UI updates immediately (no OS notification —
+    // this is app-initiated, not a real geofence entry)
+    _eventController.add(GeofenceEvent(
+      type: GeofenceEventType.poiEntered,
+      poiId: targetPoiId,
+      poiName: targetPoi.poi,
+    ));
+
+    await _loadAndStartPlayback(targetPoi, targetPoiId);
+  }
+
   Future<void> _triggerPOIAudio(TourPOI poi, String poiId) async {
     // Don't interrupt audio the user started manually
     if (BackgroundAudioService.instance.isPlaying && _currentPoiId == null) {
@@ -259,11 +305,17 @@ class GeofenceService {
       poiName: poi.poi,
     );
 
+    await _loadAndStartPlayback(poi, poiId);
+  }
+
+  /// Shared transcript-loading + playback setup used by both
+  /// [_triggerPOIAudio] and [startDefaultPlayback].
+  Future<void> _loadAndStartPlayback(TourPOI poi, String poiId) async {
     try {
       // Use cached transcript or fetch from API
       SectionedTranscriptData? data = _sectionCache[poiId];
       if (data == null) {
-        print('📡 Fetching transcript for geofence trigger: $poiId');
+        print('📡 Fetching transcript: $poiId');
         data = await _apiService.fetchSectionedTranscript(
           _city,
           poiId,
@@ -289,7 +341,7 @@ class GeofenceService {
         _currentSectionIndex = 0;
       }
 
-      print('▶️  Starting playback from section ${_currentSectionIndex + 1}/${_currentSections.length}');
+      print('▶️  Starting from section ${_currentSectionIndex + 1}/${_currentSections.length}');
 
       // Subscribe to audio completion to advance sections
       _audioSubscription?.cancel();
@@ -303,7 +355,7 @@ class GeofenceService {
 
       await _playCurrentSection(poiId);
     } catch (e) {
-      print('❌ Geofence audio error for $poiId: $e');
+      print('❌ Audio error for $poiId: $e');
       _currentPoiId = null;
       _currentPoiName = null;
     } finally {
