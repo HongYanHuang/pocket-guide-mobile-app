@@ -95,6 +95,70 @@ class GeofenceService {
     }
   }
 
+  /// Play a specific POI at a specific section index (0-based).
+  /// Called when the user taps a chapter row in the POI detail sheet.
+  ///
+  /// Behaviour:
+  ///   • Same POI + same section already playing → toggle pause/play.
+  ///   • Same POI, different section, transcript already loaded → seek to section.
+  ///   • Different POI (or transcript not yet loaded) → stop current, fetch & play.
+  Future<void> playPoiAtSection(TourPOI poi, int day, int sectionIndex) async {
+    final poiId = _getPoiId(poi);
+
+    // Same POI + same section: toggle
+    if (_currentPoiId == poiId &&
+        _currentSectionIndex == sectionIndex &&
+        !_isFetchingSections) {
+      if (BackgroundAudioService.instance.isPlaying) {
+        await BackgroundAudioService.instance.pause();
+      } else {
+        await BackgroundAudioService.instance.resume();
+      }
+      return;
+    }
+
+    // Same POI, different section, transcript already in memory — skip fetch
+    if (_currentPoiId == poiId &&
+        _currentSections.isNotEmpty &&
+        !_isFetchingSections) {
+      _currentSectionIndex = sectionIndex;
+      _sectionProgress[poiId] = sectionIndex;
+      await _playCurrentSection(poiId);
+      return;
+    }
+
+    // Different POI — stop current playback
+    if (_currentPoiId != null && _currentPoiId != poiId) {
+      await BackgroundAudioService.instance.stop();
+      _audioSubscription?.cancel();
+      _audioSubscription = null;
+      _currentPoiId = null;
+      _currentPoiName = null;
+      _currentSections = [];
+      _currentSectionIndex = 0;
+    }
+
+    if (_isFetchingSections) return;
+
+    // Mark as triggered so the location geofence doesn't re-fire for this stop
+    _triggeredByDay[day] ??= {};
+    _triggeredByDay[day]!.add(poiId);
+
+    _isFetchingSections = true;
+    _currentPoiId = poiId;
+    _currentPoiName = poi.poi;
+    // Seed the section index — _loadAndStartPlayback reads _sectionProgress
+    _sectionProgress[poiId] = sectionIndex;
+
+    _eventController.add(GeofenceEvent(
+      type: GeofenceEventType.poiEntered,
+      poiId: poiId,
+      poiName: poi.poi,
+    ));
+
+    await _loadAndStartPlayback(poi, poiId);
+  }
+
   /// Skip to the previous section within the current POI.
   Future<void> playPreviousSection() async {
     if (_currentPoiId == null || _currentSections.isEmpty) return;

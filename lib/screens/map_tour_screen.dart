@@ -1356,7 +1356,6 @@ class _MapTourScreenState extends State<MapTourScreen>
 
     if (!mounted) return;
 
-    // TODO: Replace with rawi-styled POI bottom sheet when designed
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1364,10 +1363,13 @@ class _MapTourScreenState extends State<MapTourScreen>
       isDismissible: true,
       enableDrag: true,
       barrierColor: Colors.black54,
-      builder: (_) => _SimplePoiSheet(
+      builder: (_) => _PoiDetailSheet(
         poi: poi,
         number: number,
+        poiId: poiId,
+        day: _selectedDay,
         completed: completed,
+        geofenceService: _geofenceService,
         onToggle: (v) async {
           await _togglePOICompletion(poiId, v);
         },
@@ -1653,39 +1655,47 @@ class _FloatingChrome extends StatelessWidget {
   }
 }
 
-// ─── Simple POI tap sheet (placeholder until rawi detail sheet is designed) ───
+// ─── POI detail sheet — chapters + mark as visited ───────────────────────────
 
-class _SimplePoiSheet extends StatelessWidget {
-  const _SimplePoiSheet({
+class _PoiDetailSheet extends StatelessWidget {
+  const _PoiDetailSheet({
     required this.poi,
     required this.number,
+    required this.poiId,
+    required this.day,
     required this.completed,
     required this.onToggle,
+    this.geofenceService,
   });
 
   final TourPOI poi;
   final int number;
+  final String poiId;
+  final int day;
   final bool completed;
   final ValueChanged<bool> onToggle;
+  final GeofenceService? geofenceService;
 
   @override
   Widget build(BuildContext context) {
+    final sections = poi.sections?.toList() ?? [];
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
     return Container(
       decoration: const BoxDecoration(
         color: PGColors.rawiPaper,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
-      padding: EdgeInsets.fromLTRB(
-        20,
-        16,
-        20,
-        MediaQuery.of(context).padding.bottom + 24,
+      // Cap height so chapters are scrollable on short screens
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.78,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
+          // ── Drag handle ─────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Container(
               width: 38,
               height: 4,
@@ -1695,80 +1705,147 @@ class _SimplePoiSheet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: PGColors.rawiAccent,
-                  shape: BoxShape.circle,
+
+          // ── Stop header ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 50,
+                  height: 50,
+                  child: Stack(
+                    children: [
+                      if (poi.coverImageUrl != null)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 46,
+                            height: 46,
+                            child: NetworkImageWithFallback(
+                              imageUrl: poi.coverImageUrl!,
+                            ),
+                          ),
+                        )
+                      else
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: PGColors.rawiPaper2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: PGColors.rawiAccent,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: PGColors.rawiPaper,
+                              width: 2,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$number',
+                              style: const TextStyle(
+                                color: PGColors.rawiPaper,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                height: 1,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Center(
+                const SizedBox(width: 12),
+                Expanded(
                   child: Text(
-                    '$number',
-                    style: const TextStyle(
-                      color: PGColors.rawiPaper,
+                    poi.poi,
+                    style: GoogleFonts.sourceSans3(
+                      fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      color: PGColors.rawiInk,
+                      letterSpacing: -0.02,
+                      decoration: TextDecoration.none,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  poi.poi,
-                  style: GoogleFonts.sourceSans3(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: PGColors.rawiInk,
-                    letterSpacing: -0.02,
-                    decoration: TextDecoration.none,
-                  ),
+              ],
+            ),
+          ),
+
+          // ── Chapter list (scrollable) ────────────────────────────────────
+          Container(height: 0.5, color: PGColors.rawiHair),
+
+          if (sections.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'No audio chapters available yet.',
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 13,
+                  color: PGColors.rawiInk3,
+                  decoration: TextDecoration.none,
                 ),
               ),
-            ],
-          ),
-          if (poi.blurb != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              poi.blurb!,
-              style: GoogleFonts.sourceSans3(
-                fontSize: 14,
-                height: 1.55,
-                color: PGColors.rawiInk2,
-                decoration: TextDecoration.none,
+            )
+          else
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: sections.length,
+                separatorBuilder: (_, __) =>
+                    Container(height: 0.5, color: PGColors.rawiHair),
+                itemBuilder: (_, i) =>
+                    _ChapterRow(
+                      section: sections[i],
+                      sectionIndex: i,
+                      poi: poi,
+                      poiId: poiId,
+                      day: day,
+                      geofenceService: geofenceService,
+                    ),
               ),
             ),
-          ],
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () {
-              onToggle(!completed);
-              Navigator.pop(context);
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              decoration: BoxDecoration(
-                color: completed
-                    ? PGColors.rawiPaper2
-                    : PGColors.rawiAccent,
-                borderRadius: BorderRadius.circular(14),
-                border: completed
-                    ? Border.all(color: PGColors.rawiHair)
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  completed ? 'Mark as not visited' : 'Mark as visited',
-                  style: GoogleFonts.sourceSans3(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: completed ? PGColors.rawiInk2 : PGColors.rawiPaper,
-                    decoration: TextDecoration.none,
+
+          // ── Mark as visited ──────────────────────────────────────────────
+          Container(height: 0.5, color: PGColors.rawiHair),
+          Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPad + 16),
+            child: GestureDetector(
+              onTap: () {
+                onToggle(!completed);
+                Navigator.pop(context);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: completed ? PGColors.rawiPaper2 : PGColors.rawiAccent,
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      completed ? Border.all(color: PGColors.rawiHair) : null,
+                ),
+                child: Center(
+                  child: Text(
+                    completed ? 'Mark as not visited' : 'Mark as visited',
+                    style: GoogleFonts.sourceSans3(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          completed ? PGColors.rawiInk2 : PGColors.rawiPaper,
+                      decoration: TextDecoration.none,
+                    ),
                   ),
                 ),
               ),
@@ -1776,6 +1853,162 @@ class _SimplePoiSheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Single chapter row ───────────────────────────────────────────────────────
+
+class _ChapterRow extends StatelessWidget {
+  const _ChapterRow({
+    required this.section,
+    required this.sectionIndex,
+    required this.poi,
+    required this.poiId,
+    required this.day,
+    this.geofenceService,
+  });
+
+  final TourPOISection section;
+  final int sectionIndex; // 0-based
+  final TourPOI poi;
+  final String poiId;
+  final int day;
+  final GeofenceService? geofenceService;
+
+  String _fmtDuration(int seconds) {
+    final m = seconds ~/ 60;
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAudio = section.audioUrl != null;
+    final gs = geofenceService;
+
+    return StreamBuilder<PlaybackState>(
+      stream: BackgroundAudioService.instance.playbackStateStream,
+      builder: (_, snap) {
+        final isCurrentPoi = gs?.currentPoiId == poiId;
+        final isCurrentSection =
+            isCurrentPoi && gs?.currentSectionIndex == sectionIndex;
+        final isPlaying =
+            isCurrentSection && snap.data == PlaybackState.playing;
+        final isBuffering =
+            isCurrentSection && snap.data == PlaybackState.buffering;
+
+        return GestureDetector(
+          onTap: (hasAudio && gs != null)
+              ? () => gs.playPoiAtSection(poi, day, sectionIndex)
+              : null,
+          child: Container(
+            color: isCurrentSection
+                ? PGColors.rawiAccentSoft
+                : Colors.transparent,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Row(
+              children: [
+                // Play / pause button
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: isCurrentSection
+                        ? PGColors.rawiAccent
+                        : PGColors.rawiPaper2,
+                    shape: BoxShape.circle,
+                    border: isCurrentSection
+                        ? null
+                        : Border.all(color: PGColors.rawiHair),
+                  ),
+                  child: Center(
+                    child: (hasAudio && gs != null)
+                        ? (isBuffering
+                            ? SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: isCurrentSection
+                                      ? PGColors.rawiPaper
+                                      : PGColors.rawiAccent,
+                                ),
+                              )
+                            : Icon(
+                                isPlaying
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                size: 18,
+                                color: isCurrentSection
+                                    ? PGColors.rawiPaper
+                                    : PGColors.rawiAccent,
+                              ))
+                        : Text(
+                            '${section.sectionNumber}',
+                            style: TextStyle(
+                              color: PGColors.rawiInk4,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              height: 1,
+                            ),
+                          ),
+                  ),
+                ),
+
+                const SizedBox(width: 12),
+
+                // Chapter label + title
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Chapter ${section.sectionNumber}',
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.12,
+                          color: isCurrentSection
+                              ? PGColors.rawiAccent
+                              : PGColors.rawiInk3,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        section.title,
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: PGColors.rawiInk,
+                          letterSpacing: -0.01,
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Duration
+                if (section.durationSeconds != null) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    _fmtDuration(section.durationSeconds!),
+                    style: GoogleFonts.sourceSans3(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: PGColors.rawiInk4,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
