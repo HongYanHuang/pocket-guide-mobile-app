@@ -435,11 +435,11 @@ class _MapTourScreenState extends State<MapTourScreen>
       (label: 'Finish by', value: '≈ $finishBy', accent: true),
     ];
 
-    return Positioned(
+    return Align(
       key: const ValueKey('preStart'),
-      left: 12,
-      right: 12,
-      bottom: 22,
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 22),
       child: Container(
         decoration: BoxDecoration(
           color: PGColors.rawiPaper,
@@ -612,6 +612,7 @@ class _MapTourScreenState extends State<MapTourScreen>
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -628,11 +629,9 @@ class _MapTourScreenState extends State<MapTourScreen>
             (p.poiId ?? _poiNameToId(p.poi)) == poiId) +
         1;
 
-    return Positioned(
+    return Align(
       key: const ValueKey('active'),
-      left: 0,
-      right: 0,
-      bottom: 0,
+      alignment: Alignment.bottomCenter,
       child: Container(
         decoration: BoxDecoration(
           color: PGColors.rawiPaper,
@@ -813,7 +812,7 @@ class _MapTourScreenState extends State<MapTourScreen>
     );
   }
 
-  // ── Mini player ───────────────────────────────────────────────────────────
+  // ── Mini player ──────────────────────────────────────────────────────────
 
   Widget _buildMiniPlayer() {
     final currentPoi = _geofenceService?.currentPoi;
@@ -823,11 +822,11 @@ class _MapTourScreenState extends State<MapTourScreen>
     final chapterTotal = _geofenceService?.currentSectionTotal ?? 0;
     final stopName = _geofenceService?.currentPoiName ?? '—';
 
-    return Positioned(
+    return Align(
       key: const ValueKey('mini'),
-      left: 12,
-      right: 12,
-      bottom: 26 + MediaQuery.of(context).padding.bottom,
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+      padding: EdgeInsets.fromLTRB(12, 0, 12, 26 + MediaQuery.of(context).padding.bottom),
       child: GestureDetector(
         onTap: () => setState(() => _sheetState = _SheetState.active),
         child: Container(
@@ -992,6 +991,7 @@ class _MapTourScreenState extends State<MapTourScreen>
             ],
           ),
         ),
+      ),
       ),
     );
   }
