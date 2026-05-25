@@ -221,15 +221,19 @@ class _MapTourScreenState extends State<MapTourScreen>
               _buildRecenterButton(),
 
             // ── Bottom overlay depending on sheet state ──────────────────
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 280),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: switch (_sheetState) {
-                _SheetState.preStart => _buildPreStartCard(),
-                _SheetState.active   => _buildActiveSheet(),
-                _SheetState.mini     => _buildMiniPlayer(),
-              },
+            // Positioned.fill gives AnimatedSwitcher tight constraints so that
+            // Positioned(bottom: X) children anchor to the screen bottom on web.
+            Positioned.fill(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 280),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: switch (_sheetState) {
+                  _SheetState.preStart => _buildPreStartCard(),
+                  _SheetState.active   => _buildActiveSheet(),
+                  _SheetState.mini     => _buildMiniPlayer(),
+                },
+              ),
             ),
           ],
         ),
