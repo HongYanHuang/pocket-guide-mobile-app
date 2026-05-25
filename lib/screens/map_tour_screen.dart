@@ -672,39 +672,65 @@ class _MapTourScreenState extends State<MapTourScreen>
                 child: Row(
                   children: [
                     // Stop thumbnail
-                    if (currentPoi?.coverImageUrl != null)
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: NetworkImageWithFallback(
-                            imageUrl: currentPoi!.coverImageUrl!,
-                          ),
-                        ),
-                      )
-                    else
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: PGColors.rawiPaper2,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Text(
-                            stopNumber > 0 ? '$stopNumber' : '—',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: PGColors.rawiInk,
+                    SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          if (currentPoi?.coverImageUrl != null)
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: SizedBox(
+                                width: 46,
+                                height: 46,
+                                child: NetworkImageWithFallback(
+                                  imageUrl: currentPoi!.coverImageUrl!,
+                                ),
+                              ),
+                            )
+                          else
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: PGColors.rawiPaper2,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                          ),
-                        ),
+
+                          // Number badge at bottom-right
+                          if (stopNumber > 0)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: PGColors.rawiAccent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: PGColors.rawiPaper,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '$stopNumber',
+                                    style: const TextStyle(
+                                      color: PGColors.rawiPaper,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700,
+                                      height: 1,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
+                    ),
 
                     const SizedBox(width: 12),
 
@@ -751,19 +777,16 @@ class _MapTourScreenState extends State<MapTourScreen>
 
             // Audio player
             if (_geofenceService != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: PGColors.rawiHair)),
-                  ),
-                  child: ChapterPlayerWidget(
-                    geofenceService: _geofenceService!,
-                    onShowChapterList: () {
-                      // TODO: open chapter list modal
-                    },
-                  ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: PGColors.rawiHair)),
+                ),
+                child: ChapterPlayerWidget(
+                  geofenceService: _geofenceService!,
+                  onShowChapterList: () {
+                    // TODO: open chapter list modal
+                  },
                 ),
               ),
 
