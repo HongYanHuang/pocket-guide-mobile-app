@@ -9,6 +9,7 @@ import 'package:pocket_guide_mobile/models/user_model.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AuthService {
@@ -393,6 +394,79 @@ class AuthService {
       await _storageService.deleteCodeVerifier();
       await _storageService.deleteOAuthState();
       return false;
+    }
+  }
+
+  // ── Apple Sign-In (iOS only) ────────────────────────────────────────────────
+
+  Future<bool> loginWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final identityToken = credential.identityToken;
+      if (identityToken == null) {
+        throw Exception('No identity token returned from Apple');
+      }
+
+      final tokenResponse = await _verifyAppleIdentityToken(
+        identityToken: identityToken,
+        authorizationCode: credential.authorizationCode,
+      );
+
+      if (tokenResponse == null) {
+        throw Exception('Backend failed to verify Apple identity token');
+      }
+
+      await _storageService.saveAccessToken(tokenResponse.accessToken);
+      await _storageService.saveRefreshToken(tokenResponse.refreshToken);
+
+      print('✅ Apple Sign-In successful');
+      return true;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        print('ℹ️  Apple Sign-In cancelled by user');
+        return false;
+      }
+      print('❌ Apple Sign-In error: ${e.message}');
+      return false;
+    } catch (e) {
+      print('❌ Apple Sign-In error: $e');
+      return false;
+    }
+  }
+
+  Future<AuthTokenResponse?> _verifyAppleIdentityToken({
+    required String identityToken,
+    required String authorizationCode,
+  }) async {
+    try {
+      final dio = Dio(BaseOptions(baseUrl: ApiService.baseUrl));
+      final response = await dio.post(
+        '/auth/client/apple/verify-token',
+        data: {
+          'identity_token': identityToken,
+          'authorization_code': authorizationCode,
+        },
+      );
+
+      if (response.data == null) return null;
+
+      final tokenData = response.data as Map<String, dynamic>;
+      return AuthTokenResponse(
+        (b) => b
+          ..accessToken = tokenData['access_token']
+          ..refreshToken = tokenData['refresh_token']
+          ..tokenType = tokenData['token_type']
+          ..expiresIn = tokenData['expires_in'],
+      );
+    } catch (e) {
+      print('Error verifying Apple identity token: $e');
+      return null;
     }
   }
 
