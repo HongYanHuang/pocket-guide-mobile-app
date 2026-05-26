@@ -786,9 +786,7 @@ class _MapTourScreenState extends State<MapTourScreen>
                 ),
                 child: ChapterPlayerWidget(
                   geofenceService: _geofenceService!,
-                  onShowChapterList: () {
-                    // TODO: open chapter list modal
-                  },
+                  onShowChapterList: _showChapterListSheet,
                 ),
               ),
 
@@ -1377,6 +1375,25 @@ class _MapTourScreenState extends State<MapTourScreen>
     );
   }
 
+  void _showChapterListSheet() {
+    final pois = _getPoisForDay(_selectedDay);
+    final poiIds =
+        pois.map((p) => p.poiId ?? _poiNameToId(p.poi)).toList();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: const Color(0x6B1B1915),
+      builder: (_) => _ChapterListSheet(
+        pois: pois,
+        poiIds: poiIds,
+        day: _selectedDay,
+        progressManager: _progressManager,
+        geofenceService: _geofenceService,
+      ),
+    );
+  }
+
   Future<void> _togglePOICompletion(String poiId, bool completed) async {
     await _progressManager?.updatePOICompletion(
       poiId: poiId,
@@ -1804,7 +1821,7 @@ class _PoiDetailSheet extends StatelessWidget {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 itemCount: sections.length,
-                separatorBuilder: (_, __) =>
+                separatorBuilder: (_, _) =>
                     Container(height: 0.5, color: PGColors.rawiHair),
                 itemBuilder: (_, i) =>
                     _ChapterRow(
@@ -1853,6 +1870,506 @@ class _PoiDetailSheet extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Chapter list bottom sheet ───────────────────────────────────────────────
+
+class _ChapterListSheet extends StatefulWidget {
+  const _ChapterListSheet({
+    required this.pois,
+    required this.poiIds,
+    required this.day,
+    this.progressManager,
+    this.geofenceService,
+  });
+
+  final List<TourPOI> pois;
+  final List<String> poiIds;
+  final int day;
+  final ProgressManager? progressManager;
+  final GeofenceService? geofenceService;
+
+  @override
+  State<_ChapterListSheet> createState() => _ChapterListSheetState();
+}
+
+class _ChapterListSheetState extends State<_ChapterListSheet> {
+  late List<bool> _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    final gs = widget.geofenceService;
+    // Collapse completed stops; expand current and upcoming
+    _expanded = List.generate(widget.pois.length, (i) {
+      final poiId = widget.poiIds[i];
+      final completed =
+          widget.progressManager?.isPOICompleted(poiId, widget.day) ?? false;
+      final isCurrent = poiId == gs?.currentPoiId;
+      return !completed || isCurrent;
+    });
+  }
+
+  String _fmtDur(int seconds) {
+    final m = seconds ~/ 60;
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
+
+    return StreamBuilder<PlaybackState>(
+      stream: BackgroundAudioService.instance.playbackStateStream,
+      builder: (context, snap) {
+        final playing = snap.data == PlaybackState.playing;
+        final currentPoiId = widget.geofenceService?.currentPoiId;
+        final currentSecIdx =
+            widget.geofenceService?.currentSectionIndex ?? 0;
+
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.78,
+          ),
+          decoration: const BoxDecoration(
+            color: PGColors.rawiPaper,
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(22)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 8, 0, 4),
+                child: Center(
+                  child: Container(
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: PGColors.rawiInk.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+              ),
+              // Title row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Chapters',
+                      style: GoogleFonts.sourceSans3(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: PGColors.rawiInk,
+                        letterSpacing: -0.02,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: const BoxDecoration(
+                          color: PGColors.rawiPaper2,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close_rounded,
+                          size: 14,
+                          color: PGColors.rawiInk,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(height: 0.5, color: PGColors.rawiHair),
+
+              // Stop list
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  itemCount: widget.pois.length,
+                  separatorBuilder: (_, _) =>
+                      Container(height: 0.5, color: PGColors.rawiHair),
+                  itemBuilder: (_, i) {
+                    final poi = widget.pois[i];
+                    final poiId = widget.poiIds[i];
+                    final completed =
+                        widget.progressManager?.isPOICompleted(
+                                poiId, widget.day) ??
+                            false;
+                    final isCurrent = poiId == currentPoiId;
+                    final stopState = completed
+                        ? 'completed'
+                        : isCurrent
+                            ? 'current'
+                            : 'upcoming';
+                    final sections = poi.sections?.toList() ?? [];
+                    final stopNum =
+                        (i + 1).toString().padLeft(2, '0');
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Stop header
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(
+                              () => _expanded[i] = !_expanded[i]),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                            child: Row(
+                              children: [
+                                // Photo or monogram circle
+                                _buildStopThumb(
+                                    poi, stopState, stopNum),
+                                const SizedBox(width: 12),
+                                // Eyebrow + title
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text.rich(
+                                        TextSpan(
+                                          style: GoogleFonts.sourceSans3(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.12,
+                                            color: stopState == 'current'
+                                                ? PGColors.rawiAccent
+                                                : PGColors.rawiInk3,
+                                            decoration:
+                                                TextDecoration.none,
+                                          ),
+                                          children: [
+                                            TextSpan(text: 'Stop $stopNum'),
+                                            if (stopState == 'current')
+                                              const TextSpan(
+                                                  text: '  · Current'),
+                                            if (stopState == 'completed')
+                                              TextSpan(
+                                                  text:
+                                                      '  · ${sections.length} done'),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        poi.poi,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.sourceSans3(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w600,
+                                          color: stopState == 'completed'
+                                              ? PGColors.rawiInk
+                                                  .withValues(alpha: 0.7)
+                                              : PGColors.rawiInk,
+                                          letterSpacing: -0.01,
+                                          decoration:
+                                              stopState == 'completed'
+                                                  ? TextDecoration
+                                                      .lineThrough
+                                                  : TextDecoration.none,
+                                          decorationColor:
+                                              PGColors.rawiInk4,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Chevron
+                                Icon(
+                                  _expanded[i]
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                  size: 20,
+                                  color: PGColors.rawiInk3,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Chapter rows
+                        if (_expanded[i] && sections.isNotEmpty)
+                          Padding(
+                            padding:
+                                const EdgeInsets.fromLTRB(64, 0, 16, 14),
+                            child: Column(
+                              children: List.generate(sections.length,
+                                  (ci) {
+                                final section = sections[ci];
+                                final isChapCurrent =
+                                    isCurrent && ci == currentSecIdx;
+                                final isChapDone = (completed ||
+                                    (isCurrent && ci < currentSecIdx));
+                                final isChapPlaying =
+                                    isChapCurrent && playing;
+
+                                return _buildChapterRow(
+                                  section: section,
+                                  poi: poi,
+                                  chapterIdx: ci,
+                                  isPlaying: isChapPlaying,
+                                  isCurrent: isChapCurrent,
+                                  isCompleted:
+                                      isChapDone && !isChapCurrent,
+                                  isLast: ci == sections.length - 1,
+                                );
+                              }),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: bottomPad + 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStopThumb(TourPOI poi, String stopState, String stopNum) {
+    final isCompleted = stopState == 'completed';
+    final isCurrent = stopState == 'current';
+
+    if (poi.coverImageUrl != null) {
+      Widget photo = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: NetworkImageWithFallback(imageUrl: poi.coverImageUrl!),
+        ),
+      );
+      if (isCompleted) {
+        photo = Opacity(
+          opacity: 0.7,
+          child: ColorFiltered(
+            colorFilter: const ColorFilter.matrix([
+              0.299, 0.587, 0.114, 0, 0,
+              0.299, 0.587, 0.114, 0, 0,
+              0.299, 0.587, 0.114, 0, 0,
+              0,     0,     0,     1, 0,
+            ]),
+            child: photo,
+          ),
+        );
+      }
+      return photo;
+    }
+
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: (isCompleted || isCurrent)
+            ? PGColors.rawiAccent
+            : PGColors.rawiPaper2,
+        shape: BoxShape.circle,
+        border: stopState == 'upcoming'
+            ? Border.all(color: PGColors.rawiHair)
+            : null,
+      ),
+      child: Center(
+        child: isCompleted
+            ? const Icon(Icons.check_rounded,
+                size: 14, color: PGColors.rawiPaper)
+            : Text(
+                stopNum,
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isCurrent ? PGColors.rawiPaper : PGColors.rawiInk,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  decoration: TextDecoration.none,
+                ),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildChapterRow({
+    required TourPOISection section,
+    required TourPOI poi,
+    required int chapterIdx,
+    required bool isPlaying,
+    required bool isCurrent,
+    required bool isCompleted,
+    required bool isLast,
+  }) {
+    final hasAudio = section.audioUrl != null;
+    final gs = widget.geofenceService;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: (hasAudio && gs != null)
+          ? () {
+              gs.playPoiAtSection(poi, widget.day, chapterIdx);
+              Navigator.pop(context);
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          border: !isLast
+              ? Border(
+                  bottom: BorderSide(color: PGColors.rawiHairSoft))
+              : null,
+        ),
+        child: Row(
+          children: [
+            // Chapter indicator
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color:
+                    isPlaying ? PGColors.rawiAccent : PGColors.rawiPaper2,
+                shape: BoxShape.circle,
+                border: isPlaying
+                    ? null
+                    : Border.all(color: PGColors.rawiHair),
+                boxShadow: isPlaying
+                    ? [
+                        BoxShadow(
+                          color: PGColors.rawiInk.withValues(alpha: 0.18),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: isPlaying
+                    ? const _EqBarsWidget()
+                    : isCompleted
+                        ? const Icon(Icons.check_rounded,
+                            size: 11, color: PGColors.rawiInk3)
+                        : const Icon(Icons.play_arrow_rounded,
+                            size: 13, color: PGColors.rawiInk2),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Title
+            Expanded(
+              child: Text(
+                section.title,
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 14,
+                  fontWeight:
+                      isPlaying ? FontWeight.w700 : FontWeight.w500,
+                  color:
+                      isCompleted ? PGColors.rawiInk3 : PGColors.rawiInk,
+                  letterSpacing: -0.005,
+                  height: 1.35,
+                  decoration: isCompleted
+                      ? TextDecoration.lineThrough
+                      : TextDecoration.none,
+                  decorationColor: PGColors.rawiInk4,
+                ),
+              ),
+            ),
+            // Duration
+            if (section.durationSeconds != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                _fmtDur(section.durationSeconds!),
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      isPlaying ? PGColors.rawiAccent : PGColors.rawiInk3,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Animated EQ bars (used in chapter list playing state) ───────────────────
+
+class _EqBarsWidget extends StatefulWidget {
+  const _EqBarsWidget();
+
+  @override
+  State<_EqBarsWidget> createState() => _EqBarsWidgetState();
+}
+
+class _EqBarsWidgetState extends State<_EqBarsWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  double _barH(double t, double phase) {
+    final v = math.sin(2 * math.pi * ((t + phase) % 1.0));
+    return 3.0 + 4.5 * (v + 1.0); // oscillates 3 → 12
+  }
+
+  Widget _bar(double height) {
+    return Container(
+      width: 2.5,
+      height: height,
+      decoration: BoxDecoration(
+        color: PGColors.rawiPaper,
+        borderRadius: BorderRadius.circular(1),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, _) {
+        final t = _ctrl.value;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            _bar(_barH(t, 0.0)),
+            const SizedBox(width: 2),
+            _bar(_barH(t, 0.133)),
+            const SizedBox(width: 2),
+            _bar(_barH(t, 0.267)),
+          ],
+        );
+      },
     );
   }
 }

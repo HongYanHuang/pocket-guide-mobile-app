@@ -22,6 +22,8 @@ class BackgroundAudioService {
   String? _currentTitle;
   String? _currentSubtitle;
 
+  double _currentSpeed = 1.0;
+
   // Stream controllers for UI updates
   final _playbackStateController = StreamController<PlaybackState>.broadcast();
   final _positionController = StreamController<Duration>.broadcast();
@@ -179,6 +181,20 @@ class BackgroundAudioService {
 
   /// Get total duration
   Duration? get duration => _audioPlayer?.duration;
+
+  /// Get current playback speed
+  double get currentSpeed => _currentSpeed;
+
+  /// Set playback speed
+  Future<void> setSpeed(double speed) async {
+    if (_audioPlayer == null) return;
+    _currentSpeed = speed;
+    try {
+      await _audioPlayer!.setSpeed(speed);
+    } catch (e) {
+      print('❌ Error setting speed: $e');
+    }
+  }
 
   /// Update media notification with current audio info
   void _updateMediaItem() {
