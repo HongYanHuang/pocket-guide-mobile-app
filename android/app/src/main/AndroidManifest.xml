@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
-        android:label="pocket_guide_mobile"
+        android:label="raawi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,4 +1,3 @@
-import 'dart:math' show pi;
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -77,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PGColors.rawiInk,
+      backgroundColor: PGColors.rawiPaper2,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -96,36 +95,82 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Spacer(flex: 2),
+        const Spacer(flex: 1),
 
-        // Wordmark
-        Text(
-          'rawi',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.sourceSans3(
-            fontSize: 76,
-            fontWeight: FontWeight.w800,
-            color: PGColors.rawiPaper,
-            letterSpacing: -0.04 * 76,
-            height: 1,
+        // Logo mark — ClipRRect hides the opaque black corners of the PNG
+        ClipRRect(
+          borderRadius: BorderRadius.circular(27),
+          child: Image.asset(
+            'raawi_icon.png',
+            width: 120,
+            height: 120,
           ),
         ),
 
-        const SizedBox(height: 14),
+        const SizedBox(height: 32),
 
-        // Tagline
+        // Wordmark — "raawi" + green dot
+        RichText(
+          textAlign: TextAlign.center,
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'raawi',
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w700,
+                  color: PGColors.rawiInk,
+                  letterSpacing: -0.03 * 52,
+                  height: 1,
+                ),
+              ),
+              TextSpan(
+                text: '.',
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 52,
+                  fontWeight: FontWeight.w700,
+                  color: PGColors.rawiAccent,
+                  letterSpacing: 0,
+                  height: 1,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // Primary tagline
         Text(
-          'Walk with a story.',
+          'The one who narrates,\nwalks with you.',
           textAlign: TextAlign.center,
           style: GoogleFonts.sourceSans3(
-            fontSize: 17,
-            fontWeight: FontWeight.w400,
-            color: PGColors.rawiPaper.withValues(alpha: 0.48),
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: PGColors.rawiInk,
+            height: 1.4,
             letterSpacing: -0.01,
           ),
         ),
 
-        const Spacer(flex: 3),
+        const SizedBox(height: 12),
+
+        // Sub-tagline
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36),
+          child: Text(
+            'Audio tours, narrated by people who actually know the place.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.sourceSans3(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: PGColors.rawiInk3,
+              height: 1.55,
+            ),
+          ),
+        ),
+
+        const Spacer(flex: 2),
       ],
     );
   }
@@ -134,7 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildButtonSection() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -152,8 +197,6 @@ class _LoginScreenState extends State<LoginScreen> {
               loading: _loading == 'apple',
             ),
             const SizedBox(height: 12),
-            const _OrDivider(),
-            const SizedBox(height: 12),
           ],
 
           // Google Sign-In
@@ -162,16 +205,38 @@ class _LoginScreenState extends State<LoginScreen> {
             loading: _loading == 'google',
           ),
 
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
 
           // Terms
-          Text(
-            'By continuing, you agree to our Terms of Service and Privacy Policy.',
+          RichText(
             textAlign: TextAlign.center,
-            style: GoogleFonts.sourceSans3(
-              fontSize: 11.5,
-              color: PGColors.rawiPaper.withValues(alpha: 0.28),
-              height: 1.55,
+            text: TextSpan(
+              style: GoogleFonts.sourceSans3(
+                fontSize: 11.5,
+                color: PGColors.rawiInk4,
+                height: 1.55,
+              ),
+              children: [
+                const TextSpan(text: 'By continuing, you agree to our '),
+                TextSpan(
+                  text: 'Terms of Service',
+                  style: GoogleFonts.sourceSans3(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: PGColors.rawiInk2,
+                  ),
+                ),
+                const TextSpan(text: ' and '),
+                TextSpan(
+                  text: 'Privacy Policy',
+                  style: GoogleFonts.sourceSans3(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: PGColors.rawiInk2,
+                  ),
+                ),
+                const TextSpan(text: '.'),
+              ],
             ),
           ),
         ],
@@ -181,7 +246,6 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ─── Apple Sign-In button ─────────────────────────────────────────────────────
-// Uses the package widget — required for App Store compliance.
 
 class _AppleButton extends StatelessWidget {
   const _AppleButton({this.onPressed, required this.loading});
@@ -190,12 +254,27 @@ class _AppleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const _LoadingPill(light: true);
+    if (loading) {
+      return Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: PGColors.rawiInk,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       height: 56,
       child: SignInWithAppleButton(
         onPressed: onPressed ?? () {},
-        style: SignInWithAppleButtonStyle.white,
+        style: SignInWithAppleButtonStyle.black,
         borderRadius: const BorderRadius.all(Radius.circular(14)),
         text: 'Continue with Apple',
       ),
@@ -217,17 +296,22 @@ class _GoogleButton extends StatelessWidget {
       child: Container(
         height: 56,
         decoration: BoxDecoration(
-          color: loading
-              ? PGColors.rawiPaper.withValues(alpha: 0.88)
-              : PGColors.rawiPaper,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: PGColors.rawiHair, width: 1.0),
         ),
         child: loading
-            ? const _LoadingPill(light: false)
+            ? const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.2, color: PGColors.rawiInk),
+                ),
+              )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const _GoogleGIcon(size: 20),
+                  Image.asset('assets/google_g.png', width: 24, height: 24),
                   const SizedBox(width: 10),
                   Text(
                     'Continue with Google',
@@ -241,58 +325,6 @@ class _GoogleButton extends StatelessWidget {
                 ],
               ),
       ),
-    );
-  }
-}
-
-// ─── Shared loading indicator ─────────────────────────────────────────────────
-
-class _LoadingPill extends StatelessWidget {
-  const _LoadingPill({required this.light});
-  final bool light; // true → white bg (Apple), false → paper bg (Google)
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 56,
-      child: Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.2,
-            color: light ? PGColors.rawiInk : PGColors.rawiInk,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── "or" divider ─────────────────────────────────────────────────────────────
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    final line = PGColors.rawiPaper.withValues(alpha: 0.14);
-    return Row(
-      children: [
-        Expanded(child: Container(height: 0.5, color: line)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: Text(
-            'or',
-            style: GoogleFonts.sourceSans3(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: PGColors.rawiPaper.withValues(alpha: 0.30),
-            ),
-          ),
-        ),
-        Expanded(child: Container(height: 0.5, color: line)),
-      ],
     );
   }
 }
@@ -332,67 +364,3 @@ class _ErrorBanner extends StatelessWidget {
   }
 }
 
-// ─── Google "G" badge (CustomPainter) ────────────────────────────────────────
-// Draws the 4-colour Google G: blue ring, red/yellow/green arcs, white centre,
-// blue horizontal bar.
-
-class _GoogleGIcon extends StatelessWidget {
-  const _GoogleGIcon({required this.size});
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _GoogleGPainter()),
-    );
-  }
-}
-
-class _GoogleGPainter extends CustomPainter {
-  static const _blue   = Color(0xFF4285F4);
-  static const _red    = Color(0xFFEA4335);
-  static const _yellow = Color(0xFFFBBC05);
-  static const _green  = Color(0xFF34A853);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r    = size.width / 2;
-    final c    = Offset(r, r);
-    final rect = Rect.fromCircle(center: c, radius: r);
-    final p    = Paint()..style = PaintingStyle.fill;
-
-    canvas.save();
-    canvas.clipPath(Path()..addOval(rect));
-
-    // Blue base (fills the top arc + bar region by default)
-    p.color = _blue;
-    canvas.drawCircle(c, r, p);
-
-    // Red: right side (-15° → 105°, sweep 120°)
-    p.color = _red;
-    canvas.drawArc(rect, -15 * pi / 180, 120 * pi / 180, true, p);
-
-    // Yellow: bottom (105° → 205°, sweep 100°)
-    p.color = _yellow;
-    canvas.drawArc(rect, 105 * pi / 180, 100 * pi / 180, true, p);
-
-    // Green: left (205° → 335°, sweep 130°)
-    p.color = _green;
-    canvas.drawArc(rect, 205 * pi / 180, 130 * pi / 180, true, p);
-
-    // White inner circle — creates the G ring
-    p.color = Colors.white;
-    canvas.drawCircle(c, r * 0.60, p);
-
-    // Blue horizontal bar — the G stroke on the right
-    p.color = _blue;
-    canvas.drawRect(Rect.fromLTWH(r, r - r * 0.22, r, r * 0.44), p);
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter _) => false;
-}
