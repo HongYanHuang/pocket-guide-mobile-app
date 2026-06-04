@@ -63,7 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _loading = null);
       }
     } catch (e) {
-      if (mounted) setState(() { _loading = null; _error = 'Apple sign-in failed. Please try again.'; });
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      setState(() { _loading = null; _error = msg; });
     }
   }
 

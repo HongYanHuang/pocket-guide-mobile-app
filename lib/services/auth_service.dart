@@ -408,6 +408,12 @@ class AuthService {
         ],
       );
 
+      print('✅ Apple credential received');
+      print('   user: ${credential.userIdentifier}');
+      print('   email: ${credential.email}');
+      print('   identityToken present: ${credential.identityToken != null}');
+      print('   authorizationCode present: ${credential.authorizationCode.isNotEmpty}');
+
       final identityToken = credential.identityToken;
       if (identityToken == null) {
         throw Exception('No identity token returned from Apple');
@@ -419,7 +425,7 @@ class AuthService {
       );
 
       if (tokenResponse == null) {
-        throw Exception('Backend failed to verify Apple identity token');
+        throw Exception('Backend returned null — check backend logs');
       }
 
       await _storageService.saveAccessToken(tokenResponse.accessToken);
@@ -432,11 +438,11 @@ class AuthService {
         print('ℹ️  Apple Sign-In cancelled by user');
         return false;
       }
-      print('❌ Apple Sign-In error: ${e.message}');
-      return false;
+      print('❌ Apple auth exception [${e.code}]: ${e.message}');
+      rethrow;
     } catch (e) {
       print('❌ Apple Sign-In error: $e');
-      return false;
+      rethrow;
     }
   }
 
@@ -445,7 +451,12 @@ class AuthService {
     required String authorizationCode,
   }) async {
     try {
-      final dio = Dio(BaseOptions(baseUrl: ApiService.baseUrl));
+      print('🔐 Sending Apple token to backend: ${ApiService.baseUrl}/auth/client/apple/verify-token');
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiService.baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      ));
       final response = await dio.post(
         '/auth/client/apple/verify-token',
         data: {
@@ -454,6 +465,7 @@ class AuthService {
         },
       );
 
+      print('✅ Backend responded: HTTP ${response.statusCode}');
       if (response.data == null) return null;
 
       final tokenData = response.data as Map<String, dynamic>;
@@ -464,9 +476,14 @@ class AuthService {
           ..tokenType = tokenData['token_type']
           ..expiresIn = tokenData['expires_in'],
       );
+    } on DioException catch (e) {
+      print('❌ Backend error: HTTP ${e.response?.statusCode}');
+      print('   Response body: ${e.response?.data}');
+      print('   Message: ${e.message}');
+      rethrow;
     } catch (e) {
-      print('Error verifying Apple identity token: $e');
-      return null;
+      print('❌ Unexpected error verifying Apple token: $e');
+      rethrow;
     }
   }
 
