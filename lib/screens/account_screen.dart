@@ -225,7 +225,7 @@ class _AccountScreenState extends State<AccountScreen> {
                       TextSpan(
                         text: '.',
                         style: GoogleFonts.sourceSans3(
-                          fontSize: 18,
+                          fontSize: 26,
                           fontWeight: FontWeight.w700,
                           color: PGColors.rawiAccent,
                         ),
@@ -235,7 +235,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Inspired by ❤️ over 🗺️ & Edward Gibbon',
+                  'Inspired by ❤️ over 🌏 & Edward Gibbon.',
                   style: GoogleFonts.sourceSans3(
                     fontSize: 12,
                     color: PGColors.rawiInk4,
@@ -550,6 +550,23 @@ class _AccountSettingsScreen extends StatelessWidget {
                               CupertinoPageRoute(
                                   builder: (_) =>
                                       const _DeleteAccountScreen())),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _kRed.withValues(alpha: 0.07),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'Permanently removes your profile, history and personalized tours.',
+                            style: GoogleFonts.sourceSans3(
+                              fontSize: 13,
+                              color: _kRed.withValues(alpha: 0.75),
+                              height: 1.45,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1207,8 +1224,7 @@ class _FooterLink extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w600,
           color: PGColors.rawiInk3,
-          decoration: TextDecoration.underline,
-          decorationColor: PGColors.rawiInk4,
+          decoration: TextDecoration.none,
         ),
       ),
     );
