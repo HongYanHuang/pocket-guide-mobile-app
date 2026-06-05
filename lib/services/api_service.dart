@@ -737,6 +737,17 @@ class ApiService {
     }
   }
 
+  /// Delete the current user's account
+  /// DELETE /auth/client/account — backend revokes all sessions and anonymises data
+  Future<void> deleteAccount(String accessToken) async {
+    _dio.options.headers['Authorization'] = 'Bearer $accessToken';
+    try {
+      await _dio.delete('/auth/client/account');
+    } finally {
+      _dio.options.headers.remove('Authorization');
+    }
+  }
+
   /// Get reviews for a tour
   Future<List<TourReview>> getReviews(String tourId, {int limit = 10}) async {
     try {

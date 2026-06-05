@@ -13,6 +13,7 @@ import 'package:pocket_guide_mobile/screens/create_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/home_screen.dart';
 import 'package:pocket_guide_mobile/screens/tour_detail_screen.dart';
+import 'package:pocket_guide_mobile/screens/account_screen.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -199,7 +200,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final screens = <Widget>[
       HomeScreen(onTourTap: (id) => _navigateToTour(context, id)),
-      const AccountsScreen(),
+      const AccountScreen(),
     ];
 
     return Stack(
@@ -830,132 +831,6 @@ class ExploreScreen extends StatelessWidget {
       ),
       body: const Center(
         child: Text('Explore Screen'),
-      ),
-    );
-  }
-}
-
-// Accounts Screen
-class AccountsScreen extends StatefulWidget {
-  const AccountsScreen({super.key});
-
-  @override
-  State<AccountsScreen> createState() => _AccountsScreenState();
-}
-
-class _AccountsScreenState extends State<AccountsScreen> {
-  final AuthService _authService = AuthService();
-  bool _loading = false;
-
-  Future<void> _handleLogout() async {
-    final confirmed = await showCupertinoDialog<bool>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(
-          'Logout',
-          style: PGTypography.headline.copyWith(
-            decoration: TextDecoration.none,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to logout?',
-          style: PGTypography.body.copyWith(
-            decoration: TextDecoration.none,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: PGColors.brand,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              'Logout',
-              style: TextStyle(decoration: TextDecoration.none),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      setState(() => _loading = true);
-
-      await _authService.logout();
-
-      if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          CupertinoPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: PGColors.background,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Large title header
-          PGLargeNavigationBar(
-            title: 'Account',
-          ),
-          Expanded(
-            child: _loading
-                ? Center(
-                    child: CupertinoActivityIndicator(color: PGColors.brand),
-                  )
-                : ListView(
-                    padding: EdgeInsets.symmetric(horizontal: PGSpacing.l),
-                    children: [
-                      SizedBox(height: PGSpacing.l),
-                  // Logout button
-                  CupertinoButton(
-                    padding: EdgeInsets.zero,
-                    onPressed: _handleLogout,
-                    child: Container(
-                      padding: PGSpacing.paddingL,
-                      decoration: BoxDecoration(
-                        color: PGColors.surface,
-                        borderRadius: PGRadius.radiusM,
-                        border: Border.all(color: PGColors.error, width: 1),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            CupertinoIcons.arrow_right_square,
-                            color: PGColors.error,
-                            size: 24,
-                          ),
-                          SizedBox(width: PGSpacing.l),
-                          Expanded(
-                            child: Text(
-                              'Logout',
-                              style: PGTypography.body.copyWith(
-                                color: PGColors.error,
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-          ),
-        ],
       ),
     );
   }
