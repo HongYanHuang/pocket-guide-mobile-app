@@ -206,7 +206,7 @@ class _AccountScreenState extends State<AccountScreen> {
         // ── Footer
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 108),
             child: Column(
               children: [
                 // raawi. wordmark
