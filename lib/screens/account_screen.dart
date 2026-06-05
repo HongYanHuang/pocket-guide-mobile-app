@@ -13,7 +13,6 @@ import 'package:pocket_guide_mobile/services/auth_service.dart';
 
 // ---------------------------------------------------------------------------
 // AccountScreen — "You" tab
-// Light rawi paper theme throughout.
 // ---------------------------------------------------------------------------
 
 class AccountScreen extends StatefulWidget {
@@ -47,7 +46,6 @@ class _AccountScreenState extends State<AccountScreen> {
     return name.isNotEmpty ? name[0].toUpperCase() : '?';
   }
 
-  // Apple relay emails always end with @privaterelay.appleid.com
   bool _isApple(String email) => email.endsWith('@privaterelay.appleid.com');
 
   @override
@@ -75,7 +73,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
     return CustomScrollView(
       slivers: [
-        // ── Large title "Account"
+        // ── Large title
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -118,12 +116,12 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         ),
 
-        // ── YOUR LIBRARY section
+        // ── YOUR LIBRARY
         SliverToBoxAdapter(
-          child: _Section(
+          child: _CardSection(
             label: 'YOUR LIBRARY',
-            rows: [
-              _Row(
+            children: [
+              _NavRow(
                 icon: CupertinoIcons.clock,
                 label: 'History',
                 onTap: () => Navigator.push(context,
@@ -131,8 +129,8 @@ class _AccountScreenState extends State<AccountScreen> {
                         builder: (_) => const _HistoryScreen(
                             title: 'History'))),
               ),
-              _RowDivider(),
-              _Row(
+              const _Divider(),
+              _NavRow(
                 icon: CupertinoIcons.pencil,
                 label: 'My personalized tours',
                 onTap: () => Navigator.push(context,
@@ -144,12 +142,12 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         ),
 
-        // ── PREFERENCES section
+        // ── PREFERENCES
         SliverToBoxAdapter(
-          child: _Section(
+          child: _CardSection(
             label: 'PREFERENCES',
-            rows: [
-              _Row(
+            children: [
+              _NavRow(
                 icon: CupertinoIcons.bell,
                 label: 'Notifications',
                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
@@ -157,39 +155,154 @@ class _AccountScreenState extends State<AccountScreen> {
                       content: Text('Notification settings coming soon.')),
                 ),
               ),
-              _RowDivider(),
-              _InfoRow(
+              const _Divider(),
+              const _ValueRow(
                 icon: CupertinoIcons.globe,
                 label: 'Language',
                 value: 'English',
+                locked: true,
               ),
-              _RowDivider(),
-              _InfoRow(
+              const _Divider(),
+              const _ValueRow(
                 icon: CupertinoIcons.arrow_2_squarepath,
                 label: 'Units',
                 value: 'Kilometres',
+                locked: true,
               ),
-              _RowDivider(),
+              const _Divider(),
               _AutoPlayRow(),
             ],
           ),
         ),
 
-        // ── Account settings link
+        // ── Account settings / About / Sign out  (one group, no label)
+        SliverToBoxAdapter(
+          child: _CardSection(
+            children: [
+              _NavRow(
+                icon: CupertinoIcons.person_crop_circle,
+                label: 'Account settings',
+                onTap: () => Navigator.push(context,
+                    CupertinoPageRoute(
+                        builder: (_) => const _AccountSettingsScreen())),
+              ),
+              const _Divider(),
+              _NavRow(
+                icon: CupertinoIcons.info_circle,
+                label: 'About raawi',
+                value: 'v1.0',
+                onTap: () {},
+              ),
+              const _Divider(),
+              _NavRow(
+                icon: CupertinoIcons.square_arrow_right,
+                label: 'Sign out',
+                onTap: () => _confirmSignOut(context),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Footer
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-            child: _Row(
-              icon: CupertinoIcons.settings,
-              label: 'Account settings',
-              onTap: () => Navigator.push(context,
-                  CupertinoPageRoute(
-                      builder: (_) => const _AccountSettingsScreen())),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 48),
+            child: Column(
+              children: [
+                // raawi. wordmark
+                RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: 'raawi',
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: PGColors.rawiInk,
+                          letterSpacing: -0.02 * 18,
+                        ),
+                      ),
+                      TextSpan(
+                        text: '.',
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: PGColors.rawiAccent,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Inspired by ❤️ over 🗺️ & Edward Gibbon',
+                  style: GoogleFonts.sourceSans3(
+                    fontSize: 12,
+                    color: PGColors.rawiInk4,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                // Terms & Privacy links
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _FooterLink(
+                        label: 'Terms & Conditions',
+                        url: 'https://www.google.com'),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('·',
+                          style: GoogleFonts.sourceSans3(
+                              fontSize: 13, color: PGColors.rawiInk4)),
+                    ),
+                    _FooterLink(
+                        label: 'Privacy Policy',
+                        url: 'https://www.google.com'),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmSignOut(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: PGColors.rawiPaper,
+        title: Text('Sign out?',
+            style: GoogleFonts.sourceSans3(
+                color: PGColors.rawiInk, fontWeight: FontWeight.w700)),
+        content: Text('You will need to sign in again to access your account.',
+            style: GoogleFonts.sourceSans3(
+                color: PGColors.rawiInk3, height: 1.45)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel',
+                style: GoogleFonts.sourceSans3(color: PGColors.rawiInk3)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Sign out',
+                style: GoogleFonts.sourceSans3(color: _kRed)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await _auth.logout();
+    if (context.mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (_) => false,
+      );
+    }
   }
 }
 
@@ -210,7 +323,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
   final _auth = AuthService();
   List<Map<String, dynamic>> _tours = [];
   bool _loading = true;
-  String? _error;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -230,7 +343,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
         });
       }
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _hasError = true; _loading = false; });
     }
   }
 
@@ -256,12 +369,19 @@ class _HistoryScreenState extends State<_HistoryScreen> {
           child: CircularProgressIndicator(
               color: PGColors.rawiInk3, strokeWidth: 2));
     }
-    if (_error != null || _tours.isEmpty) {
+    if (_hasError) {
+      return Center(
+        child: Text('Could not load tours.',
+            style: GoogleFonts.sourceSans3(
+                fontSize: 14, color: PGColors.rawiInk4)),
+      );
+    }
+    if (_tours.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.map, size: 44, color: PGColors.rawiInk4),
+            const Icon(CupertinoIcons.map, size: 44, color: PGColors.rawiInk4),
             const SizedBox(height: 14),
             Text('No tours yet',
                 style: GoogleFonts.sourceSans3(
@@ -279,7 +399,7 @@ class _HistoryScreenState extends State<_HistoryScreen> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: _tours.length,
-      separatorBuilder: (_, __) => const Divider(
+      separatorBuilder: (ctx, i) => const Divider(
           color: PGColors.rawiHair, height: 1, thickness: 1,
           indent: 20, endIndent: 20),
       itemBuilder: (_, i) => _TourRow(tour: _tours[i]),
@@ -302,9 +422,8 @@ class _TourRow extends StatelessWidget {
   String get _date {
     final raw = tour['created_at'] as String?;
     if (raw == null) return '';
-    try {
-      return DateFormat('MMM yyyy').format(DateTime.parse(raw));
-    } catch (_) { return ''; }
+    try { return DateFormat('MMM yyyy').format(DateTime.parse(raw)); }
+    catch (_) { return ''; }
   }
 
   String? get _coverUrl {
@@ -323,16 +442,13 @@ class _TourRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          // Thumbnail
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: SizedBox(
-              width: 60,
-              height: 60,
+              width: 60, height: 60,
               child: _coverUrl != null
-                  ? Image.network(_coverUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _placeholder())
+                  ? Image.network(_coverUrl!, fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, st) => _placeholder())
                   : _placeholder(),
             ),
           ),
@@ -346,8 +462,7 @@ class _TourRow extends StatelessWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: PGColors.rawiInk),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 3),
                 if (_city.isNotEmpty) ...[
                   Text(_city,
@@ -356,10 +471,8 @@ class _TourRow extends StatelessWidget {
                   const SizedBox(height: 2),
                 ],
                 Text(
-                  [
-                    if (_date.isNotEmpty) _date,
-                    _days == 1 ? '1 day' : '$_days days',
-                  ].join(' · '),
+                  [if (_date.isNotEmpty) _date,
+                    _days == 1 ? '1 day' : '$_days days'].join(' · '),
                   style: GoogleFonts.sourceSans3(
                       fontSize: 12, color: PGColors.rawiInk4),
                 ),
@@ -376,12 +489,11 @@ class _TourRow extends StatelessWidget {
   Widget _placeholder() => Container(
         color: PGColors.rawiPaper2,
         child: const Icon(CupertinoIcons.map,
-            color: PGColors.rawiInk4, size: 22),
-      );
+            color: PGColors.rawiInk4, size: 22));
 }
 
 // ---------------------------------------------------------------------------
-// Account Settings screen
+// Account Settings screen  (Delete account — Sign out is on main screen)
 // ---------------------------------------------------------------------------
 
 class _AccountSettingsScreen extends StatelessWidget {
@@ -401,12 +513,10 @@ class _AccountSettingsScreen extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   const SizedBox(height: 8),
-
-                  // Link account (placeholder)
-                  _Section(
+                  _CardSection(
                     label: 'LINKED ACCOUNTS',
-                    rows: [
-                      _Row(
+                    children: [
+                      _NavRow(
                         icon: CupertinoIcons.link,
                         label: 'Link account',
                         trailing: _badge('Soon'),
@@ -415,25 +525,9 @@ class _AccountSettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  const SizedBox(height: 8),
-
-                  // Sign out
-                  _Section(
-                    rows: [
-                      _Row(
-                        icon: CupertinoIcons.arrow_right_square,
-                        label: 'Sign Out',
-                        labelColor: PGColors.rawiInk,
-                        onTap: () => _confirmSignOut(context),
-                        showChevron: false,
-                      ),
-                    ],
-                  ),
-
-                  // Large spacer — Delete is kept far from Sign Out
+                  // ── Large spacer so Delete is far from everything above
                   const SizedBox(height: 120),
 
-                  // Delete account — kept far from Sign Out (App Store requirement)
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Column(
@@ -444,7 +538,7 @@ class _AccountSettingsScreen extends StatelessWidget {
                           style: GoogleFonts.sourceSans3(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: const Color(0xFFD45B5B).withOpacity(0.7),
+                            color: _kRed.withValues(alpha: 0.65),
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -452,11 +546,10 @@ class _AccountSettingsScreen extends StatelessWidget {
                         _DestructiveRow(
                           icon: CupertinoIcons.trash,
                           label: 'Delete Account',
-                          onTap: () => Navigator.push(
-                            context,
-                            CupertinoPageRoute(
-                                builder: (_) => const _DeleteAccountScreen()),
-                          ),
+                          onTap: () => Navigator.push(context,
+                              CupertinoPageRoute(
+                                  builder: (_) =>
+                                      const _DeleteAccountScreen())),
                         ),
                       ],
                     ),
@@ -469,60 +562,6 @@ class _AccountSettingsScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  Widget _badge(String text) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: PGColors.rawiHairSoft,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(text,
-          style: GoogleFonts.sourceSans3(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: PGColors.rawiInk4,
-              letterSpacing: 0.3)),
-    );
-  }
-
-  Future<void> _confirmSignOut(BuildContext context) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: PGColors.rawiPaper,
-        title: Text('Sign Out?',
-            style: GoogleFonts.sourceSans3(
-                color: PGColors.rawiInk, fontWeight: FontWeight.w700)),
-        content: Text(
-          'You will need to sign in again to access your account.',
-          style: GoogleFonts.sourceSans3(
-              color: PGColors.rawiInk3, height: 1.45),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel',
-                style: GoogleFonts.sourceSans3(color: PGColors.rawiInk3)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Sign Out',
-                style: GoogleFonts.sourceSans3(
-                    color: const Color(0xFFD45B5B))),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    await AuthService().logout();
-    if (context.mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (_) => false,
-      );
-    }
   }
 }
 
@@ -552,7 +591,7 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
       final token = await _auth.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
       await _api.deleteAccount(token);
-      await _auth.logout(); // clears tokens even if backend call fails
+      await _auth.logout();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -595,19 +634,13 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
                     fontSize: 14, color: PGColors.rawiInk3, height: 1.55),
               ),
               const SizedBox(height: 28),
-              _SheetBtn(
-                label: 'Cancel',
-                bg: PGColors.rawiPaper2,
-                textColor: PGColors.rawiInk,
-                onTap: () => Navigator.pop(ctx, false),
-              ),
+              _SheetBtn(label: 'Cancel', bg: PGColors.rawiPaper2,
+                  textColor: PGColors.rawiInk,
+                  onTap: () => Navigator.pop(ctx, false)),
               const SizedBox(height: 10),
-              _SheetBtn(
-                label: 'Delete Account',
-                bg: const Color(0xFFD45B5B).withOpacity(0.12),
-                textColor: const Color(0xFFD45B5B),
-                onTap: () => Navigator.pop(ctx, true),
-              ),
+              _SheetBtn(label: 'Delete Account',
+                  bg: _kRed.withValues(alpha: 0.1), textColor: _kRed,
+                  onTap: () => Navigator.pop(ctx, true)),
             ],
           ),
         ),
@@ -617,7 +650,6 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const red = Color(0xFFD45B5B);
     return Scaffold(
       backgroundColor: PGColors.rawiPaper,
       body: SafeArea(
@@ -648,7 +680,6 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
                       ],
                     ),
                     const SizedBox(height: 32),
-                    // Confirmation checkbox
                     GestureDetector(
                       onTap: () => setState(() => _confirmed = !_confirmed),
                       child: Row(
@@ -659,7 +690,7 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
                                 ? CupertinoIcons.checkmark_square_fill
                                 : CupertinoIcons.square,
                             size: 22,
-                            color: _confirmed ? red : PGColors.rawiInk4,
+                            color: _confirmed ? _kRed : PGColors.rawiInk4,
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -681,12 +712,12 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
                       child: _deleting
                           ? const Center(
                               child: CircularProgressIndicator(
-                                  color: red, strokeWidth: 2))
+                                  color: _kRed, strokeWidth: 2))
                           : ElevatedButton(
                               onPressed: _confirmed ? _handleDelete : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: _confirmed
-                                    ? red.withOpacity(0.1)
+                                    ? _kRed.withValues(alpha: 0.1)
                                     : PGColors.rawiPaper2,
                                 disabledBackgroundColor: PGColors.rawiPaper2,
                                 shadowColor: Colors.transparent,
@@ -695,19 +726,17 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
                                   borderRadius: BorderRadius.circular(14),
                                   side: BorderSide(
                                     color: _confirmed
-                                        ? red.withOpacity(0.4)
+                                        ? _kRed.withValues(alpha: 0.4)
                                         : PGColors.rawiHair,
                                   ),
                                 ),
                               ),
-                              child: Text(
-                                'Delete My Account',
-                                style: GoogleFonts.sourceSans3(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: _confirmed ? red : PGColors.rawiInk4,
-                                ),
-                              ),
+                              child: Text('Delete My Account',
+                                  style: GoogleFonts.sourceSans3(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: _confirmed ? _kRed : PGColors.rawiInk4,
+                                  )),
                             ),
                     ),
                     const SizedBox(height: 40),
@@ -726,11 +755,13 @@ class _DeleteAccountScreenState extends State<_DeleteAccountScreen> {
 // Shared building-block widgets
 // ---------------------------------------------------------------------------
 
-/// Section with an optional LABEL and a card containing [rows].
-class _Section extends StatelessWidget {
-  const _Section({this.label, required this.rows});
+const _kRed = Color(0xFFD45B5B);
+
+/// Grouped card — background SAME as screen (rawiPaper), with border + radius.
+class _CardSection extends StatelessWidget {
+  const _CardSection({this.label, required this.children});
   final String? label;
-  final List<Widget> rows;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
@@ -753,12 +784,12 @@ class _Section extends StatelessWidget {
           ],
           Container(
             decoration: BoxDecoration(
-              color: PGColors.rawiPaper2,
+              // Same color as screen background — border provides definition
+              color: PGColors.rawiPaper,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: PGColors.rawiHair),
             ),
-            child: Column(
-              children: rows,
-            ),
+            child: Column(children: children),
           ),
         ],
       ),
@@ -766,30 +797,30 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _RowDivider extends StatelessWidget {
+/// Thin divider inside a card — indented to align with label text.
+class _Divider extends StatelessWidget {
+  const _Divider();
+
   @override
   Widget build(BuildContext context) {
     return const Divider(
-        color: PGColors.rawiHair, height: 1, thickness: 1,
-        indent: 52, endIndent: 0);
+        color: PGColors.rawiHair, height: 1, thickness: 1, indent: 52);
   }
 }
 
-/// Standard tappable row with icon, label, optional trailing widget, chevron.
-class _Row extends StatelessWidget {
-  const _Row({
+/// Standard tappable row.
+class _NavRow extends StatelessWidget {
+  const _NavRow({
     required this.icon,
     required this.label,
+    this.value,
     this.trailing,
-    this.labelColor,
-    this.showChevron = true,
     required this.onTap,
   });
   final IconData icon;
   final String label;
+  final String? value;
   final Widget? trailing;
-  final Color? labelColor;
-  final bool showChevron;
   final VoidCallback onTap;
 
   @override
@@ -802,25 +833,27 @@ class _Row extends StatelessWidget {
         splashColor: PGColors.rawiHairSoft,
         highlightColor: PGColors.rawiHairSoft,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(
             children: [
               _IconBubble(icon: icon),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  label,
-                  style: GoogleFonts.sourceSans3(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: labelColor ?? PGColors.rawiInk,
-                  ),
-                ),
+                child: Text(label,
+                    style: GoogleFonts.sourceSans3(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: PGColors.rawiInk)),
               ),
+              if (value != null) ...[
+                Text(value!,
+                    style: GoogleFonts.sourceSans3(
+                        fontSize: 15, color: PGColors.rawiInk4)),
+                const SizedBox(width: 4),
+              ],
               if (trailing != null) ...[trailing!, const SizedBox(width: 6)],
-              if (showChevron)
-                const Icon(CupertinoIcons.chevron_right,
-                    size: 14, color: PGColors.rawiInk4),
+              const Icon(CupertinoIcons.chevron_right,
+                  size: 14, color: PGColors.rawiInk4),
             ],
           ),
         ),
@@ -829,21 +862,23 @@ class _Row extends StatelessWidget {
   }
 }
 
-/// Read-only row with a displayed value and a lock indicator.
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({
+/// Read-only row showing a locked value.
+class _ValueRow extends StatelessWidget {
+  const _ValueRow({
     required this.icon,
     required this.label,
     required this.value,
+    required this.locked,
   });
   final IconData icon;
   final String label;
   final String value;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       child: Row(
         children: [
           _IconBubble(icon: icon),
@@ -858,97 +893,67 @@ class _InfoRow extends StatelessWidget {
           Text(value,
               style: GoogleFonts.sourceSans3(
                   fontSize: 15, color: PGColors.rawiInk4)),
-          const SizedBox(width: 6),
-          const Icon(CupertinoIcons.lock, size: 12, color: PGColors.rawiInk4),
+          if (locked) ...[
+            const SizedBox(width: 5),
+            const Icon(CupertinoIcons.lock, size: 12, color: PGColors.rawiInk4),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Auto-play row — the one interactive preference, stored locally.
+/// Auto-play row — persisted locally, shows On/Off + chevron.
 class _AutoPlayRow extends StatefulWidget {
   @override
   State<_AutoPlayRow> createState() => _AutoPlayRowState();
 }
 
 class _AutoPlayRowState extends State<_AutoPlayRow> {
-  bool _autoPlay = true;
-  static const _key = 'pref_autoplay_next_stop';
+  bool _on = true;
+  static const _prefKey = 'pref_autoplay_next_stop';
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) setState(() => _autoPlay = prefs.getBool(_key) ?? true);
+    SharedPreferences.getInstance()
+        .then((p) => mounted ? setState(() => _on = p.getBool(_prefKey) ?? true) : null);
   }
 
   Future<void> _toggle() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => _autoPlay = !_autoPlay);
-    await prefs.setBool(_key, _autoPlay);
+    final next = !_on;
+    setState(() => _on = next);
+    (await SharedPreferences.getInstance()).setBool(_prefKey, next);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        children: [
-          _IconBubble(icon: CupertinoIcons.playpause),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('Auto-play next stop',
-                style: GoogleFonts.sourceSans3(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: PGColors.rawiInk)),
-          ),
-          CupertinoSwitch(
-            value: _autoPlay,
-            onChanged: (_) => _toggle(),
-            activeColor: PGColors.rawiAccent,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Destructive red row (no card background, border only).
-class _DestructiveRow extends StatelessWidget {
-  const _DestructiveRow({required this.icon, required this.label, required this.onTap});
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    const red = Color(0xFFD45B5B);
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: _toggle,
         borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: red.withOpacity(0.3)),
-          ),
+        splashColor: PGColors.rawiHairSoft,
+        highlightColor: PGColors.rawiHairSoft,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
           child: Row(
             children: [
-              Icon(icon, size: 18, color: red.withOpacity(0.7)),
+              _IconBubble(icon: CupertinoIcons.playpause),
               const SizedBox(width: 12),
-              Text(label,
+              Expanded(
+                child: Text('Auto-play next stop',
+                    style: GoogleFonts.sourceSans3(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: PGColors.rawiInk)),
+              ),
+              Text(_on ? 'On' : 'Off',
                   style: GoogleFonts.sourceSans3(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: red.withOpacity(0.85))),
+                      fontSize: 15, color: PGColors.rawiInk4)),
+              const SizedBox(width: 4),
+              const Icon(CupertinoIcons.chevron_right,
+                  size: 14, color: PGColors.rawiInk4),
             ],
           ),
         ),
@@ -968,7 +973,7 @@ class _IconBubble extends StatelessWidget {
       width: 32,
       height: 32,
       decoration: BoxDecoration(
-        color: PGColors.rawiPaper3,
+        color: PGColors.rawiPaper2,
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
@@ -995,24 +1000,22 @@ class _NavHeader extends StatelessWidget {
                 color: PGColors.rawiInk, size: 28),
           ),
           const SizedBox(width: 2),
-          Text(
-            title,
-            style: GoogleFonts.sourceSans3(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: PGColors.rawiInk,
-              letterSpacing: -0.3,
-            ),
-          ),
+          Text(title,
+              style: GoogleFonts.sourceSans3(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: PGColors.rawiInk,
+                  letterSpacing: -0.3)),
         ],
       ),
     );
   }
 }
 
-/// Centered avatar circle with provider badge overlay.
+/// Centered avatar with golden gradient + provider badge.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.initials, this.pictureUrl, required this.isApple});
+  const _Avatar(
+      {required this.initials, this.pictureUrl, required this.isApple});
   final String initials;
   final String? pictureUrl;
   final bool isApple;
@@ -1022,7 +1025,6 @@ class _Avatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Main circle
         Container(
           width: 80,
           height: 80,
@@ -1038,13 +1040,11 @@ class _Avatar extends StatelessWidget {
           child: pictureUrl != null && pictureUrl!.isNotEmpty
               ? ClipOval(
                   child: Image.network(pictureUrl!,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _initials()))
-              : _initials(),
+                      width: 80, height: 80, fit: BoxFit.cover,
+                      errorBuilder: (ctx, err, st) => _initialsText()))
+              : _initialsText(),
         ),
-        // Provider badge — bottom-right
+        // Provider badge
         Positioned(
           right: -2,
           bottom: -2,
@@ -1062,27 +1062,62 @@ class _Avatar extends StatelessWidget {
                     style: TextStyle(fontSize: 11, color: Color(0xFF1B1915)))
                 : Text('G',
                     style: GoogleFonts.sourceSans3(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF4285F4),
-                    )),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF4285F4))),
           ),
         ),
       ],
     );
   }
 
-  Widget _initials() => Text(
+  Widget _initialsText() => Text(
         initials,
         style: GoogleFonts.sourceSans3(
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
+            fontSize: 26, fontWeight: FontWeight.w700, color: Colors.white),
       );
 }
 
-/// Consequence info block for the delete account screen.
+/// Red destructive bordered row.
+class _DestructiveRow extends StatelessWidget {
+  const _DestructiveRow(
+      {required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          decoration: BoxDecoration(
+            color: PGColors.rawiPaper,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _kRed.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              _IconBubble(icon: icon),
+              const SizedBox(width: 12),
+              Text(label,
+                  style: GoogleFonts.sourceSans3(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: _kRed.withValues(alpha: 0.85))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Consequence info block for delete screen.
 class _ConsequenceBlock extends StatelessWidget {
   const _ConsequenceBlock({
     required this.title,
@@ -1095,28 +1130,25 @@ class _ConsequenceBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const red = Color(0xFFD45B5B);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: GoogleFonts.sourceSans3(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: isWarning ? red.withOpacity(0.75) : PGColors.rawiInk4,
-            letterSpacing: 0.6,
-          ),
-        ),
+        Text(title,
+            style: GoogleFonts.sourceSans3(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isWarning ? _kRed.withValues(alpha: 0.7) : PGColors.rawiInk4,
+                letterSpacing: 0.6)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isWarning ? red.withOpacity(0.06) : PGColors.rawiPaper2,
+            color: isWarning ? _kRed.withValues(alpha: 0.06) : PGColors.rawiPaper2,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isWarning ? red.withOpacity(0.18) : PGColors.rawiHair,
-            ),
+                color: isWarning
+                    ? _kRed.withValues(alpha: 0.18)
+                    : PGColors.rawiHair),
           ),
           child: Column(
             children: items.asMap().entries.map((e) {
@@ -1126,30 +1158,22 @@ class _ConsequenceBlock extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 1),
-                      child: Icon(
-                        isWarning
-                            ? CupertinoIcons.xmark_circle
-                            : CupertinoIcons.checkmark_circle,
-                        size: 14,
-                        color: isWarning
-                            ? red.withOpacity(0.55)
-                            : PGColors.rawiInk4,
-                      ),
+                    Icon(
+                      isWarning
+                          ? CupertinoIcons.xmark_circle
+                          : CupertinoIcons.checkmark_circle,
+                      size: 14,
+                      color: isWarning ? _kRed.withValues(alpha: 0.55) : PGColors.rawiInk4,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        e.value,
-                        style: GoogleFonts.sourceSans3(
-                          fontSize: 14,
-                          color: isWarning
-                              ? PGColors.rawiInk3
-                              : PGColors.rawiInk4,
-                          height: 1.4,
-                        ),
-                      ),
+                      child: Text(e.value,
+                          style: GoogleFonts.sourceSans3(
+                              fontSize: 14,
+                              color: isWarning
+                                  ? PGColors.rawiInk3
+                                  : PGColors.rawiInk4,
+                              height: 1.4)),
                     ),
                   ],
                 ),
@@ -1162,13 +1186,56 @@ class _ConsequenceBlock extends StatelessWidget {
   }
 }
 
+/// Footer link (Terms / Privacy).
+class _FooterLink extends StatelessWidget {
+  const _FooterLink({required this.label, required this.url});
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Text(
+        label,
+        style: GoogleFonts.sourceSans3(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: PGColors.rawiInk3,
+          decoration: TextDecoration.underline,
+          decorationColor: PGColors.rawiInk4,
+        ),
+      ),
+    );
+  }
+}
+
+/// Badge chip (e.g. "Soon").
+Widget _badge(String text) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: PGColors.rawiHairSoft,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(text,
+          style: GoogleFonts.sourceSans3(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: PGColors.rawiInk4,
+              letterSpacing: 0.3)),
+    );
+
 class _SheetBtn extends StatelessWidget {
-  const _SheetBtn({
-    required this.label,
-    required this.bg,
-    required this.textColor,
-    required this.onTap,
-  });
+  const _SheetBtn(
+      {required this.label,
+      required this.bg,
+      required this.textColor,
+      required this.onTap});
   final String label;
   final Color bg;
   final Color textColor;
@@ -1182,12 +1249,11 @@ class _SheetBtn extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-        ),
+            backgroundColor: bg,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12))),
         child: Text(label,
             style: GoogleFonts.sourceSans3(
                 fontSize: 16,
