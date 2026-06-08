@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
@@ -198,64 +199,353 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPad = MediaQuery.of(context).padding.bottom;
     final screens = <Widget>[
       HomeScreen(onTourTap: (id) => _navigateToTour(context, id)),
+      const _NearbyScreen(),
+      const _SavedScreen(),
       const AccountScreen(),
     ];
 
-    return Stack(
-      children: [
-        Scaffold(
-          backgroundColor: PGColors.background,
-          body: IndexedStack(
+    return Scaffold(
+      backgroundColor: PGColors.rawiPaper,
+      body: Stack(
+        children: [
+          IndexedStack(
             index: _currentIndex,
             children: screens,
           ),
-          bottomNavigationBar: PGTabBar(
-            currentIndex: _currentIndex,
-            onTap: (index) {
-              setState(() {
-                _currentIndex = index;
-              });
-            },
-            items: [
-              PGTabItem(
-                icon: CupertinoIcons.house,
-                activeIcon: CupertinoIcons.house_fill,
-                label: 'Tours',
-              ),
-              PGTabItem(
-                icon: CupertinoIcons.person,
-                activeIcon: CupertinoIcons.person_fill,
-                label: 'Account',
-              ),
-            ],
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: bottomPad + 16,
+            child: _RawiTabBar(
+              currentIndex: _currentIndex,
+              onTap: (i) => setState(() => _currentIndex = i),
+            ),
           ),
-        ),
-        // Floating action button overlay (using Material FAB for functionality)
-        Positioned(
-          right: 16,
-          bottom: 70,
-          child: FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                CupertinoPageRoute(
-                  builder: (context) => const CreateTourScreen(),
-                ),
-              );
-            },
-            backgroundColor: PGColors.brand,
-            elevation: 4,
-            child: Icon(CupertinoIcons.add, size: 32, color: PGColors.white),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 
+
+// ── Placeholder screens ───────────────────────────────────────────────────────
+
+class _NearbyScreen extends StatelessWidget {
+  const _NearbyScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PGColors.rawiPaper,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _RawiTabIcon(type: _TabIconType.compass, color: PGColors.rawiInk4),
+              const SizedBox(height: 16),
+              Text('Nearby', style: GoogleFonts.sourceSans3(
+                  fontSize: 22, fontWeight: FontWeight.w700, color: PGColors.rawiInk)),
+              const SizedBox(height: 6),
+              Text('Coming soon', style: GoogleFonts.sourceSans3(
+                  fontSize: 14, color: PGColors.rawiInk4)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedScreen extends StatelessWidget {
+  const _SavedScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PGColors.rawiPaper,
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _RawiTabIcon(type: _TabIconType.bookmark, color: PGColors.rawiInk4),
+              const SizedBox(height: 16),
+              Text('Saved', style: GoogleFonts.sourceSans3(
+                  fontSize: 22, fontWeight: FontWeight.w700, color: PGColors.rawiInk)),
+              const SizedBox(height: 6),
+              Text('Coming soon', style: GoogleFonts.sourceSans3(
+                  fontSize: 14, color: PGColors.rawiInk4)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Rawi floating tab bar ─────────────────────────────────────────────────────
+
+enum _TabIconType { book, compass, bookmark, user }
+
+const _kTabInactiveLabel = Color(0xFF9A9285); // design: inactive label
+const _kTabInactiveIcon  = Color(0xFF6B6459); // design: inactive icon
+
+class _RawiTabBar extends StatelessWidget {
+  const _RawiTabBar({required this.currentIndex, required this.onTap});
+  final int currentIndex;
+  final void Function(int) onTap;
+
+  static const _tabs = [
+    (label: 'Tours',  icon: _TabIconType.book),
+    (label: 'Nearby', icon: _TabIconType.compass),
+    (label: 'Saved',  icon: _TabIconType.bookmark),
+    (label: 'You',    icon: _TabIconType.user),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A1B1915),
+            blurRadius: 28,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            decoration: BoxDecoration(
+              // rawiPaper at 78% opacity
+              color: const Color(0xC7F6F1E7),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: const Color(0x1A1B1915),
+                width: 0.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_tabs.length, (i) => _TabItem(
+                label: _tabs[i].label,
+                icon: _tabs[i].icon,
+                isActive: currentIndex == i,
+                onTap: () => onTap(i),
+              )),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TabItem extends StatelessWidget {
+  const _TabItem({
+    required this.label,
+    required this.icon,
+    required this.isActive,
+    required this.onTap,
+  });
+  final String label;
+  final _TabIconType icon;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor = isActive ? PGColors.rawiInk : _kTabInactiveLabel;
+    final iconColor  = isActive ? PGColors.rawiInk : _kTabInactiveIcon;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Opacity(
+              opacity: isActive ? 1.0 : 0.75,
+              child: _RawiTabIcon(type: icon, color: iconColor),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: GoogleFonts.sourceSans3(
+                fontSize: 11,
+                fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
+                color: labelColor,
+                letterSpacing: 0.2,
+              ),
+            ),
+            // Active dot — always reserve 5px height so tabs don't shift
+            SizedBox(
+              height: 5,
+              child: isActive
+                  ? Align(
+                      alignment: Alignment.topCenter,
+                      child: Container(
+                        width: 3,
+                        height: 3,
+                        margin: const EdgeInsets.only(top: 2),
+                        decoration: BoxDecoration(
+                          color: PGColors.rawiAccent,
+                          borderRadius: BorderRadius.circular(3),
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tab icon CustomPaint ──────────────────────────────────────────────────────
+
+class _RawiTabIcon extends StatelessWidget {
+  const _RawiTabIcon({required this.type, required this.color});
+  final _TabIconType type;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(22, 22),
+      painter: _RawiIconPainter(type: type, color: color),
+    );
+  }
+}
+
+class _RawiIconPainter extends CustomPainter {
+  const _RawiIconPainter({required this.type, required this.color});
+  final _TabIconType type;
+  final Color color;
+
+  Paint get _stroke => Paint()
+    ..color = color
+    ..strokeWidth = 1.2
+    ..style = PaintingStyle.stroke
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    switch (type) {
+      case _TabIconType.book:     _drawBook(canvas, size);
+      case _TabIconType.compass:  _drawCompass(canvas, size);
+      case _TabIconType.bookmark: _drawBookmark(canvas, size);
+      case _TabIconType.user:     _drawUser(canvas, size);
+    }
+  }
+
+  // Tours — open book (two pages + spine)
+  void _drawBook(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final p = _stroke;
+
+    // Left page
+    canvas.drawPath(
+      Path()
+        ..moveTo(4, 5.5)
+        ..cubicTo(4, 4.67, 4.67, 4, 5.5, 4)
+        ..lineTo(11, 4)
+        ..lineTo(11, 19)
+        ..lineTo(5.5, 19)
+        ..cubicTo(4.67, 19, 4, 18.33, 4, 17.5)
+        ..close(),
+      p,
+    );
+    // Right page
+    canvas.drawPath(
+      Path()
+        ..moveTo(20, 5.5)
+        ..cubicTo(20, 4.67, 19.33, 4, 18.5, 4)
+        ..lineTo(13, 4)
+        ..lineTo(13, 19)
+        ..lineTo(18.5, 19)
+        ..cubicTo(19.33, 19, 20, 18.33, 20, 17.5)
+        ..close(),
+      p,
+    );
+    // Spine
+    canvas.drawLine(const Offset(12, 4), const Offset(12, 19), p);
+    canvas.restore();
+  }
+
+  // Nearby — compass circle + needle diamond
+  void _drawCompass(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final p = _stroke;
+
+    canvas.drawCircle(const Offset(12, 12), 8.4, p);
+    canvas.drawPath(
+      Path()
+        ..moveTo(14.5, 9.5)
+        ..lineTo(11, 11)
+        ..lineTo(9.5, 14.5)
+        ..lineTo(13, 13)
+        ..close(),
+      p,
+    );
+    canvas.restore();
+  }
+
+  // Saved — bookmark with notch at bottom
+  void _drawBookmark(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 20, size.height / 22);
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(4, 3)
+        ..lineTo(16, 3)
+        ..lineTo(16, 20)
+        ..lineTo(10, 16)
+        ..lineTo(4, 20)
+        ..close(),
+      _stroke,
+    );
+    canvas.restore();
+  }
+
+  // You — head circle + shoulder arc
+  void _drawUser(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final p = _stroke;
+
+    canvas.drawCircle(const Offset(12, 8.5), 3.5, p);
+    canvas.drawPath(
+      Path()
+        ..moveTo(5, 19.5)
+        ..cubicTo(6.2, 16.3, 9, 14.5, 12, 14.5)
+        ..cubicTo(15, 14.5, 17.8, 16.3, 19, 19.5),
+      p,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_RawiIconPainter old) =>
+      old.type != type || old.color != color;
+}
 
 // City Selection Bottom Sheet
 class CitySelectionBottomSheet extends StatefulWidget {

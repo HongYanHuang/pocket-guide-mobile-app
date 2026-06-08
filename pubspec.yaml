@@ -106,7 +106,7 @@ flutter:
   uses-material-design: true
 
   assets:
-    - raawi_icon.png
+    - rrawi_icon.png
     - assets/google_g.png
 
   # To add assets to your application, add an assets section, like this:
@@ -143,5 +143,5 @@ flutter:
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "raawi_icon.png"
+  image_path: "rrawi_icon.png"
   min_sdk_android: 21
