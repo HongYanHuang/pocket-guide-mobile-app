@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ClipRRect(
           borderRadius: BorderRadius.circular(27),
           child: Image.asset(
-            'raawi_icon.png',
+            'rrawi_icon.png',
             width: 120,
             height: 120,
           ),
@@ -111,13 +111,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
         const SizedBox(height: 32),
 
-        // Wordmark — "raawi" + green dot
+        // Wordmark — "rrawi" + green dot
         RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
             children: [
               TextSpan(
-                text: 'raawi',
+                text: 'rrawi',
                 style: GoogleFonts.sourceSans3(
                   fontSize: 52,
                   fontWeight: FontWeight.w700,

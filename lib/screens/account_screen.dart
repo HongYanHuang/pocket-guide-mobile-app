@@ -189,7 +189,7 @@ class _AccountScreenState extends State<AccountScreen> {
               const _Divider(),
               _NavRow(
                 icon: CupertinoIcons.info_circle,
-                label: 'About raawi',
+                label: 'About rrawi',
                 value: 'v1.0',
                 onTap: () {},
               ),
@@ -209,12 +209,12 @@ class _AccountScreenState extends State<AccountScreen> {
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 108),
             child: Column(
               children: [
-                // raawi. wordmark
+                // rrawi. wordmark
                 RichText(
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: 'raawi',
+                        text: 'rrawi',
                         style: GoogleFonts.sourceSans3(
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
