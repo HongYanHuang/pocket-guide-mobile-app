@@ -1,9 +1,11 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
@@ -32,6 +34,32 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool get _isIOS => !kIsWeb && Platform.isIOS;
   bool get _busy  => _loading != null;
+
+  late final TapGestureRecognizer _termsTap;
+  late final TapGestureRecognizer _privacyTap;
+
+  @override
+  void initState() {
+    super.initState();
+    _termsTap  = TapGestureRecognizer()
+      ..onTap = () => _launchUrl('https://www.rrawi.com/terms');
+    _privacyTap = TapGestureRecognizer()
+      ..onTap = () => _launchUrl('https://www.rrawi.com/privacy');
+  }
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url).replace(queryParameters: {'source': 'rrawi-app'});
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+    }
+  }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -222,6 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const TextSpan(text: 'By continuing, you agree to our '),
                 TextSpan(
                   text: 'Terms of Service',
+                  recognizer: _termsTap,
                   style: GoogleFonts.sourceSans3(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
@@ -231,6 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const TextSpan(text: ' and '),
                 TextSpan(
                   text: 'Privacy Policy',
+                  recognizer: _privacyTap,
                   style: GoogleFonts.sourceSans3(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w600,
