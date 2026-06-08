@@ -250,7 +250,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   children: [
                     _FooterLink(
                         label: 'Terms & Conditions',
-                        url: 'https://www.google.com'),
+                        url: 'https://www.rrawi.com/terms'),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Text('·',
@@ -259,7 +259,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                     _FooterLink(
                         label: 'Privacy Policy',
-                        url: 'https://www.google.com'),
+                        url: 'https://www.rrawi.com/privacy'),
                   ],
                 ),
               ],
@@ -1215,7 +1215,7 @@ class _FooterLink extends StatelessWidget {
       onTap: () async {
         final uri = Uri.parse(url);
         if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         }
       },
       child: Text(
