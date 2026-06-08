@@ -55,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url).replace(queryParameters: {'source': 'app'});
+    final uri = Uri.parse(url).replace(queryParameters: {'source': 'rrawi-app'});
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
     }

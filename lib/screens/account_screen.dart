@@ -1213,7 +1213,7 @@ class _FooterLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final uri = Uri.parse(url).replace(queryParameters: {'source': 'app'});
+        final uri = Uri.parse(url).replace(queryParameters: {'source': 'rrawi-app'});
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         }
