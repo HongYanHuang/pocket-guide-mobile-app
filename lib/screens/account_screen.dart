@@ -1213,7 +1213,7 @@ class _FooterLink extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () async {
-        final uri = Uri.parse(url);
+        final uri = Uri.parse(url).replace(queryParameters: {'source': 'app'});
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
         }
