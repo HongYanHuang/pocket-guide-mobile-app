@@ -1,4 +1,5 @@
 import 'package:latlong2/latlong.dart';
+import 'package:pocket_guide_mobile/maps/map_provider.dart';
 
 class GPSPoint {
   final double latitude;
@@ -42,9 +43,14 @@ class TrailPoint {
     );
   }
 
-  // Convert to LatLng for flutter_map
+  // Convert to LatLng for internal geolocator distance calculations
   LatLng toLatLng() {
     return LatLng(latitude, longitude);
+  }
+
+  // Convert to RrawiLatLng for the map provider abstraction
+  RrawiLatLng toRrawiLatLng() {
+    return RrawiLatLng(latitude, longitude);
   }
 }
 
