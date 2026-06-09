@@ -69,6 +69,12 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   List<MapPinData> _pins = [];
   final Map<String, Offset> _pinScreenPositions = {};
 
+  // Guard against concurrent toScreenLocationBatch calls.
+  // If a call is in-flight and the camera moves again, we schedule one
+  // more recalculation so the final resting position is always correct.
+  bool _positionUpdateInFlight = false;
+  bool _pendingPositionUpdate = false;
+
   // Updates buffered before the style finishes loading
   List<MapRouteSegment>? _pendingRoute;
   List<MapPinData>? _pendingPins;
@@ -80,10 +86,24 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     _controller = _OpenFreeMapController(this);
   }
 
+  @override
+  void dispose() {
+    _mlController?.removeListener(_onCameraPositionChanged);
+    super.dispose();
+  }
+
   // ── MapLibre callbacks ────────────────────────────────────────────────────
 
   void _onMapCreated(MapLibreMapController controller) {
     _mlController = controller;
+    // MapLibreMapController is a ChangeNotifier that fires on every camera
+    // position update — including continuously during panning.
+    controller.addListener(_onCameraPositionChanged);
+  }
+
+  /// Fires on every camera frame (pan, pinch-zoom, programmatic move).
+  void _onCameraPositionChanged() {
+    _recalculateScreenPositions();
   }
 
   Future<void> _onStyleLoaded() async {
@@ -269,22 +289,41 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   }
 
   Future<void> _recalculateScreenPositions() async {
-    if (_mlController == null || !mounted) return;
-    final updated = <String, Offset>{};
-    for (final pin in _pins) {
-      try {
-        final pt = await _mlController!.toScreenLocation(
-          LatLng(pin.location.latitude, pin.location.longitude),
-        );
-        updated[pin.id] = Offset(pt.x.toDouble(), pt.y.toDouble());
-      } catch (_) {}
+    if (_mlController == null || !mounted || _pins.isEmpty) return;
+
+    // If a batch call is already running, flag that we need one more pass
+    // once it finishes (so the final camera position is always applied).
+    if (_positionUpdateInFlight) {
+      _pendingPositionUpdate = true;
+      return;
     }
-    if (mounted) {
+    _positionUpdateInFlight = true;
+
+    try {
+      final latLngs = _pins
+          .map((p) => LatLng(p.location.latitude, p.location.longitude))
+          .toList();
+      final points = await _mlController!.toScreenLocationBatch(latLngs);
+      if (!mounted) return;
+      final updated = <String, Offset>{};
+      for (var i = 0; i < _pins.length && i < points.length; i++) {
+        updated[_pins[i].id] =
+            Offset(points[i].x.toDouble(), points[i].y.toDouble());
+      }
       setState(() {
         _pinScreenPositions
           ..clear()
           ..addAll(updated);
       });
+    } catch (_) {
+      // Ignore errors during rapid camera moves
+    } finally {
+      _positionUpdateInFlight = false;
+      // If camera moved while we were computing, do one final update.
+      if (_pendingPositionUpdate && mounted) {
+        _pendingPositionUpdate = false;
+        _recalculateScreenPositions();
+      }
     }
   }
 
@@ -311,7 +350,6 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           onCameraIdle: () {
             final wasGesture = !_programmaticMove;
             _programmaticMove = false;
-            _recalculateScreenPositions();
             widget.onCameraIdle(wasGesture);
           },
         ),
