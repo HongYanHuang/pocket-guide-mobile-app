@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -18,12 +17,13 @@ import 'package:pocket_guide_mobile/services/geofence_service.dart';
 import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/background_audio_service.dart';
+import 'package:pocket_guide_mobile/maps/map_provider.dart';
+import 'package:pocket_guide_mobile/maps/map_service.dart';
 import 'package:pocket_guide_mobile/models/gps_trail_point.dart';
 import 'package:pocket_guide_mobile/models/geofence_event.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
-import 'package:pocket_guide_mobile/widgets/map/stop_pin_widget.dart';
 import 'package:pocket_guide_mobile/widgets/map/chapter_player_widget.dart';
 import 'package:pocket_guide_mobile/widgets/network_image_with_fallback.dart';
 
@@ -51,7 +51,8 @@ class MapTourScreen extends StatefulWidget {
 
 class _MapTourScreenState extends State<MapTourScreen>
     with WidgetsBindingObserver {
-  final MapController _mapController = MapController();
+  RrawiMapController? _mapController;
+  Widget? _cachedMapWidget; // map widget must not be recreated on setState
   final LocationService _locationService = LocationService();
   final AuthService _authService = AuthService();
 
@@ -118,10 +119,14 @@ class _MapTourScreenState extends State<MapTourScreen>
       _geofenceSubscription = _geofenceService!.events.listen((event) {
         if (!mounted) return;
         setState(() {});
+        _updateMapLayers(); // current POI may have changed
       });
     }
 
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _updateMapLayers();
+    }
   }
 
   String _getTourLanguage() {
@@ -151,20 +156,22 @@ class _MapTourScreenState extends State<MapTourScreen>
       setState(() => _userPosition = position);
 
       if (_autoFollowUser) {
-        _mapController.move(
-          LatLng(position.latitude, position.longitude),
-          _mapController.camera.zoom,
+        _mapController?.moveCamera(
+          RrawiLatLng(position.latitude, position.longitude),
         );
       }
 
+      _mapController?.updateUserLocation(
+        RrawiLatLng(position.latitude, position.longitude),
+      );
+
       _trailManager?.addPoint(position);
-      setState(() {
-        _trailPoints.add(TrailPoint(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: DateTime.now(),
-        ));
-      });
+      _trailPoints.add(TrailPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        timestamp: DateTime.now(),
+      ));
+      _updateRoute(); // refresh trail segment
 
       _geofenceService?.onLocationUpdate(position);
     };
@@ -246,29 +253,121 @@ class _MapTourScreenState extends State<MapTourScreen>
   // ── Map layer ─────────────────────────────────────────────────────────────
 
   Widget _buildMap() {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _calculateCenter(),
-        initialZoom: _calculateZoom(),
-        minZoom: 10.0,
-        maxZoom: 18.0,
-        onPositionChanged: (_, hasGesture) {
-          if (hasGesture && _autoFollowUser) {
-            setState(() => _autoFollowUser = false);
-          }
-        },
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.pocketguide.mobile',
-          maxZoom: 19,
-        ),
-        PolylineLayer(polylines: _buildPolylines()),
-        MarkerLayer(markers: _buildMarkers()),
-      ],
+    // Cache the map widget — recreating it on setState resets the MapLibre
+    // native view and loses camera state.
+    return _cachedMapWidget ??= MapService.instance.currentProvider.buildMap(
+      context: context,
+      initialCenter: _calculateCenterRrawi(),
+      initialZoom: _calculateZoom(),
+      onReady: (controller) {
+        _mapController = controller;
+        _updateMapLayers();
+        if (_userPosition != null) {
+          _mapController!.updateUserLocation(
+            RrawiLatLng(_userPosition!.latitude, _userPosition!.longitude),
+          );
+        }
+      },
+      onCameraIdle: (wasGesture) {
+        if (wasGesture && _autoFollowUser) {
+          setState(() => _autoFollowUser = false);
+        }
+      },
     );
+  }
+
+  // ── Imperative map update helpers ─────────────────────────────────────────
+
+  void _updateMapLayers() {
+    _updateRoute();
+    _updatePins();
+  }
+
+  void _updateRoute() {
+    if (_mapController == null) return;
+    final pois = _getPoisForDay(_selectedDay);
+    final poiPoints = pois.map(_getPoiLocation).whereType<LatLng>().toList();
+    final currentPoiId = _geofenceService?.currentPoiId;
+
+    int currentIdx = -1;
+    for (var i = 0; i < pois.length; i++) {
+      if ((pois[i].poiId ?? _poiNameToId(pois[i].poi)) == currentPoiId) {
+        currentIdx = i;
+        break;
+      }
+    }
+
+    final segments = <MapRouteSegment>[];
+
+    // Completed portion (dashed, muted)
+    if (currentIdx > 0) {
+      segments.add(MapRouteSegment(
+        points: poiPoints
+            .sublist(0, currentIdx + 1)
+            .map((l) => RrawiLatLng(l.latitude, l.longitude))
+            .toList(),
+        style: RouteSegmentStyle.completed,
+      ));
+    }
+
+    // Upcoming portion (solid accent)
+    final startIdx = math.max(0, currentIdx);
+    if (startIdx < poiPoints.length - 1) {
+      segments.add(MapRouteSegment(
+        points: poiPoints
+            .sublist(startIdx)
+            .map((l) => RrawiLatLng(l.latitude, l.longitude))
+            .toList(),
+        style: RouteSegmentStyle.upcoming,
+      ));
+    }
+
+    // GPS trail
+    if (widget.isActiveMode && _trailPoints.length >= 2) {
+      segments.add(MapRouteSegment(
+        points: _trailPoints.map((tp) => tp.toRrawiLatLng()).toList(),
+        style: RouteSegmentStyle.trail,
+      ));
+    }
+
+    _mapController!.updateRoute(segments);
+  }
+
+  void _updatePins() {
+    if (_mapController == null) return;
+    final pois = _getPoisForDay(_selectedDay);
+    final currentPoiId = _geofenceService?.currentPoiId;
+    final pins = <MapPinData>[];
+
+    for (var i = 0; i < pois.length; i++) {
+      final poi = pois[i];
+      final location = _getPoiLocation(poi);
+      if (location == null) continue;
+
+      final poiId = poi.poiId ?? _poiNameToId(poi.poi);
+      final completed =
+          _progressManager?.isPOICompleted(poiId, _selectedDay) ?? false;
+      final pinState = completed
+          ? MapPinState.completed
+          : (poiId == currentPoiId)
+              ? MapPinState.current
+              : MapPinState.upcoming;
+
+      final photoUrl = poi.coverImageUrl != null
+          ? _resolveImageUrl(poi.coverImageUrl!)
+          : null;
+
+      pins.add(MapPinData(
+        id: poiId,
+        location: RrawiLatLng(location.latitude, location.longitude),
+        number: i + 1,
+        state: pinState,
+        photoUrl: photoUrl,
+        onTap: () => _onPoiTap(poi, i + 1, poiId),
+      ));
+    }
+
+    _mapController!.updatePins(pins);
   }
 
   // ── Top chrome ────────────────────────────────────────────────────────────
@@ -1019,148 +1118,6 @@ class _MapTourScreenState extends State<MapTourScreen>
     );
   }
 
-  // ── Markers ───────────────────────────────────────────────────────────────
-
-  List<Marker> _buildMarkers() {
-    final pois = _getPoisForDay(_selectedDay);
-    final markers = <Marker>[];
-    final currentPoiId = _geofenceService?.currentPoiId;
-
-    for (var i = 0; i < pois.length; i++) {
-      final poi = pois[i];
-      final location = _getPoiLocation(poi);
-      if (location == null) continue;
-
-      final poiId = poi.poiId ?? _poiNameToId(poi.poi);
-      final completed =
-          _progressManager?.isPOICompleted(poiId, _selectedDay) ?? false;
-
-      final state = completed
-          ? StopPinState.completed
-          : (poiId == currentPoiId)
-              ? StopPinState.current
-              : StopPinState.upcoming;
-
-      // Build a full base URL for the cover image
-      final photoUrl = poi.coverImageUrl != null
-          ? _resolveImageUrl(poi.coverImageUrl!)
-          : null;
-
-      // Size the marker container large enough for the pulse ring
-      const containerSize = 72.0;
-
-      markers.add(Marker(
-        point: location,
-        width: containerSize,
-        height: containerSize,
-        child: Center(
-          child: StopPinWidget(
-            number: i + 1,
-            state: state,
-            photoUrl: photoUrl,
-            onTap: () => _onPoiTap(poi, i + 1, poiId),
-          ),
-        ),
-      ));
-    }
-
-    // User location dot (active mode)
-    if (widget.isActiveMode && _userPosition != null) {
-      markers.add(Marker(
-        point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
-        width: 30,
-        height: 30,
-        child: _buildUserDot(),
-      ));
-    }
-
-    return markers;
-  }
-
-  Widget _buildUserDot() {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: const Color(0x384583F0),
-            shape: BoxShape.circle,
-          ),
-        ),
-        Container(
-          width: 16,
-          height: 16,
-          decoration: BoxDecoration(
-            color: const Color(0xFF4583F0),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<Polyline> _buildPolylines() {
-    final pois = _getPoisForDay(_selectedDay);
-    final poiPoints = pois
-        .map(_getPoiLocation)
-        .whereType<LatLng>()
-        .toList();
-
-    final polylines = <Polyline>[];
-
-    if (poiPoints.length >= 2) {
-      // Split into completed and upcoming segments
-      final currentPoiId = _geofenceService?.currentPoiId;
-      int currentIdx = -1;
-      for (var i = 0; i < pois.length; i++) {
-        if ((pois[i].poiId ?? _poiNameToId(pois[i].poi)) == currentPoiId) {
-          currentIdx = i;
-          break;
-        }
-      }
-
-      // Completed portion (dashed, faded)
-      if (currentIdx > 0) {
-        polylines.add(Polyline(
-          points: poiPoints.sublist(0, currentIdx + 1),
-          color: PGColors.rawiInk.withValues(alpha: 0.3),
-          strokeWidth: 2.5,
-          pattern: StrokePattern.dashed(segments: const [8, 6]),
-        ));
-      }
-
-      // Upcoming portion (solid accent)
-      final startIdx = math.max(0, currentIdx);
-      if (startIdx < poiPoints.length - 1) {
-        polylines.add(Polyline(
-          points: poiPoints.sublist(startIdx),
-          color: PGColors.rawiAccent.withValues(alpha: 0.7),
-          strokeWidth: 4.5,
-        ));
-      }
-    }
-
-    // GPS trail (active mode)
-    if (widget.isActiveMode && _trailPoints.length >= 2) {
-      polylines.add(Polyline(
-        points: _trailPoints.map((tp) => tp.toLatLng()).toList(),
-        color: PGColors.rawiAccent.withValues(alpha: 0.5),
-        strokeWidth: 3.0,
-      ));
-    }
-
-    return polylines;
-  }
 
   // ── Floating chrome helpers ───────────────────────────────────────────────
 
@@ -1308,6 +1265,11 @@ class _MapTourScreenState extends State<MapTourScreen>
     return LatLng(avgLat, avgLng);
   }
 
+  RrawiLatLng _calculateCenterRrawi() {
+    final c = _calculateCenter();
+    return RrawiLatLng(c.latitude, c.longitude);
+  }
+
   double _calculateZoom() {
     final locs = _getPoisForDay(_selectedDay)
         .map(_getPoiLocation)
@@ -1340,9 +1302,9 @@ class _MapTourScreenState extends State<MapTourScreen>
   void _centerOnUserLocation() {
     if (_userPosition == null) return;
     setState(() => _autoFollowUser = true);
-    _mapController.move(
-      LatLng(_userPosition!.latitude, _userPosition!.longitude),
-      16.0,
+    _mapController?.moveCamera(
+      RrawiLatLng(_userPosition!.latitude, _userPosition!.longitude),
+      zoom: 16.0,
     );
   }
 
@@ -1522,8 +1484,11 @@ class _MapTourScreenState extends State<MapTourScreen>
                     FixedExtentScrollController(initialItem: _selectedDay - 1),
                 onSelectedItemChanged: (idx) {
                   setState(() => _selectedDay = idx + 1);
-                  _mapController.move(
-                      _calculateCenter(), _calculateZoom());
+                  _mapController?.moveCamera(
+                    _calculateCenterRrawi(),
+                    zoom: _calculateZoom(),
+                  );
+                  _updateMapLayers();
                   _geofenceService?.updateActiveDay(
                       idx + 1, _getPoisForDay(idx + 1));
                   if (widget.isActiveMode) {
@@ -1641,7 +1606,7 @@ class _MapTourScreenState extends State<MapTourScreen>
     _progressManager?.dispose();
     _geofenceSubscription?.cancel();
     _geofenceService?.dispose();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 }
