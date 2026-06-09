@@ -1,20 +1,22 @@
+import 'dart:math' show Point;
+
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import 'package:pocket_guide_mobile/maps/map_provider.dart';
-import 'package:pocket_guide_mobile/widgets/map/stop_pin_widget.dart';
 
 // ─── Public provider ──────────────────────────────────────────────────────────
 
 /// MapLibre GL + OpenFreeMap vector tiles implementation of [RrawiMapProvider].
 ///
-/// POC strategy
-/// ─────────────
-/// • Route polylines → MapLibre GL GeoJSON sources + line layers (GPU-native).
-/// • User-location dot → MapLibre GL GeoJSON source + circle layers.
-/// • POI pins → Flutter widget overlay positioned via [toScreenLocation].
-///   This preserves [StopPinWidget] (photos, pulse ring, etc.) with no
-///   bitmap pre-rendering.  Pin positions refresh on every [onCameraIdle].
+/// All map content (route lines, POI pins, user dot) is rendered as native
+/// MapLibre GL layers via GeoJSON sources.  This keeps everything inside the
+/// GL render pipeline so all layers move perfectly in sync — no Flutter overlay
+/// lag during panning.
+///
+/// Trade-off: POI photos are not supported in this approach (they would require
+/// pre-rendering Flutter widgets to bitmaps and registering them as sprite
+/// images).  Numbers + state colours are rendered with GL circle + text layers.
 class OpenFreeMapProvider implements RrawiMapProvider {
   static const String _styleUrl =
       'https://tiles.openfreemap.org/styles/liberty';
@@ -65,15 +67,8 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   bool _styleLoaded = false;
   bool _programmaticMove = false;
 
-  // Overlay state
-  List<MapPinData> _pins = [];
-  final Map<String, Offset> _pinScreenPositions = {};
-
-  // Guard against concurrent toScreenLocationBatch calls.
-  // If a call is in-flight and the camera moves again, we schedule one
-  // more recalculation so the final resting position is always correct.
-  bool _positionUpdateInFlight = false;
-  bool _pendingPositionUpdate = false;
+  /// id → tap callback for the currently displayed pins
+  final Map<String, VoidCallback?> _pinTapCallbacks = {};
 
   // Updates buffered before the style finishes loading
   List<MapRouteSegment>? _pendingRoute;
@@ -86,24 +81,10 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     _controller = _OpenFreeMapController(this);
   }
 
-  @override
-  void dispose() {
-    _mlController?.removeListener(_onCameraPositionChanged);
-    super.dispose();
-  }
-
   // ── MapLibre callbacks ────────────────────────────────────────────────────
 
   void _onMapCreated(MapLibreMapController controller) {
     _mlController = controller;
-    // MapLibreMapController is a ChangeNotifier that fires on every camera
-    // position update — including continuously during panning.
-    controller.addListener(_onCameraPositionChanged);
-  }
-
-  /// Fires on every camera frame (pan, pinch-zoom, programmatic move).
-  void _onCameraPositionChanged() {
-    _recalculateScreenPositions();
   }
 
   Future<void> _onStyleLoaded() async {
@@ -130,79 +111,138 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     final ctrl = _mlController!;
     final empty = _emptyCollection();
 
-    // ── Route GeoJSON sources ─────────────────────────────────────────────────
+    // ── Route sources & layers ────────────────────────────────────────────────
     await ctrl.addGeoJsonSource('route-completed', empty);
     await ctrl.addGeoJsonSource('route-upcoming', empty);
     await ctrl.addGeoJsonSource('route-trail', empty);
 
-    // Completed segment: dashed, 30 % opacity rawiInk
-    await ctrl.addLineLayer(
-      'route-completed',
-      'route-completed-layer',
-      LineLayerProperties(
-        lineColor: '#1B1915',
-        lineWidth: 2.5,
-        lineOpacity: 0.3,
-        lineDasharray: [8.0, 6.0],
-        lineCap: 'round',
-        lineJoin: 'round',
-      ),
-    );
+    await ctrl.addLineLayer('route-completed', 'route-completed-layer',
+        LineLayerProperties(
+          lineColor: '#1B1915',
+          lineWidth: 2.5,
+          lineOpacity: 0.3,
+          lineDasharray: [8.0, 6.0],
+          lineCap: 'round',
+          lineJoin: 'round',
+        ));
 
-    // Upcoming segment: solid accent, 70 %
-    await ctrl.addLineLayer(
-      'route-upcoming',
-      'route-upcoming-layer',
-      LineLayerProperties(
-        lineColor: '#3A4A3A',
-        lineWidth: 4.5,
-        lineOpacity: 0.7,
-        lineCap: 'round',
-        lineJoin: 'round',
-      ),
-    );
+    await ctrl.addLineLayer('route-upcoming', 'route-upcoming-layer',
+        LineLayerProperties(
+          lineColor: '#3A4A3A',
+          lineWidth: 4.5,
+          lineOpacity: 0.7,
+          lineCap: 'round',
+          lineJoin: 'round',
+        ));
 
-    // GPS trail: lighter accent
-    await ctrl.addLineLayer(
-      'route-trail',
-      'route-trail-layer',
-      LineLayerProperties(
-        lineColor: '#3A4A3A',
-        lineWidth: 3.0,
-        lineOpacity: 0.5,
-        lineCap: 'round',
-        lineJoin: 'round',
-      ),
-    );
+    await ctrl.addLineLayer('route-trail', 'route-trail-layer',
+        LineLayerProperties(
+          lineColor: '#3A4A3A',
+          lineWidth: 3.0,
+          lineOpacity: 0.5,
+          lineCap: 'round',
+          lineJoin: 'round',
+        ));
 
-    // ── User-location GeoJSON source & layers ─────────────────────────────────
+    // ── User-location source & layers ─────────────────────────────────────────
     await ctrl.addGeoJsonSource('user-loc', empty);
 
-    // Outer halo
+    await ctrl.addCircleLayer('user-loc', 'user-halo-layer',
+        const CircleLayerProperties(
+          circleRadius: 14.0,
+          circleColor: '#4583F0',
+          circleOpacity: 0.22,
+        ));
+
+    await ctrl.addCircleLayer('user-loc', 'user-dot-layer',
+        const CircleLayerProperties(
+          circleRadius: 8.0,
+          circleColor: '#4583F0',
+          circleStrokeWidth: 3.0,
+          circleStrokeColor: '#FFFFFF',
+        ));
+
+    // ── POI pin source & layers ───────────────────────────────────────────────
+    // All pins live in a single GeoJSON source. Each feature carries 'state'
+    // ('upcoming' | 'current' | 'completed') and 'number' (string) properties.
+    // Data-driven expressions drive colour / size — no Flutter overlay needed.
+    await ctrl.addGeoJsonSource('pins', empty);
+
+    // Pulse ring — rendered only for the 'current' pin
     await ctrl.addCircleLayer(
-      'user-loc',
-      'user-halo-layer',
+      'pins',
+      'pins-pulse-layer',
       const CircleLayerProperties(
-        circleRadius: 14.0,
-        circleColor: '#4583F0',
-        circleOpacity: 0.22,
+        circleRadius: 30.0,
+        circleColor: '#3A4A3A',
+        circleOpacity: 0.18,
+        circleStrokeWidth: 0.0,
       ),
+      filter: ['==', ['get', 'state'], 'current'],
     );
 
-    // Core dot with white stroke
+    // Main pin circle — radius and colours driven by 'state'
     await ctrl.addCircleLayer(
-      'user-loc',
-      'user-dot-layer',
-      const CircleLayerProperties(
-        circleRadius: 8.0,
-        circleColor: '#4583F0',
-        circleStrokeWidth: 3.0,
-        circleStrokeColor: '#FFFFFF',
+      'pins',
+      'pins-circle-layer',
+      CircleLayerProperties(
+        // rawiAccent for current/completed, rawiPaper for upcoming
+        circleColor: [
+          'case',
+          ['==', ['get', 'state'], 'upcoming'], '#F6F1E7',
+          '#3A4A3A',
+        ],
+        circleRadius: [
+          'case',
+          ['==', ['get', 'state'], 'current'], 20.0,
+          ['==', ['get', 'state'], 'completed'], 13.0,
+          14.0, // upcoming
+        ],
+        circleStrokeWidth: [
+          'case',
+          ['==', ['get', 'state'], 'current'], 3.0,
+          2.0,
+        ],
+        circleStrokeColor: [
+          'case',
+          ['==', ['get', 'state'], 'upcoming'], '#1B1915',
+          '#F6F1E7',
+        ],
       ),
+      enableInteraction: true,
+    );
+
+    // Number / checkmark text on top of the circle
+    await ctrl.addSymbolLayer(
+      'pins',
+      'pins-text-layer',
+      SymbolLayerProperties(
+        textField: [
+          'case',
+          ['==', ['get', 'state'], 'completed'], '✓',
+          ['to-string', ['get', 'number']],
+        ],
+        textSize: [
+          'case',
+          ['==', ['get', 'state'], 'current'], 14.0,
+          11.0,
+        ],
+        textColor: [
+          'case',
+          ['==', ['get', 'state'], 'upcoming'], '#1B1915',
+          '#F6F1E7',
+        ],
+        textFont: ['Noto Sans Bold', 'Arial Unicode MS Bold'],
+        textIgnorePlacement: true,
+        textAllowOverlap: true,
+        iconIgnorePlacement: true,
+        iconAllowOverlap: true,
+      ),
+      enableInteraction: false, // taps handled by the circle layer below
     );
   }
 
-  // ── State mutators (called by _OpenFreeMapController) ─────────────────────
+  // ── State mutators called by _OpenFreeMapController ───────────────────────
 
   Future<void> moveCameraInternal(RrawiLatLng center, double zoom) async {
     if (_mlController == null) return;
@@ -264,8 +304,27 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   }
 
   void _applyPins(List<MapPinData> pins) {
-    _pins = pins;
-    _recalculateScreenPositions();
+    _pinTapCallbacks.clear();
+    final features = <Map<String, dynamic>>[];
+    for (final pin in pins) {
+      _pinTapCallbacks[pin.id] = pin.onTap;
+      features.add({
+        'type': 'Feature',
+        'geometry': {
+          'type': 'Point',
+          'coordinates': [pin.location.longitude, pin.location.latitude],
+        },
+        'properties': {
+          'id': pin.id,
+          'number': '${pin.number}',
+          'state': pin.state.name, // 'upcoming' | 'current' | 'completed'
+        },
+      });
+    }
+    _mlController?.setGeoJsonSource('pins', {
+      'type': 'FeatureCollection',
+      'features': features,
+    });
   }
 
   void _applyUserLocation(RrawiLatLng? position) {
@@ -288,105 +347,50 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     });
   }
 
-  Future<void> _recalculateScreenPositions() async {
-    if (_mlController == null || !mounted || _pins.isEmpty) return;
-
-    // If a batch call is already running, flag that we need one more pass
-    // once it finishes (so the final camera position is always applied).
-    if (_positionUpdateInFlight) {
-      _pendingPositionUpdate = true;
-      return;
-    }
-    _positionUpdateInFlight = true;
-
+  /// Handle map taps — query which pin (if any) was hit.
+  Future<void> _onMapClick(Point<double> point, LatLng latLng) async {
+    if (_mlController == null) return;
     try {
-      final latLngs = _pins
-          .map((p) => LatLng(p.location.latitude, p.location.longitude))
-          .toList();
-      final points = await _mlController!.toScreenLocationBatch(latLngs);
-      if (!mounted) return;
-      final updated = <String, Offset>{};
-      for (var i = 0; i < _pins.length && i < points.length; i++) {
-        updated[_pins[i].id] =
-            Offset(points[i].x.toDouble(), points[i].y.toDouble());
+      final features = await _mlController!.queryRenderedFeatures(
+        point,
+        ['pins-circle-layer', 'pins-pulse-layer'],
+        null,
+      );
+      if (features.isNotEmpty) {
+        final props = Map<String, dynamic>.from(
+          features.first['properties'] as Map,
+        );
+        final id = props['id'] as String?;
+        if (id != null) _pinTapCallbacks[id]?.call();
       }
-      setState(() {
-        _pinScreenPositions
-          ..clear()
-          ..addAll(updated);
-      });
-    } catch (_) {
-      // Ignore errors during rapid camera moves
-    } finally {
-      _positionUpdateInFlight = false;
-      // If camera moved while we were computing, do one final update.
-      if (_pendingPositionUpdate && mounted) {
-        _pendingPositionUpdate = false;
-        _recalculateScreenPositions();
-      }
-    }
+    } catch (_) {}
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // ── Base map (vector tiles from OpenFreeMap) ──────────────────────────
-        MapLibreMap(
-          styleString: widget.styleUrl,
-          onMapCreated: _onMapCreated,
-          onStyleLoadedCallback: _onStyleLoaded,
-          initialCameraPosition: CameraPosition(
-            target: LatLng(
-              widget.initialCenter.latitude,
-              widget.initialCenter.longitude,
-            ),
-            zoom: widget.initialZoom,
-          ),
-          minMaxZoomPreference: const MinMaxZoomPreference(10, 18),
-          trackCameraPosition: true,
-          onCameraIdle: () {
-            final wasGesture = !_programmaticMove;
-            _programmaticMove = false;
-            widget.onCameraIdle(wasGesture);
-          },
+    return MapLibreMap(
+      styleString: widget.styleUrl,
+      onMapCreated: _onMapCreated,
+      onStyleLoadedCallback: _onStyleLoaded,
+      initialCameraPosition: CameraPosition(
+        target: LatLng(
+          widget.initialCenter.latitude,
+          widget.initialCenter.longitude,
         ),
-
-        // ── POI pin overlays ──────────────────────────────────────────────────
-        // Centre each 72×72 container on the pin's screen coordinate.
-        // Matches the containerSize=72 anchor used in the old flutter_map setup.
-        ..._pins.map((pin) {
-          final pos = _pinScreenPositions[pin.id];
-          if (pos == null) return const SizedBox.shrink();
-          return Positioned(
-            key: ValueKey('pin-${pin.id}'),
-            left: pos.dx - 36,
-            top: pos.dy - 36,
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: Center(
-                child: StopPinWidget(
-                  number: pin.number,
-                  state: _toStopPinState(pin.state),
-                  photoUrl: pin.photoUrl,
-                  onTap: pin.onTap,
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
+        zoom: widget.initialZoom,
+      ),
+      minMaxZoomPreference: const MinMaxZoomPreference(10, 18),
+      trackCameraPosition: true,
+      onMapClick: _onMapClick,
+      onCameraIdle: () {
+        final wasGesture = !_programmaticMove;
+        _programmaticMove = false;
+        widget.onCameraIdle(wasGesture);
+      },
     );
   }
-
-  StopPinState _toStopPinState(MapPinState s) => switch (s) {
-    MapPinState.upcoming  => StopPinState.upcoming,
-    MapPinState.current   => StopPinState.current,
-    MapPinState.completed => StopPinState.completed,
-  };
 }
 
 // ─── Controller implementation ────────────────────────────────────────────────
