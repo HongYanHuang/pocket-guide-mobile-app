@@ -255,10 +255,56 @@ class _MapTourScreenState extends State<MapTourScreen>
   Widget _buildMap() {
     // Cache the map widget — recreating it on setState resets the MapLibre
     // native view and loses camera state.
-    return _cachedMapWidget ??= MapService.instance.currentProvider.buildMap(
+    if (_cachedMapWidget != null) return _cachedMapWidget!;
+
+    final mq = MediaQuery.of(context);
+    final sw = mq.size.width;
+    final sh = mq.size.height;
+    final safePad = mq.padding;
+    final pois = _getPoisForDay(_selectedDay)
+        .map(_getPoiLocation)
+        .whereType<LatLng>()
+        .toList();
+
+    final RrawiLatLng initialCenter;
+    final double initialZoom;
+
+    if (widget.isActiveMode) {
+      // Center on the first POI (GPS auto-follow will take over once active).
+      initialCenter = pois.isNotEmpty
+          ? RrawiLatLng(pois.first.latitude, pois.first.longitude)
+          : _calculateCenterRrawi();
+      // Zoom to show first two stops (current + next) so the user can see
+      // where to head. Min 13.5 so the view is never uncomfortably wide.
+      final activePois = pois.length >= 2 ? pois.sublist(0, 2) : pois;
+      final mapH = sh - safePad.top - safePad.bottom - 160.0;
+      initialZoom = _fitZoomToLocations(
+        locs: activePois,
+        mapWidth: sw,
+        mapHeight: mapH,
+        paddingFactor: 2.0,
+        minZoom: 13.5,
+        maxZoom: 15.5,
+      );
+    } else {
+      // Preview: center on centroid of all POIs, zoom to fit all of them.
+      initialCenter = _calculateCenterRrawi();
+      // Reserve ~280px for the pre-start card + top chrome.
+      final mapH = sh - safePad.top - safePad.bottom - 280.0;
+      initialZoom = _fitZoomToLocations(
+        locs: pois,
+        mapWidth: sw,
+        mapHeight: mapH,
+        paddingFactor: 1.5,
+        minZoom: 11.0,
+        maxZoom: 16.0,
+      );
+    }
+
+    _cachedMapWidget = MapService.instance.currentProvider.buildMap(
       context: context,
-      initialCenter: _calculateCenterRrawi(),
-      initialZoom: _calculateZoom(),
+      initialCenter: initialCenter,
+      initialZoom: initialZoom,
       onReady: (controller) {
         _mapController = controller;
         _updateMapLayers();
@@ -274,6 +320,42 @@ class _MapTourScreenState extends State<MapTourScreen>
         }
       },
     );
+    return _cachedMapWidget!;
+  }
+
+  /// Returns the MapLibre zoom level that fits [locs] into a [mapWidth] ×
+  /// [mapHeight] viewport with the given [paddingFactor] (e.g. 1.5 = 50%
+  /// extra space).  Clamped to [minZoom]..[maxZoom].
+  double _fitZoomToLocations({
+    required List<LatLng> locs,
+    required double mapWidth,
+    required double mapHeight,
+    double paddingFactor = 1.5,
+    double minZoom = 10.0,
+    double maxZoom = 18.0,
+  }) {
+    if (locs.length < 2) return math.min(14.5, maxZoom);
+
+    final minLat = locs.map((l) => l.latitude).reduce(math.min);
+    final maxLat = locs.map((l) => l.latitude).reduce(math.max);
+    final minLng = locs.map((l) => l.longitude).reduce(math.min);
+    final maxLng = locs.map((l) => l.longitude).reduce(math.max);
+
+    final latSpan = math.max(maxLat - minLat, 0.001);
+    final lngSpan = math.max(maxLng - minLng, 0.001);
+    final centerLat = (minLat + maxLat) / 2;
+
+    // Web-Mercator zoom formula:
+    //   zoomLng = log2(mapW × 360 / (256 × lngSpan × padding))
+    //   zoomLat = log2(mapH × 180 × cos(lat) / (256 × latSpan × padding))
+    const tileSize = 256.0;
+    final cosLat = math.cos(centerLat * math.pi / 180);
+    final safeH = math.max(mapHeight, 100.0);
+
+    final zoomLng = math.log(mapWidth * 360 / (tileSize * lngSpan * paddingFactor)) / math.log(2);
+    final zoomLat = math.log(safeH * 180 * cosLat / (tileSize * latSpan * paddingFactor)) / math.log(2);
+
+    return math.min(zoomLng, zoomLat).clamp(minZoom, maxZoom);
   }
 
   // ── Imperative map update helpers ─────────────────────────────────────────
@@ -1270,27 +1352,6 @@ class _MapTourScreenState extends State<MapTourScreen>
     return RrawiLatLng(c.latitude, c.longitude);
   }
 
-  double _calculateZoom() {
-    final locs = _getPoisForDay(_selectedDay)
-        .map(_getPoiLocation)
-        .whereType<LatLng>()
-        .toList();
-
-    if (locs.length < 2) return 14.0;
-
-    final maxDiff = [
-      locs.map((l) => l.latitude).reduce((a, b) => a > b ? a : b) -
-          locs.map((l) => l.latitude).reduce((a, b) => a < b ? a : b),
-      locs.map((l) => l.longitude).reduce((a, b) => a > b ? a : b) -
-          locs.map((l) => l.longitude).reduce((a, b) => a < b ? a : b),
-    ].reduce((a, b) => a > b ? a : b);
-
-    if (maxDiff > 0.1) return 12.0;
-    if (maxDiff > 0.05) return 13.0;
-    if (maxDiff > 0.02) return 14.0;
-    return 15.0;
-  }
-
   String _poiNameToId(String name) {
     return name
         .toLowerCase()
@@ -1484,9 +1545,21 @@ class _MapTourScreenState extends State<MapTourScreen>
                     FixedExtentScrollController(initialItem: _selectedDay - 1),
                 onSelectedItemChanged: (idx) {
                   setState(() => _selectedDay = idx + 1);
+                  final dayPois = _getPoisForDay(idx + 1)
+                      .map(_getPoiLocation)
+                      .whereType<LatLng>()
+                      .toList();
+                  final mq = MediaQuery.of(context);
                   _mapController?.moveCamera(
                     _calculateCenterRrawi(),
-                    zoom: _calculateZoom(),
+                    zoom: _fitZoomToLocations(
+                      locs: dayPois,
+                      mapWidth: mq.size.width,
+                      mapHeight: mq.size.height - mq.padding.top - mq.padding.bottom - 280,
+                      paddingFactor: 1.5,
+                      minZoom: 11.0,
+                      maxZoom: 16.0,
+                    ),
                   );
                   _updateMapLayers();
                   _geofenceService?.updateActiveDay(

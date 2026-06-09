@@ -1,5 +1,3 @@
-import 'dart:math' show Point;
-
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -9,14 +7,14 @@ import 'package:pocket_guide_mobile/maps/map_provider.dart';
 
 /// MapLibre GL + OpenFreeMap vector tiles implementation of [RrawiMapProvider].
 ///
-/// All map content (route lines, POI pins, user dot) is rendered as native
-/// MapLibre GL layers via GeoJSON sources.  This keeps everything inside the
-/// GL render pipeline so all layers move perfectly in sync — no Flutter overlay
-/// lag during panning.
+/// Circles use the annotation manager (addCircles) — the officially tested
+/// path.  Text labels use a custom GeoJSON source + symbol layer so we can
+/// specify 'Noto Sans Regular', the font that is actually bundled in the
+/// OpenFreeMap liberty style (the annotation SymbolManager hard-codes
+/// 'Open Sans Regular' which is absent, causing silent text failures).
 ///
-/// Trade-off: POI photos are not supported in this approach (they would require
-/// pre-rendering Flutter widgets to bitmaps and registering them as sprite
-/// images).  Numbers + state colours are rendered with GL circle + text layers.
+/// Route lines are inserted *below* the annotation circle layer so that pins
+/// always render on top of the route path.
 class OpenFreeMapProvider implements RrawiMapProvider {
   static const String _styleUrl =
       'https://tiles.openfreemap.org/styles/liberty';
@@ -67,8 +65,8 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   bool _styleLoaded = false;
   bool _programmaticMove = false;
 
-  /// id → tap callback for the currently displayed pins
-  final Map<String, VoidCallback?> _pinTapCallbacks = {};
+  /// Maps annotation Circle.id → tap callback for pin circles.
+  final Map<String, VoidCallback?> _circleTapCallbacks = {};
 
   // Updates buffered before the style finishes loading
   List<MapRouteSegment>? _pendingRoute;
@@ -85,6 +83,10 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _mlController = controller;
+    // Tap on a pin circle → fire its registered callback.
+    controller.onCircleTapped.add((circle) {
+      _circleTapCallbacks[circle.id]?.call();
+    });
   }
 
   Future<void> _onStyleLoaded() async {
@@ -111,50 +113,83 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     final ctrl = _mlController!;
     final empty = _emptyCollection();
 
-    // ── Route sources & layers ────────────────────────────────────────────────
+    // The annotation circle layer was already added during manager
+    // initialisation (before this callback).  Inserting route lines *below*
+    // it means circles always render on top of the route path.
+    final circleLayerId = ctrl.circleManager?.layerIds.firstOrNull;
+
+    // ── Route sources & layers (below pin circles) ─────────────────────────
     await ctrl.addGeoJsonSource('route-completed', empty);
     await ctrl.addGeoJsonSource('route-upcoming', empty);
     await ctrl.addGeoJsonSource('route-trail', empty);
 
-    await ctrl.addLineLayer('route-completed', 'route-completed-layer',
-        LineLayerProperties(
-          lineColor: '#1B1915',
-          lineWidth: 2.5,
-          lineOpacity: 0.3,
-          lineDasharray: [8.0, 6.0],
-          lineCap: 'round',
-          lineJoin: 'round',
-        ));
-
-    await ctrl.addLineLayer('route-upcoming', 'route-upcoming-layer',
-        LineLayerProperties(
-          lineColor: '#3A4A3A',
-          lineWidth: 4.5,
-          lineOpacity: 0.7,
-          lineCap: 'round',
-          lineJoin: 'round',
-        ));
-
-    await ctrl.addLineLayer('route-trail', 'route-trail-layer',
+    // Add in ascending z-order (trail → completed → upcoming → pulse ring).
+    // All go below circleLayerId; each subsequent call pushes just below
+    // circleLayerId, so the last added ends up closest to the circles.
+    await ctrl.addLineLayer(
+        'route-trail',
+        'route-trail-layer',
         LineLayerProperties(
           lineColor: '#3A4A3A',
           lineWidth: 3.0,
           lineOpacity: 0.5,
           lineCap: 'round',
           lineJoin: 'round',
-        ));
+        ),
+        belowLayerId: circleLayerId);
 
-    // ── User-location source & layers ─────────────────────────────────────────
+    await ctrl.addLineLayer(
+        'route-completed',
+        'route-completed-layer',
+        LineLayerProperties(
+          lineColor: '#9A9285',
+          lineWidth: 2.5,
+          lineOpacity: 0.55,
+          lineDasharray: [4.0, 4.0],
+          lineCap: 'round',
+          lineJoin: 'round',
+        ),
+        belowLayerId: circleLayerId);
+
+    await ctrl.addLineLayer(
+        'route-upcoming',
+        'route-upcoming-layer',
+        LineLayerProperties(
+          lineColor: '#3A4A3A',
+          lineWidth: 4.5,
+          lineOpacity: 0.7,
+          lineCap: 'round',
+          lineJoin: 'round',
+        ),
+        belowLayerId: circleLayerId);
+
+    // ── Pulse ring for current stop (added last → sits just below circles) ──
+    await ctrl.addGeoJsonSource('pin-pulse', empty);
+    await ctrl.addCircleLayer(
+        'pin-pulse',
+        'pin-pulse-layer',
+        const CircleLayerProperties(
+          circleRadius: 27.0,
+          circleColor: '#3A4A3A',
+          circleOpacity: 0.20,
+        ),
+        belowLayerId: circleLayerId);
+
+    // ── User-location source & layers (above circles) ──────────────────────
     await ctrl.addGeoJsonSource('user-loc', empty);
 
-    await ctrl.addCircleLayer('user-loc', 'user-halo-layer',
+    await ctrl.addCircleLayer(
+        'user-loc',
+        'user-halo-layer',
         const CircleLayerProperties(
           circleRadius: 14.0,
           circleColor: '#4583F0',
           circleOpacity: 0.22,
         ));
 
-    await ctrl.addCircleLayer('user-loc', 'user-dot-layer',
+    await ctrl.addCircleLayer(
+        'user-loc',
+        'user-dot-layer',
         const CircleLayerProperties(
           circleRadius: 8.0,
           circleColor: '#4583F0',
@@ -162,83 +197,62 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           circleStrokeColor: '#FFFFFF',
         ));
 
-    // ── POI pin source & layers ───────────────────────────────────────────────
-    // All pins live in a single GeoJSON source. Each feature carries 'state'
-    // ('upcoming' | 'current' | 'completed') and 'number' (string) properties.
-    // Data-driven expressions drive colour / size — no Flutter overlay needed.
-    await ctrl.addGeoJsonSource('pins', empty);
+    // ── Pin number labels ──────────────────────────────────────────────────
+    // Three separate sources so each state gets constant (non-expression)
+    // colour and size — avoids fragile iOS color-expression handling.
+    // textFont uses 'Noto Sans Regular' which IS bundled in the OpenFreeMap
+    // liberty style (the annotation SymbolManager hard-codes 'Open Sans
+    // Regular' which is absent, causing silent text failures).
+    await ctrl.addGeoJsonSource('pin-labels-upcoming', empty);
+    await ctrl.addGeoJsonSource('pin-labels-current', empty);
+    await ctrl.addGeoJsonSource('pin-labels-completed', empty);
 
-    // Pulse ring — rendered only for the 'current' pin
-    await ctrl.addCircleLayer(
-      'pins',
-      'pins-pulse-layer',
-      const CircleLayerProperties(
-        circleRadius: 30.0,
-        circleColor: '#3A4A3A',
-        circleOpacity: 0.18,
-        circleStrokeWidth: 0.0,
-      ),
-      filter: ['==', ['get', 'state'], 'current'],
-    );
-
-    // Main pin circle — radius and colours driven by 'state'
-    await ctrl.addCircleLayer(
-      'pins',
-      'pins-circle-layer',
-      CircleLayerProperties(
-        // rawiAccent for current/completed, rawiPaper for upcoming
-        circleColor: [
-          'case',
-          ['==', ['get', 'state'], 'upcoming'], '#F6F1E7',
-          '#3A4A3A',
-        ],
-        circleRadius: [
-          'case',
-          ['==', ['get', 'state'], 'current'], 20.0,
-          ['==', ['get', 'state'], 'completed'], 13.0,
-          14.0, // upcoming
-        ],
-        circleStrokeWidth: [
-          'case',
-          ['==', ['get', 'state'], 'current'], 3.0,
-          2.0,
-        ],
-        circleStrokeColor: [
-          'case',
-          ['==', ['get', 'state'], 'upcoming'], '#1B1915',
-          '#F6F1E7',
-        ],
-      ),
-      enableInteraction: true,
-    );
-
-    // Number / checkmark text on top of the circle
     await ctrl.addSymbolLayer(
-      'pins',
-      'pins-text-layer',
+      'pin-labels-upcoming',
+      'pin-labels-upcoming-layer',
       SymbolLayerProperties(
-        textField: [
-          'case',
-          ['==', ['get', 'state'], 'completed'], '✓',
-          ['to-string', ['get', 'number']],
-        ],
-        textSize: [
-          'case',
-          ['==', ['get', 'state'], 'current'], 14.0,
-          11.0,
-        ],
-        textColor: [
-          'case',
-          ['==', ['get', 'state'], 'upcoming'], '#1B1915',
-          '#F6F1E7',
-        ],
-        textFont: ['Noto Sans Bold', 'Arial Unicode MS Bold'],
+        textField: ['get', 'label'],
+        textFont: ['Noto Sans Bold'],
+        textSize: 12.0,
+        textColor: '#1B1915',
         textIgnorePlacement: true,
         textAllowOverlap: true,
         iconIgnorePlacement: true,
         iconAllowOverlap: true,
       ),
-      enableInteraction: false, // taps handled by the circle layer below
+      enableInteraction: false,
+    );
+
+    await ctrl.addSymbolLayer(
+      'pin-labels-current',
+      'pin-labels-current-layer',
+      SymbolLayerProperties(
+        textField: ['get', 'label'],
+        textFont: ['Noto Sans Bold'],
+        textSize: 14.0,
+        textColor: '#F6F1E7',
+        textIgnorePlacement: true,
+        textAllowOverlap: true,
+        iconIgnorePlacement: true,
+        iconAllowOverlap: true,
+      ),
+      enableInteraction: false,
+    );
+
+    await ctrl.addSymbolLayer(
+      'pin-labels-completed',
+      'pin-labels-completed-layer',
+      SymbolLayerProperties(
+        textField: ['get', 'label'],
+        textFont: ['Noto Sans Bold'],
+        textSize: 10.0,
+        textColor: '#F6F1E7',
+        textIgnorePlacement: true,
+        textAllowOverlap: true,
+        iconIgnorePlacement: true,
+        iconAllowOverlap: true,
+      ),
+      enableInteraction: false,
     );
   }
 
@@ -261,17 +275,26 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       _mlController?.cameraPosition?.zoom ?? widget.initialZoom;
 
   void setRoute(List<MapRouteSegment> segments) {
-    if (!_styleLoaded) { _pendingRoute = segments; return; }
+    if (!_styleLoaded) {
+      _pendingRoute = segments;
+      return;
+    }
     _applyRoute(segments);
   }
 
   void setPins(List<MapPinData> pins) {
-    if (!_styleLoaded) { _pendingPins = pins; return; }
+    if (!_styleLoaded) {
+      _pendingPins = pins;
+      return;
+    }
     _applyPins(pins);
   }
 
   void setUserLocation(RrawiLatLng? position) {
-    if (!_styleLoaded) { _pendingUserLocation = position; return; }
+    if (!_styleLoaded) {
+      _pendingUserLocation = position;
+      return;
+    }
     _applyUserLocation(position);
   }
 
@@ -287,16 +310,17 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     List<MapRouteSegment> all,
   ) {
     final matching = all.where((s) => s.style == style).toList();
-    final features = matching.map((s) => <String, dynamic>{
-      'type': 'Feature',
-      'geometry': {
-        'type': 'LineString',
-        'coordinates': s.points
-            .map((p) => [p.longitude, p.latitude])
-            .toList(),
-      },
-      'properties': <String, dynamic>{},
-    }).toList();
+    final features = matching
+        .map((s) => <String, dynamic>{
+              'type': 'Feature',
+              'geometry': {
+                'type': 'LineString',
+                'coordinates':
+                    s.points.map((p) => [p.longitude, p.latitude]).toList(),
+              },
+              'properties': <String, dynamic>{},
+            })
+        .toList();
     _mlController?.setGeoJsonSource(sourceId, {
       'type': 'FeatureCollection',
       'features': features,
@@ -304,24 +328,100 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   }
 
   void _applyPins(List<MapPinData> pins) {
-    _pinTapCallbacks.clear();
-    final features = <Map<String, dynamic>>[];
-    for (final pin in pins) {
-      _pinTapCallbacks[pin.id] = pin.onTap;
-      features.add({
-        'type': 'Feature',
-        'geometry': {
-          'type': 'Point',
-          'coordinates': [pin.location.longitude, pin.location.latitude],
-        },
-        'properties': {
-          'id': pin.id,
-          'number': '${pin.number}',
-          'state': pin.state.name, // 'upcoming' | 'current' | 'completed'
-        },
-      });
+    _applyPinsAsync(pins);
+  }
+
+  Future<void> _applyPinsAsync(List<MapPinData> pins) async {
+    final ctrl = _mlController;
+    if (ctrl == null) return;
+
+    await ctrl.clearCircles();
+    _circleTapCallbacks.clear();
+
+    // Always update all sources (clears them when pins is empty).
+    _updatePulseSource(ctrl, pins);
+    _updateLabelSource(ctrl, 'pin-labels-upcoming', MapPinState.upcoming, pins);
+    _updateLabelSource(ctrl, 'pin-labels-current', MapPinState.current, pins);
+    _updateLabelSource(ctrl, 'pin-labels-completed', MapPinState.completed, pins);
+
+    if (pins.isEmpty) return;
+
+    // ── Main pin circles ───────────────────────────────────────────────────
+    final circleOptionsList = pins.map((p) {
+      final double radius;
+      final String fill;
+      final String stroke;
+      final double strokeW;
+      switch (p.state) {
+        case MapPinState.current:
+          radius = 19.0;
+          fill = '#3A4A3A';
+          stroke = '#3A4A3A'; // no visible border
+          strokeW = 0.0;
+        case MapPinState.upcoming:
+          radius = 13.0;
+          fill = '#F6F1E7';
+          stroke = '#1B1915';
+          strokeW = 1.5;
+        case MapPinState.completed:
+          radius = 11.0;
+          fill = '#3A4A3A';
+          stroke = '#F6F1E7';
+          strokeW = 2.0;
+      }
+      return CircleOptions(
+        geometry: LatLng(p.location.latitude, p.location.longitude),
+        circleRadius: radius,
+        circleColor: fill,
+        circleStrokeColor: stroke,
+        circleStrokeWidth: strokeW,
+      );
+    }).toList();
+
+    final circles = await ctrl.addCircles(circleOptionsList);
+    for (var i = 0; i < circles.length; i++) {
+      _circleTapCallbacks[circles[i].id] = pins[i].onTap;
     }
-    _mlController?.setGeoJsonSource('pins', {
+  }
+
+  void _updatePulseSource(MapLibreMapController ctrl, List<MapPinData> pins) {
+    final features = pins
+        .where((p) => p.state == MapPinState.current)
+        .map((p) => <String, dynamic>{
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': [p.location.longitude, p.location.latitude],
+              },
+              'properties': <String, dynamic>{},
+            })
+        .toList();
+    ctrl.setGeoJsonSource('pin-pulse', {
+      'type': 'FeatureCollection',
+      'features': features,
+    });
+  }
+
+  void _updateLabelSource(
+    MapLibreMapController ctrl,
+    String sourceId,
+    MapPinState state,
+    List<MapPinData> allPins,
+  ) {
+    final features = allPins
+        .where((p) => p.state == state)
+        .map((p) => <String, dynamic>{
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': [p.location.longitude, p.location.latitude],
+              },
+              'properties': {
+                'label': state == MapPinState.completed ? '✓' : '${p.number}',
+              },
+            })
+        .toList();
+    ctrl.setGeoJsonSource(sourceId, {
       'type': 'FeatureCollection',
       'features': features,
     });
@@ -347,25 +447,6 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     });
   }
 
-  /// Handle map taps — query which pin (if any) was hit.
-  Future<void> _onMapClick(Point<double> point, LatLng latLng) async {
-    if (_mlController == null) return;
-    try {
-      final features = await _mlController!.queryRenderedFeatures(
-        point,
-        ['pins-circle-layer', 'pins-pulse-layer'],
-        null,
-      );
-      if (features.isNotEmpty) {
-        final props = Map<String, dynamic>.from(
-          features.first['properties'] as Map,
-        );
-        final id = props['id'] as String?;
-        if (id != null) _pinTapCallbacks[id]?.call();
-      }
-    } catch (_) {}
-  }
-
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -383,7 +464,14 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       ),
       minMaxZoomPreference: const MinMaxZoomPreference(10, 18),
       trackCameraPosition: true,
-      onMapClick: _onMapClick,
+      // circles must be below symbols so pin numbers render on top.
+      annotationOrder: const [
+        AnnotationType.fill,
+        AnnotationType.line,
+        AnnotationType.circle,
+        AnnotationType.symbol,
+      ],
+      annotationConsumeTapEvents: const [AnnotationType.circle],
       onCameraIdle: () {
         final wasGesture = !_programmaticMove;
         _programmaticMove = false;
