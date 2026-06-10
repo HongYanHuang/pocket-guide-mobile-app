@@ -113,6 +113,10 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     final ctrl = _mlController!;
     final empty = _emptyCollection();
 
+    // Apply rawi palette overrides to the base Liberty style before we add
+    // our own layers — keeps everything in one initialisation pass.
+    await _applyStyleOverrides(ctrl);
+
     // The annotation circle layer was already added during manager
     // initialisation (before this callback).  Inserting route lines *below*
     // it means circles always render on top of the route path.
@@ -296,6 +300,188 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       return;
     }
     _applyUserLocation(position);
+  }
+
+  // ── Liberty base-map style overrides ─────────────────────────────────────
+
+  /// Overrides OpenFreeMap Liberty colours to match the rawi paper/ink palette.
+  ///
+  /// Called once in [_initLayers] immediately after style load.  Each call
+  /// uses [setLayerProperties] (paint overrides) or [setLayerVisibility]
+  /// (hide transit/POI clutter).  Layers that don't exist in a future Liberty
+  /// version are silently skipped via the try-catch helper.
+  Future<void> _applyStyleOverrides(MapLibreMapController ctrl) async {
+    // ── Base & land ──────────────────────────────────────────────────────
+    // BackgroundLayerProperties is absent from maplibre_gl 0.26 so we
+    // implement LayerProperties inline — toJson() is all the SDK needs.
+    await _trySet(ctrl, 'background',
+        _RawLayerProperties({'background-color': '#F6F1E7'}));
+
+    await _trySet(ctrl, 'landuse_residential',
+        const FillLayerProperties(fillColor: '#EFE8D8'));
+
+    await _trySet(ctrl, 'landcover_wood',
+        const FillLayerProperties(fillColor: 'hsla(75,18%,72%,0.55)'));
+
+    await _trySet(ctrl, 'landcover_grass',
+        const FillLayerProperties(fillColor: '#D8DAC0'));
+
+    await _trySet(ctrl, 'park',
+        const FillLayerProperties(
+          fillColor: '#DCDEC4',
+          fillOutlineColor: 'rgba(58,74,58,0.25)',
+        ));
+
+    await _trySet(ctrl, 'park_outline',
+        const LineLayerProperties(lineColor: 'rgba(58,74,58,0.18)'));
+
+    // ── Water ────────────────────────────────────────────────────────────
+    await _trySet(ctrl, 'water',
+        const FillLayerProperties(fillColor: '#C3CBC9'));
+
+    for (final id in ['waterway_river', 'waterway_other', 'waterway_tunnel']) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: '#B3BDBB'));
+    }
+
+    for (final id in [
+      'waterway_line_label',
+      'water_name_point_label',
+      'water_name_line_label',
+    ]) {
+      await _trySet(ctrl, id,
+          const SymbolLayerProperties(
+            textColor: '#6B6459',
+            textHaloColor: '#F6F1E7',
+          ));
+    }
+
+    // ── Roads — major fill ───────────────────────────────────────────────
+    await _trySet(ctrl, 'road_motorway',
+        const LineLayerProperties(lineColor: '#E7DEC9'));
+
+    for (final id in [
+      'road_trunk_primary', 'road_secondary_tertiary',
+      'road_link', 'road_motorway_link',
+      'bridge_trunk_primary', 'bridge_secondary_tertiary',
+      'bridge_link', 'bridge_motorway', 'bridge_motorway_link',
+      'tunnel_trunk_primary', 'tunnel_secondary_tertiary',
+      'tunnel_link', 'tunnel_motorway', 'tunnel_motorway_link',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: '#EFE8D8'));
+    }
+
+    // ── Roads — minor fill ───────────────────────────────────────────────
+    for (final id in [
+      'road_minor', 'road_service_track', 'road_path_pedestrian',
+      'bridge_street', 'bridge_service_track', 'bridge_path_pedestrian',
+      'tunnel_minor', 'tunnel_service_track', 'tunnel_path_pedestrian',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: '#FBF8F1'));
+    }
+
+    // ── Roads — casings (replace orange + grey with hair) ────────────────
+    for (final id in [
+      'road_motorway_casing', 'road_trunk_primary_casing',
+      'road_secondary_tertiary_casing', 'road_link_casing',
+      'road_motorway_link_casing', 'road_minor_casing',
+      'road_service_track_casing',
+      'bridge_motorway_casing', 'bridge_trunk_primary_casing',
+      'bridge_secondary_tertiary_casing', 'bridge_link_casing',
+      'bridge_motorway_link_casing', 'bridge_street_casing',
+      'bridge_path_pedestrian_casing', 'bridge_service_track_casing',
+      'tunnel_motorway_casing', 'tunnel_trunk_primary_casing',
+      'tunnel_secondary_tertiary_casing', 'tunnel_link_casing',
+      'tunnel_motorway_link_casing', 'tunnel_street_casing',
+      'tunnel_service_track_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.10)'));
+    }
+
+    // ── Rail ─────────────────────────────────────────────────────────────
+    for (final id in [
+      'road_major_rail', 'road_transit_rail',
+      'road_major_rail_hatching', 'road_transit_rail_hatching',
+      'bridge_major_rail', 'bridge_transit_rail',
+      'bridge_major_rail_hatching', 'bridge_transit_rail_hatching',
+      'tunnel_major_rail', 'tunnel_transit_rail',
+      'tunnel_major_rail_hatching', 'tunnel_transit_rail_hatching',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: '#C9C2B4'));
+    }
+
+    // ── Buildings ────────────────────────────────────────────────────────
+    await _trySet(ctrl, 'building',
+        const FillLayerProperties(
+          fillColor: '#EBE3D2',
+          fillOutlineColor: 'rgba(27,25,21,0.10)',
+        ));
+
+    await _trySet(ctrl, 'building-3d',
+        const FillExtrusionLayerProperties(
+          fillExtrusionColor: '#E7DEC9',
+          fillExtrusionOpacity: 0.7,
+        ));
+
+    // ── Labels ───────────────────────────────────────────────────────────
+    for (final id in [
+      'label_city', 'label_city_capital',
+      'label_town', 'label_village',
+      'label_state', 'label_other',
+      'label_country_1', 'label_country_2', 'label_country_3',
+    ]) {
+      await _trySet(ctrl, id,
+          const SymbolLayerProperties(
+            textColor: '#1B1915',
+            textHaloColor: '#F6F1E7',
+          ));
+    }
+
+    for (final id in [
+      'highway-name-path', 'highway-name-minor', 'highway-name-major',
+    ]) {
+      await _trySet(ctrl, id,
+          const SymbolLayerProperties(
+            textColor: '#9A9285',
+            textHaloColor: '#F6F1E7',
+          ));
+    }
+
+    await _trySet(ctrl, 'poi_transit',
+        const SymbolLayerProperties(
+          textColor: '#6B6459',
+          textHaloColor: '#F6F1E7',
+        ));
+
+    for (final id in ['airport', 'poi_r1', 'poi_r7', 'poi_r20']) {
+      await _trySet(ctrl, id,
+          const SymbolLayerProperties(textHaloColor: '#F6F1E7'));
+    }
+
+    // ── Hide transit/POI clutter ─────────────────────────────────────────
+    // Bus stops, generic POIs, and transit icons compete visually with our
+    // numbered stop pins.  Hide them so pins are the only points on the map.
+    for (final id in ['poi_transit', 'poi_r1', 'poi_r7', 'poi_r20']) {
+      try {
+        await ctrl.setLayerVisibility(id, false);
+      } catch (_) {}
+    }
+  }
+
+  /// Calls [setLayerProperties] and silently swallows "layer not found"
+  /// errors so that future Liberty style changes don't crash the app.
+  Future<void> _trySet(
+    MapLibreMapController ctrl,
+    String layerId,
+    LayerProperties props,
+  ) async {
+    try {
+      await ctrl.setLayerProperties(layerId, props);
+    } catch (_) {}
   }
 
   void _applyRoute(List<MapRouteSegment> segments) {
@@ -510,4 +696,19 @@ class _OpenFreeMapController implements RrawiMapController {
   void dispose() {
     // MapLibreMapController lifecycle is owned by the MapLibreMap widget.
   }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/// Thin [LayerProperties] wrapper for layer types that maplibre_gl 0.26 does
+/// not expose a typed class for (e.g. the `background` layer).
+///
+/// [setLayerProperties] only calls [toJson] on the properties object, so
+/// passing a raw paint-property map is perfectly safe.
+class _RawLayerProperties implements LayerProperties {
+  const _RawLayerProperties(this._paint);
+  final Map<String, dynamic> _paint;
+
+  @override
+  Map<String, dynamic> toJson({bool skipNulls = true}) => _paint;
 }
