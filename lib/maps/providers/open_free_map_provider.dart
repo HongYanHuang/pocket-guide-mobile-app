@@ -117,6 +117,24 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     // our own layers — keeps everything in one initialisation pass.
     await _applyStyleOverrides(ctrl);
 
+    // ── Path casing (Liberty has no native casing for non-bridge paths) ───
+    // Adds a hairline outline behind pedestrian paths/footways so they read
+    // clearly against pale park fills.  Uses the openmaptiles vector source
+    // directly with an old-syntax filter for broad MapLibre compatibility.
+    await ctrl.addLineLayer(
+      'openmaptiles',
+      'path-casing',
+      const LineLayerProperties(
+        lineColor: 'rgba(27,25,21,0.14)',
+        lineWidth: 3.0,
+        lineCap: 'round',
+        lineJoin: 'round',
+      ),
+      belowLayerId: 'road_path_pedestrian',
+      sourceLayer: 'transportation',
+      filter: ['in', 'class', 'path', 'pedestrian', 'footway', 'cycleway'],
+    );
+
     // The annotation circle layer was already added during manager
     // initialisation (before this callback).  Inserting route lines *below*
     // it means circles always render on top of the route path.
@@ -308,12 +326,12 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   ///
   /// Called once in [_initLayers] immediately after style load.  Each call
   /// uses [setLayerProperties] (paint overrides) or [setLayerVisibility]
-  /// (hide transit/POI clutter).  Layers that don't exist in a future Liberty
-  /// version are silently skipped via the try-catch helper.
+  /// (show/hide layers).  Layers missing in a future Liberty version are
+  /// silently skipped via [_trySet].
   Future<void> _applyStyleOverrides(MapLibreMapController ctrl) async {
     // ── Base & land ──────────────────────────────────────────────────────
-    // BackgroundLayerProperties is absent from maplibre_gl 0.26 so we
-    // implement LayerProperties inline — toJson() is all the SDK needs.
+    // BackgroundLayerProperties is absent from maplibre_gl 0.26; use inline
+    // implementation — toJson() is all setLayerProperties needs.
     await _trySet(ctrl, 'background',
         _RawLayerProperties({'background-color': '#F6F1E7'}));
 
@@ -336,14 +354,17 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         const LineLayerProperties(lineColor: 'rgba(58,74,58,0.18)'));
 
     // ── Water ────────────────────────────────────────────────────────────
+    // Slightly more saturated than previous #C3CBC9 so the river acts as a
+    // visual anchor at low zoom.
     await _trySet(ctrl, 'water',
-        const FillLayerProperties(fillColor: '#C3CBC9'));
+        const FillLayerProperties(fillColor: '#B6C6CE'));
 
     for (final id in ['waterway_river', 'waterway_other', 'waterway_tunnel']) {
       await _trySet(ctrl, id,
           const LineLayerProperties(lineColor: '#B3BDBB'));
     }
 
+    // Water labels — explicit visibility + halo so they read on paper bg.
     for (final id in [
       'waterway_line_label',
       'water_name_point_label',
@@ -353,10 +374,12 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           const SymbolLayerProperties(
             textColor: '#6B6459',
             textHaloColor: '#F6F1E7',
+            textHaloWidth: 1.5,
           ));
+      try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
     }
 
-    // ── Roads — major fill ───────────────────────────────────────────────
+    // ── Roads — major fill (white ribbons, high contrast on paper) ───────
     await _trySet(ctrl, 'road_motorway',
         const LineLayerProperties(lineColor: '#E7DEC9'));
 
@@ -369,7 +392,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       'tunnel_link', 'tunnel_motorway', 'tunnel_motorway_link',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#EFE8D8'));
+          const LineLayerProperties(lineColor: '#FFFFFF'));
     }
 
     // ── Roads — minor fill ───────────────────────────────────────────────
@@ -382,23 +405,32 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           const LineLayerProperties(lineColor: '#FBF8F1'));
     }
 
-    // ── Roads — casings (replace orange + grey with hair) ────────────────
+    // ── Roads — casings ──────────────────────────────────────────────────
+    // Major casings darker (0.18) so arterials have a clear edge.
+    // Minor casings at 0.12 — every street needs a defined boundary.
     for (final id in [
       'road_motorway_casing', 'road_trunk_primary_casing',
       'road_secondary_tertiary_casing', 'road_link_casing',
-      'road_motorway_link_casing', 'road_minor_casing',
-      'road_service_track_casing',
+      'road_motorway_link_casing',
       'bridge_motorway_casing', 'bridge_trunk_primary_casing',
       'bridge_secondary_tertiary_casing', 'bridge_link_casing',
-      'bridge_motorway_link_casing', 'bridge_street_casing',
-      'bridge_path_pedestrian_casing', 'bridge_service_track_casing',
+      'bridge_motorway_link_casing',
       'tunnel_motorway_casing', 'tunnel_trunk_primary_casing',
       'tunnel_secondary_tertiary_casing', 'tunnel_link_casing',
-      'tunnel_motorway_link_casing', 'tunnel_street_casing',
-      'tunnel_service_track_casing',
+      'tunnel_motorway_link_casing',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.10)'));
+          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.18)'));
+    }
+
+    for (final id in [
+      'road_minor_casing', 'road_service_track_casing',
+      'bridge_street_casing', 'bridge_path_pedestrian_casing',
+      'bridge_service_track_casing',
+      'tunnel_street_casing', 'tunnel_service_track_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.12)'));
     }
 
     // ── Rail ─────────────────────────────────────────────────────────────
@@ -421,13 +453,19 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           fillOutlineColor: 'rgba(27,25,21,0.10)',
         ));
 
+    // 3D extrusion fades in z16→z17 so below z17 only flat footprints show.
+    // Opacity 0.6 keeps blocks from fighting the walking sheet.
     await _trySet(ctrl, 'building-3d',
-        const FillExtrusionLayerProperties(
+        FillExtrusionLayerProperties(
           fillExtrusionColor: '#E7DEC9',
-          fillExtrusionOpacity: 0.7,
+          fillExtrusionOpacity: [
+            'interpolate', ['linear'], ['zoom'],
+            16, 0.0,
+            17, 0.6,
+          ],
         ));
 
-    // ── Labels ───────────────────────────────────────────────────────────
+    // ── Place & water labels — ink on paper, ensure visible ──────────────
     for (final id in [
       'label_city', 'label_city_capital',
       'label_town', 'label_village',
@@ -438,37 +476,40 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           const SymbolLayerProperties(
             textColor: '#1B1915',
             textHaloColor: '#F6F1E7',
+            textHaloWidth: 1.5,
           ));
+      try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
     }
 
+    // Road name labels — muted ink-4, explicit visibility at all zoom levels.
     for (final id in [
-      'highway-name-path', 'highway-name-minor', 'highway-name-major',
+      'highway-name-major', 'highway-name-minor', 'highway-name-path',
     ]) {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#9A9285',
             textHaloColor: '#F6F1E7',
+            textHaloWidth: 1.5,
+          ));
+      try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
+    }
+
+    for (final id in ['airport']) {
+      await _trySet(ctrl, id,
+          const SymbolLayerProperties(
+            textHaloColor: '#F6F1E7',
+            textHaloWidth: 1.5,
           ));
     }
 
-    await _trySet(ctrl, 'poi_transit',
-        const SymbolLayerProperties(
-          textColor: '#6B6459',
-          textHaloColor: '#F6F1E7',
-        ));
-
-    for (final id in ['airport', 'poi_r1', 'poi_r7', 'poi_r20']) {
-      await _trySet(ctrl, id,
-          const SymbolLayerProperties(textHaloColor: '#F6F1E7'));
-    }
-
-    // ── Hide transit/POI clutter ─────────────────────────────────────────
-    // Bus stops, generic POIs, and transit icons compete visually with our
-    // numbered stop pins.  Hide them so pins are the only points on the map.
-    for (final id in ['poi_transit', 'poi_r1', 'poi_r7', 'poi_r20']) {
-      try {
-        await ctrl.setLayerVisibility(id, false);
-      } catch (_) {}
+    // ── Hide clutter ─────────────────────────────────────────────────────
+    // Transit/POI icons compete with numbered stop pins — hide them.
+    // Oneway arrows are pedestrian noise on a walking tour.
+    for (final id in [
+      'poi_transit', 'poi_r1', 'poi_r7', 'poi_r20',
+      'road_one_way_arrow', 'road_one_way_arrow_opposite',
+    ]) {
+      try { await ctrl.setLayerVisibility(id, false); } catch (_) {}
     }
   }
 
