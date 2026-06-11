@@ -351,16 +351,15 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   /// silently skipped via [_trySet].
   Future<void> _applyStyleOverrides(MapLibreMapController ctrl) async {
     // ── Base & land ──────────────────────────────────────────────────────
-    // Ground is now #E2D7C0 (~0.83 luminance) vs roads #FFFFFF (~1.0).
-    // That ~0.17 gap gives white roads clear contrast so they read as bright
-    // ribbons — previously ground was #F6F1E7 (~0.95), almost the same value.
+    // Ground #DCD0B6 (~0.79 luminance) vs roads #FFFFFF (~1.0).
+    // The ~0.21 gap gives white roads strong contrast as bright ribbons.
     // BackgroundLayerProperties is absent from maplibre_gl 0.26; use inline
     // implementation — toJson() is all setLayerProperties needs.
     await _trySet(ctrl, 'background',
-        _RawLayerProperties({'background-color': '#E2D7C0'}));
+        _RawLayerProperties({'background-color': '#DCD0B6'}));
 
     await _trySet(ctrl, 'landuse_residential',
-        const FillLayerProperties(fillColor: '#E2D7C0'));
+        const FillLayerProperties(fillColor: '#DCD0B6'));
 
     await _trySet(ctrl, 'landcover_wood',
         const FillLayerProperties(fillColor: 'hsla(75,18%,68%,0.55)'));
@@ -388,7 +387,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           const LineLayerProperties(lineColor: '#A8BBC0'));
     }
 
-    // Water labels — halo matches new ground tone.
+    // Water labels — halo matches ground #DCD0B6.
     for (final id in [
       'waterway_line_label',
       'water_name_point_label',
@@ -397,7 +396,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#6B6459',
-            textHaloColor: '#E2D7C0',
+            textHaloColor: '#DCD0B6',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -431,8 +430,9 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     }
 
     // ── Roads — casings ──────────────────────────────────────────────────
-    // All casings at 0.22 — darker ground means casings need to be bolder
-    // to stay as a clear dark hairline edge against the tan background.
+    // Solid near-black #3C3730 casings: dark enough to frame white fills
+    // against the tan ground without the casing disappearing at opacity.
+    // Major roads get 2 px casing each side; minor roads get 1.5 px.
     for (final id in [
       'road_motorway_casing', 'road_trunk_primary_casing',
       'road_secondary_tertiary_casing', 'road_link_casing',
@@ -443,13 +443,19 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       'tunnel_motorway_casing', 'tunnel_trunk_primary_casing',
       'tunnel_secondary_tertiary_casing', 'tunnel_link_casing',
       'tunnel_motorway_link_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          const LineLayerProperties(lineColor: '#3C3730', lineWidth: 2.0));
+    }
+
+    for (final id in [
       'road_minor_casing', 'road_service_track_casing',
       'bridge_street_casing', 'bridge_path_pedestrian_casing',
       'bridge_service_track_casing',
       'tunnel_street_casing', 'tunnel_service_track_casing',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.22)'));
+          const LineLayerProperties(lineColor: '#3C3730', lineWidth: 1.5));
     }
 
     // ── Rail ─────────────────────────────────────────────────────────────
@@ -466,28 +472,24 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     }
 
     // ── Buildings ────────────────────────────────────────────────────────
-    // Slightly darker than ground (#D8CDB8 < #E2D7C0) so footprints read,
+    // Slightly darker than ground (#D2C6AE < #DCD0B6) so footprints read,
     // but quieter than roads so they don't compete with the street network.
+    // Outline uses #3C3730 at ~25% alpha (hex AA = 0x40).
     await _trySet(ctrl, 'building',
         const FillLayerProperties(
-          fillColor: '#D8CDB8',
-          fillOutlineColor: 'rgba(27,25,21,0.16)',
+          fillColor: '#D2C6AE',
+          fillOutlineColor: '#3C373040',
         ));
 
-    // 3D extrusion fades in z16→z17 so below z17 only flat footprints show.
-    // Slightly darker than flat building fill so 3D reads with depth.
+    // 3D extrusion at fixed 0.65 opacity — consistent depth without fading.
     await _trySet(ctrl, 'building-3d',
-        FillExtrusionLayerProperties(
-          fillExtrusionColor: '#D0C4A8',
-          fillExtrusionOpacity: [
-            'interpolate', ['linear'], ['zoom'],
-            16, 0.0,
-            17, 0.6,
-          ],
+        const FillExtrusionLayerProperties(
+          fillExtrusionColor: '#D2C6AE',
+          fillExtrusionOpacity: 0.65,
         ));
 
     // ── Place & water labels — ink on tan ground, ensure visible ─────────
-    // Halo colour updated to match new ground #E2D7C0.
+    // Halo colour matches ground #DCD0B6.
     for (final id in [
       'label_city', 'label_city_capital',
       'label_town', 'label_village',
@@ -497,7 +499,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#1B1915',
-            textHaloColor: '#E2D7C0',
+            textHaloColor: '#DCD0B6',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -510,7 +512,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#9A9285',
-            textHaloColor: '#E2D7C0',
+            textHaloColor: '#DCD0B6',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -519,7 +521,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     for (final id in ['airport']) {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
-            textHaloColor: '#E2D7C0',
+            textHaloColor: '#DCD0B6',
             textHaloWidth: 1.5,
           ));
     }
