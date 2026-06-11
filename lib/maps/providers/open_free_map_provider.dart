@@ -115,12 +115,16 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
 
     // Apply rawi palette overrides to the base Liberty style before we add
     // our own layers — keeps everything in one initialisation pass.
+    debugPrint('🗺️  [initLayers] 1 — applyStyleOverrides');
     await _applyStyleOverrides(ctrl);
 
     // ── Path casing (Liberty has no native casing for non-bridge paths) ───
     // Adds a hairline outline behind pedestrian paths/footways so they read
-    // clearly against pale park fills.  Uses the openmaptiles vector source
-    // directly with an old-syntax filter for broad MapLibre compatibility.
+    // clearly against pale park fills.  Uses old-style any/== filters instead
+    // of ["in", ...] because NSPredicate(mglJSONObject:) in MapLibre 6.26 can
+    // throw an ObjC exception (not catchable by Swift do-catch) when the
+    // legacy "in" format is used, crashing the app.
+    debugPrint('🗺️  [initLayers] 2 — addLineLayer path-casing');
     await ctrl.addLineLayer(
       'openmaptiles',
       'path-casing',
@@ -132,15 +136,22 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       ),
       belowLayerId: 'road_path_pedestrian',
       sourceLayer: 'transportation',
-      filter: ['in', 'class', 'path', 'pedestrian', 'footway', 'cycleway'],
+      filter: ['any',
+        ['==', 'class', 'path'],
+        ['==', 'class', 'pedestrian'],
+        ['==', 'class', 'footway'],
+        ['==', 'class', 'cycleway'],
+      ],
     );
 
     // The annotation circle layer was already added during manager
     // initialisation (before this callback).  Inserting route lines *below*
     // it means circles always render on top of the route path.
     final circleLayerId = ctrl.circleManager?.layerIds.firstOrNull;
+    debugPrint('🗺️  [initLayers] 3 — circleLayerId=$circleLayerId');
 
     // ── Route sources & layers (below pin circles) ─────────────────────────
+    debugPrint('🗺️  [initLayers] 4 — addGeoJsonSource route-*');
     await ctrl.addGeoJsonSource('route-completed', empty);
     await ctrl.addGeoJsonSource('route-upcoming', empty);
     await ctrl.addGeoJsonSource('route-trail', empty);
@@ -148,6 +159,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     // Add in ascending z-order (trail → completed → upcoming → pulse ring).
     // All go below circleLayerId; each subsequent call pushes just below
     // circleLayerId, so the last added ends up closest to the circles.
+    debugPrint('🗺️  [initLayers] 5 — addLineLayer route-trail');
     await ctrl.addLineLayer(
         'route-trail',
         'route-trail-layer',
@@ -160,6 +172,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         ),
         belowLayerId: circleLayerId);
 
+    debugPrint('🗺️  [initLayers] 6 — addLineLayer route-completed');
     await ctrl.addLineLayer(
         'route-completed',
         'route-completed-layer',
@@ -173,6 +186,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         ),
         belowLayerId: circleLayerId);
 
+    debugPrint('🗺️  [initLayers] 7 — addLineLayer route-upcoming');
     await ctrl.addLineLayer(
         'route-upcoming',
         'route-upcoming-layer',
@@ -186,6 +200,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         belowLayerId: circleLayerId);
 
     // ── Pulse ring for current stop (added last → sits just below circles) ──
+    debugPrint('🗺️  [initLayers] 8 — addCircleLayer pin-pulse');
     await ctrl.addGeoJsonSource('pin-pulse', empty);
     await ctrl.addCircleLayer(
         'pin-pulse',
@@ -198,6 +213,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         belowLayerId: circleLayerId);
 
     // ── User-location source & layers (above circles) ──────────────────────
+    debugPrint('🗺️  [initLayers] 9 — addCircleLayer user-loc');
     await ctrl.addGeoJsonSource('user-loc', empty);
 
     await ctrl.addCircleLayer(
@@ -222,13 +238,15 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     // ── Pin number labels ──────────────────────────────────────────────────
     // Three separate sources so each state gets constant (non-expression)
     // colour and size — avoids fragile iOS color-expression handling.
-    // textFont uses 'Noto Sans Regular' which IS bundled in the OpenFreeMap
+    // textFont uses 'Noto Sans Bold' which IS bundled in the OpenFreeMap
     // liberty style (the annotation SymbolManager hard-codes 'Open Sans
     // Regular' which is absent, causing silent text failures).
+    debugPrint('🗺️  [initLayers] 10 — addGeoJsonSource pin-labels-*');
     await ctrl.addGeoJsonSource('pin-labels-upcoming', empty);
     await ctrl.addGeoJsonSource('pin-labels-current', empty);
     await ctrl.addGeoJsonSource('pin-labels-completed', empty);
 
+    debugPrint('🗺️  [initLayers] 11 — addSymbolLayer pin-labels-upcoming');
     await ctrl.addSymbolLayer(
       'pin-labels-upcoming',
       'pin-labels-upcoming-layer',
@@ -245,6 +263,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       enableInteraction: false,
     );
 
+    debugPrint('🗺️  [initLayers] 12 — addSymbolLayer pin-labels-current');
     await ctrl.addSymbolLayer(
       'pin-labels-current',
       'pin-labels-current-layer',
@@ -261,6 +280,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       enableInteraction: false,
     );
 
+    debugPrint('🗺️  [initLayers] 13 — addSymbolLayer pin-labels-completed');
     await ctrl.addSymbolLayer(
       'pin-labels-completed',
       'pin-labels-completed-layer',
@@ -276,6 +296,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       ),
       enableInteraction: false,
     );
+    debugPrint('🗺️  [initLayers] 14 — DONE');
   }
 
   // ── State mutators called by _OpenFreeMapController ───────────────────────
