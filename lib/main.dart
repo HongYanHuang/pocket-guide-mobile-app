@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -24,14 +25,36 @@ import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
 import 'package:pocket_guide_mobile/widgets/network_image_with_fallback.dart';
 import 'package:pocket_guide_api/pocket_guide_api.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // Initialise notification plugin early so it's ready before tour start.
-  // Only on real devices — skip for web (unsupported).
-  if (!kIsWeb) {
-    await NotificationService.instance.initialize();
-  }
-  runApp(const PocketGuideApp());
+void main() {
+  // Catch ALL uncaught Flutter framework errors (widget build, layout, etc.)
+  // and print a full stack trace so crashes are never silent.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details); // still shows red screen in debug
+    debugPrint('━━━ FlutterError ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    debugPrint(details.exceptionAsString());
+    debugPrint(details.stack.toString());
+    debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  };
+
+  // Catch ALL unhandled async/zone errors (API calls, futures, etc.)
+  // These are the ones that produce a silent white/blank screen otherwise.
+  runZonedGuarded(
+    () async {
+      WidgetsFlutterBinding.ensureInitialized();
+      // Initialise notification plugin early so it's ready before tour start.
+      // Only on real devices — skip for web (unsupported).
+      if (!kIsWeb) {
+        await NotificationService.instance.initialize();
+      }
+      runApp(const PocketGuideApp());
+    },
+    (Object error, StackTrace stack) {
+      debugPrint('━━━ Zone Error ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      debugPrint(error.toString());
+      debugPrint(stack.toString());
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    },
+  );
 }
 
 class PocketGuideApp extends StatelessWidget {
