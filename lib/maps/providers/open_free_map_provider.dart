@@ -351,23 +351,27 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   /// silently skipped via [_trySet].
   Future<void> _applyStyleOverrides(MapLibreMapController ctrl) async {
     // ── Base & land ──────────────────────────────────────────────────────
+    // Ground is now #E2D7C0 (~0.83 luminance) vs roads #FFFFFF (~1.0).
+    // That ~0.17 gap gives white roads clear contrast so they read as bright
+    // ribbons — previously ground was #F6F1E7 (~0.95), almost the same value.
     // BackgroundLayerProperties is absent from maplibre_gl 0.26; use inline
     // implementation — toJson() is all setLayerProperties needs.
     await _trySet(ctrl, 'background',
-        _RawLayerProperties({'background-color': '#F6F1E7'}));
+        _RawLayerProperties({'background-color': '#E2D7C0'}));
 
     await _trySet(ctrl, 'landuse_residential',
-        const FillLayerProperties(fillColor: '#EFE8D8'));
+        const FillLayerProperties(fillColor: '#E2D7C0'));
 
     await _trySet(ctrl, 'landcover_wood',
-        const FillLayerProperties(fillColor: 'hsla(75,18%,72%,0.55)'));
+        const FillLayerProperties(fillColor: 'hsla(75,18%,68%,0.55)'));
 
+    // Parks/grass keep a greenish tint to read as parks, just slightly darker.
     await _trySet(ctrl, 'landcover_grass',
-        const FillLayerProperties(fillColor: '#D8DAC0'));
+        const FillLayerProperties(fillColor: '#CBD2B0'));
 
     await _trySet(ctrl, 'park',
         const FillLayerProperties(
-          fillColor: '#DCDEC4',
+          fillColor: '#CBD2B0',
           fillOutlineColor: 'rgba(58,74,58,0.25)',
         ));
 
@@ -375,17 +379,16 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
         const LineLayerProperties(lineColor: 'rgba(58,74,58,0.18)'));
 
     // ── Water ────────────────────────────────────────────────────────────
-    // Slightly more saturated than previous #C3CBC9 so the river acts as a
-    // visual anchor at low zoom.
+    // Warm slate-blue — clearly distinct from the tan ground.
     await _trySet(ctrl, 'water',
-        const FillLayerProperties(fillColor: '#B6C6CE'));
+        const FillLayerProperties(fillColor: '#AEC3C8'));
 
     for (final id in ['waterway_river', 'waterway_other', 'waterway_tunnel']) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#B3BDBB'));
+          const LineLayerProperties(lineColor: '#A8BBC0'));
     }
 
-    // Water labels — explicit visibility + halo so they read on paper bg.
+    // Water labels — halo matches new ground tone.
     for (final id in [
       'waterway_line_label',
       'water_name_point_label',
@@ -394,15 +397,16 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#6B6459',
-            textHaloColor: '#F6F1E7',
+            textHaloColor: '#E2D7C0',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
     }
 
-    // ── Roads — major fill (white ribbons, high contrast on paper) ───────
+    // ── Roads — major fill (white ribbons on tan ground) ─────────────────
+    // Motorway tinted slightly warm so it reads as "bigger" than plain white.
     await _trySet(ctrl, 'road_motorway',
-        const LineLayerProperties(lineColor: '#E7DEC9'));
+        const LineLayerProperties(lineColor: '#F5EFE0'));
 
     for (final id in [
       'road_trunk_primary', 'road_secondary_tertiary',
@@ -423,12 +427,12 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       'tunnel_minor', 'tunnel_service_track', 'tunnel_path_pedestrian',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#FBF8F1'));
+          const LineLayerProperties(lineColor: '#FFFFFF'));
     }
 
     // ── Roads — casings ──────────────────────────────────────────────────
-    // Major casings darker (0.18) so arterials have a clear edge.
-    // Minor casings at 0.12 — every street needs a defined boundary.
+    // All casings at 0.22 — darker ground means casings need to be bolder
+    // to stay as a clear dark hairline edge against the tan background.
     for (final id in [
       'road_motorway_casing', 'road_trunk_primary_casing',
       'road_secondary_tertiary_casing', 'road_link_casing',
@@ -439,19 +443,13 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       'tunnel_motorway_casing', 'tunnel_trunk_primary_casing',
       'tunnel_secondary_tertiary_casing', 'tunnel_link_casing',
       'tunnel_motorway_link_casing',
-    ]) {
-      await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.18)'));
-    }
-
-    for (final id in [
       'road_minor_casing', 'road_service_track_casing',
       'bridge_street_casing', 'bridge_path_pedestrian_casing',
       'bridge_service_track_casing',
       'tunnel_street_casing', 'tunnel_service_track_casing',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.12)'));
+          const LineLayerProperties(lineColor: 'rgba(27,25,21,0.22)'));
     }
 
     // ── Rail ─────────────────────────────────────────────────────────────
@@ -468,17 +466,19 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     }
 
     // ── Buildings ────────────────────────────────────────────────────────
+    // Slightly darker than ground (#D8CDB8 < #E2D7C0) so footprints read,
+    // but quieter than roads so they don't compete with the street network.
     await _trySet(ctrl, 'building',
         const FillLayerProperties(
-          fillColor: '#EBE3D2',
-          fillOutlineColor: 'rgba(27,25,21,0.10)',
+          fillColor: '#D8CDB8',
+          fillOutlineColor: 'rgba(27,25,21,0.16)',
         ));
 
     // 3D extrusion fades in z16→z17 so below z17 only flat footprints show.
-    // Opacity 0.6 keeps blocks from fighting the walking sheet.
+    // Slightly darker than flat building fill so 3D reads with depth.
     await _trySet(ctrl, 'building-3d',
         FillExtrusionLayerProperties(
-          fillExtrusionColor: '#E7DEC9',
+          fillExtrusionColor: '#D0C4A8',
           fillExtrusionOpacity: [
             'interpolate', ['linear'], ['zoom'],
             16, 0.0,
@@ -486,7 +486,8 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           ],
         ));
 
-    // ── Place & water labels — ink on paper, ensure visible ──────────────
+    // ── Place & water labels — ink on tan ground, ensure visible ─────────
+    // Halo colour updated to match new ground #E2D7C0.
     for (final id in [
       'label_city', 'label_city_capital',
       'label_town', 'label_village',
@@ -496,20 +497,20 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#1B1915',
-            textHaloColor: '#F6F1E7',
+            textHaloColor: '#E2D7C0',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
     }
 
-    // Road name labels — muted ink-4, explicit visibility at all zoom levels.
+    // Road name labels — muted ink-4, halo matches ground.
     for (final id in [
       'highway-name-major', 'highway-name-minor', 'highway-name-path',
     ]) {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#9A9285',
-            textHaloColor: '#F6F1E7',
+            textHaloColor: '#E2D7C0',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -518,7 +519,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     for (final id in ['airport']) {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
-            textHaloColor: '#F6F1E7',
+            textHaloColor: '#E2D7C0',
             textHaloWidth: 1.5,
           ));
     }
