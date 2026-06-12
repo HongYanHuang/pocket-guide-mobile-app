@@ -1519,10 +1519,7 @@ class _MapTourScreenState extends State<MapTourScreen>
 
     if (finish == true && mounted) {
       await ActiveTourService().clearActiveTour();
-      // Use pushNamedAndRemoveUntil instead of pop() so this works whether the
-      // app was cold-started directly into the tour (no screen below) or
-      // entered normally via TourDetailScreen. It also bypasses PopScope
-      // (canPop: false) which would re-trigger this dialog on a plain pop().
+      await BackgroundAudioService.instance.stop();
       if (!mounted) return;
       Navigator.of(context).pushNamedAndRemoveUntil('/home', (_) => false);
     }
