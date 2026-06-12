@@ -215,6 +215,10 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       final accessToken = await _authService.getAccessToken();
       if (accessToken == null) throw Exception('Not authenticated');
 
+      // Map UI values to backend API enum values
+      const paceMap = {'relaxed': 'relaxed', 'balanced': 'normal', 'fast': 'packed'};
+      const walkingMap = {'light': 'light', 'moderate': 'moderate', 'lots': 'intensive'};
+
       final response = await _apiService.generateTour(
         accessToken: accessToken,
         city: _selectedCity!,
@@ -222,8 +226,8 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
         durationMode: _isDayMode ? 'days' : 'hours',
         hoursPerDay: _isDayMode ? null : _hours,
         language: _language,
-        pace: _pace,
-        walking: _walking,
+        pace: paceMap[_pace] ?? _pace,
+        walking: walkingMap[_walking] ?? _walking,
         interests: _interests.isEmpty ? null : _interests,
         mustSee: _mustSeePOIs.isEmpty ? null : _mustSeePOIs,
         startLocation: _startLocationController.text.trim().isEmpty
