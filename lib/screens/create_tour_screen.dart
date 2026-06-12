@@ -5,9 +5,6 @@ import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
-import 'package:pocket_guide_mobile/design_system/components/pg_navigation.dart';
-import 'package:pocket_guide_mobile/design_system/components/pg_button.dart';
-import 'package:pocket_guide_mobile/design_system/components/pg_card.dart';
 import 'package:intl/intl.dart';
 
 class CreateTourScreen extends StatefulWidget {
@@ -84,11 +81,11 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
-            title: Text('Error'),
+            title: const Text('Error'),
             content: Text('Failed to load cities: $e'),
             actions: [
               CupertinoDialogAction(
-                child: Text('OK'),
+                child: const Text('OK'),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -148,11 +145,11 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       showCupertinoDialog(
         context: context,
         builder: (context) => CupertinoAlertDialog(
-          title: Text('Missing Information'),
-          content: Text('Please select a city'),
+          title: const Text('Missing Information'),
+          content: const Text('Please select a city'),
           actions: [
             CupertinoDialogAction(
-              child: Text('OK'),
+              child: const Text('OK'),
               onPressed: () => Navigator.pop(context),
             ),
           ],
@@ -161,23 +158,16 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final accessToken = await _authService.getAccessToken();
-      if (accessToken == null) {
-        throw Exception('Not authenticated');
-      }
+      if (accessToken == null) throw Exception('Not authenticated');
 
-      // Prepare interests
       final selectedInterestsList = _selectedInterests.entries
           .where((e) => e.value)
           .map((e) => e.key)
           .toList();
-
-      print('🚀 Generating tour for $_selectedCity, $_days days');
 
       final response = await _apiService.generateTour(
         accessToken: accessToken,
@@ -199,31 +189,22 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       );
 
       final tourId = response['tour_id'] as String;
-
-      print('✅ Tour generated with ID: $tourId');
-
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
 
       if (mounted) {
         Navigator.of(context).pop(tourId);
       }
     } catch (e) {
-      print('❌ Tour generation failed: $e');
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       if (mounted) {
         showCupertinoDialog(
           context: context,
           builder: (context) => CupertinoAlertDialog(
-            title: Text('Generation Failed'),
+            title: const Text('Generation Failed'),
             content: Text('Failed to generate tour: $e'),
             actions: [
               CupertinoDialogAction(
-                child: Text('OK'),
+                child: const Text('OK'),
                 onPressed: () => Navigator.pop(context),
               ),
             ],
@@ -233,425 +214,526 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     }
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      backgroundColor: PGColors.background,
-      navigationBar: PGNavigationBar(
-        title: 'Create Tour',
-        leading: PGBackButton(),
+      backgroundColor: PGColors.rawiPaper2,
+      navigationBar: CupertinoNavigationBar(
+        backgroundColor: PGColors.rawiPaper2,
+        border: Border(
+          bottom: BorderSide(color: PGColors.rawiHair),
+        ),
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Icon(
+            CupertinoIcons.back,
+            color: PGColors.rawiInk,
+          ),
+        ),
+        middle: Text(
+          'Create Tour',
+          style: PGTypography.headline.copyWith(color: PGColors.rawiInk),
+        ),
       ),
       child: SafeArea(
         child: Stack(
           children: [
             ListView(
-              padding: PGSpacing.screen,
+              padding: EdgeInsets.symmetric(
+                horizontal: PGSpacing.l,
+                vertical: PGSpacing.l,
+              ),
               children: [
-                SizedBox(height: PGSpacing.l),
+                // ── Destination ──────────────────────────────────────────
+                _buildSectionHeader('Destination'),
+                const SizedBox(height: 10),
+                _buildDestinationDropdown(),
+                SizedBox(height: PGSpacing.xxl),
 
-                // City Selection
-                _buildSectionTitle('Destination'),
-                SizedBox(height: PGSpacing.m),
-                CupertinoButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () => _showCityPicker(),
-                  child: Container(
-                    padding: PGSpacing.paddingL,
-                    decoration: BoxDecoration(
-                      color: PGColors.surface,
-                      borderRadius: PGRadius.radiusM,
-                      border: Border.all(color: PGColors.border),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _selectedCity ?? 'Select a city',
-                          style: PGTypography.body.copyWith(
-                            color: _selectedCity != null
-                                ? PGColors.textPrimary
-                                : PGColors.textSecondary,
-                          ),
-                        ),
-                        Icon(
-                          CupertinoIcons.chevron_down,
-                          size: 20,
-                          color: PGColors.textSecondary,
-                        ),
-                      ],
-                    ),
-                  ),
+                // ── Duration & Date ──────────────────────────────────────
+                _buildSectionHeader('Duration & Date'),
+                const SizedBox(height: 10),
+                _buildDurationDateRow(),
+                SizedBox(height: PGSpacing.xxl),
+
+                // ── Interests ────────────────────────────────────────────
+                _buildSectionHeader('Interests'),
+                const SizedBox(height: 10),
+                _buildInterestChips(),
+                SizedBox(height: PGSpacing.xxl),
+
+                // ── Preferences ──────────────────────────────────────────
+                _buildSectionHeader('Preferences'),
+                const SizedBox(height: 10),
+                _buildSegmentCard(
+                  label: 'Pace',
+                  currentValue: _pace,
+                  options: const {
+                    'relaxed': 'Relaxed',
+                    'normal': 'Normal',
+                    'fast': 'Fast',
+                  },
+                  onChanged: (v) => setState(() => _pace = v),
+                ),
+                const SizedBox(height: 10),
+                _buildSegmentCard(
+                  label: 'Walking',
+                  currentValue: _walking,
+                  options: const {
+                    'light': 'Light',
+                    'moderate': 'Moderate',
+                    'intensive': 'Intensive',
+                  },
+                  onChanged: (v) => setState(() => _walking = v),
                 ),
                 SizedBox(height: PGSpacing.xxl),
 
-                // Duration & Start Date
-                _buildSectionTitle('Duration & Date'),
-                SizedBox(height: PGSpacing.m),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: PGSpacing.paddingL,
-                        decoration: BoxDecoration(
-                          color: PGColors.surface,
-                          borderRadius: PGRadius.radiusM,
-                          border: Border.all(color: PGColors.border),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Days', style: PGTypography.caption1),
-                            SizedBox(height: PGSpacing.xs),
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () => _showDaysPicker(),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    _days.toString(),
-                                    style: PGTypography.headline,
-                                  ),
-                                  SizedBox(width: PGSpacing.xs),
-                                  Icon(
-                                    CupertinoIcons.chevron_down,
-                                    size: 16,
-                                    color: PGColors.textSecondary,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: PGSpacing.m),
-                    Expanded(
-                      child: CupertinoButton(
-                        padding: EdgeInsets.zero,
-                        onPressed: () => _selectDate(context),
-                        child: Container(
-                          padding: PGSpacing.paddingL,
-                          decoration: BoxDecoration(
-                            color: PGColors.surface,
-                            borderRadius: PGRadius.radiusM,
-                            border: Border.all(color: PGColors.border),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Start Date', style: PGTypography.caption1),
-                              SizedBox(height: PGSpacing.xs),
-                              Text(
-                                DateFormat('MMM d, y').format(_startDate),
-                                style: PGTypography.body,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: PGSpacing.xxl),
-
-                // Interests
-                _buildSectionTitle('Interests'),
-                SizedBox(height: PGSpacing.m),
-                Wrap(
-                  spacing: PGSpacing.s,
-                  runSpacing: PGSpacing.s,
-                  children: _selectedInterests.keys.map((interest) {
-                    final isSelected = _selectedInterests[interest]!;
-                    return CupertinoButton(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: PGSpacing.l,
-                        vertical: PGSpacing.s,
-                      ),
-                      color: isSelected ? PGColors.brand : PGColors.surface,
-                      borderRadius: BorderRadius.circular(PGRadius.l),
-                      minSize: 0,
-                      onPressed: () {
-                        setState(() {
-                          _selectedInterests[interest] =
-                              !_selectedInterests[interest]!;
-                        });
-                      },
-                      child: Text(
-                        interest,
-                        style: PGTypography.callout.copyWith(
-                          color: isSelected ? PGColors.white : PGColors.textPrimary,
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                SizedBox(height: PGSpacing.xxl),
-
-                // Pace & Walking
-                _buildSectionTitle('Preferences'),
-                SizedBox(height: PGSpacing.m),
-                _buildPreferenceRow('Pace', _pace, {
-                  'relaxed': 'Relaxed',
-                  'normal': 'Normal',
-                  'fast': 'Fast',
-                }, (value) {
-                  setState(() => _pace = value);
-                }),
-                SizedBox(height: PGSpacing.m),
-                _buildPreferenceRow('Walking', _walking, {
-                  'light': 'Light',
-                  'moderate': 'Moderate',
-                  'intensive': 'Intensive',
-                }, (value) {
-                  setState(() => _walking = value);
-                }),
-                SizedBox(height: PGSpacing.xxl),
-
-                // Must-see POIs
-                _buildSectionTitle('Must-See Places (Optional)'),
-                SizedBox(height: PGSpacing.m),
-                Row(
-                  children: [
-                    Expanded(
-                      child: CupertinoTextField(
-                        controller: _mustSeeController,
-                        placeholder: 'Enter a place name',
-                        padding: PGSpacing.paddingL,
-                        decoration: BoxDecoration(
-                          color: PGColors.surface,
-                          borderRadius: PGRadius.radiusM,
-                          border: Border.all(color: PGColors.border),
-                        ),
-                        style: PGTypography.body,
-                      ),
-                    ),
-                    SizedBox(width: PGSpacing.m),
-                    CupertinoButton(
-                      padding: PGSpacing.paddingL,
-                      color: PGColors.brand,
-                      borderRadius: BorderRadius.circular(PGRadius.m),
-                      minSize: 0,
-                      onPressed: _addMustSeePOI,
-                      child: Icon(CupertinoIcons.add, color: PGColors.white),
-                    ),
-                  ],
-                ),
+                // ── Must-See Places ───────────────────────────────────────
+                _buildSectionHeader('Must-See Places (Optional)'),
+                const SizedBox(height: 10),
+                _buildMustSeeRow(),
                 if (_mustSeePOIs.isNotEmpty) ...[
-                  SizedBox(height: PGSpacing.m),
-                  Wrap(
-                    spacing: PGSpacing.s,
-                    runSpacing: PGSpacing.s,
-                    children: _mustSeePOIs.map((poi) {
-                      return Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: PGSpacing.m,
-                          vertical: PGSpacing.s,
-                        ),
-                        decoration: BoxDecoration(
-                          color: PGColors.gray100,
-                          borderRadius: BorderRadius.circular(PGRadius.s),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(poi, style: PGTypography.callout),
-                            SizedBox(width: PGSpacing.s),
-                            CupertinoButton(
-                              padding: EdgeInsets.zero,
-                              minSize: 0,
-                              onPressed: () => _removeMustSeePOI(poi),
-                              child: Icon(
-                                CupertinoIcons.xmark_circle_fill,
-                                size: 18,
-                                color: PGColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                  const SizedBox(height: 10),
+                  _buildMustSeeTags(),
                 ],
                 SizedBox(height: PGSpacing.xxl),
 
-                // Start/End Location
-                _buildSectionTitle('Start Location (Optional)'),
-                SizedBox(height: PGSpacing.m),
-                CupertinoTextField(
+                // ── Start Location ───────────────────────────────────────
+                _buildSectionHeader('Start Location (Optional)'),
+                const SizedBox(height: 10),
+                _buildTextField(
                   controller: _startLocationController,
                   placeholder: 'e.g., Hotel name or address',
-                  padding: PGSpacing.paddingL,
-                  decoration: BoxDecoration(
-                    color: PGColors.surface,
-                    borderRadius: PGRadius.radiusM,
-                    border: Border.all(color: PGColors.border),
-                  ),
-                  style: PGTypography.body,
                 ),
-                SizedBox(height: PGSpacing.l),
-                Row(
-                  children: [
-                    CupertinoSwitch(
-                      value: _useDifferentEndLocation,
-                      activeColor: PGColors.brand,
-                      onChanged: (value) {
-                        setState(() => _useDifferentEndLocation = value);
-                      },
-                    ),
-                    SizedBox(width: PGSpacing.m),
-                    Text(
-                      'Different end location',
-                      style: PGTypography.body,
-                    ),
-                  ],
-                ),
+                const SizedBox(height: 14),
+                _buildDifferentEndToggle(),
                 if (_useDifferentEndLocation) ...[
-                  SizedBox(height: PGSpacing.m),
-                  CupertinoTextField(
+                  const SizedBox(height: 10),
+                  _buildTextField(
                     controller: _endLocationController,
                     placeholder: 'End location',
-                    padding: PGSpacing.paddingL,
-                    decoration: BoxDecoration(
-                      color: PGColors.surface,
-                      borderRadius: PGRadius.radiusM,
-                      border: Border.all(color: PGColors.border),
-                    ),
-                    style: PGTypography.body,
                   ),
                 ],
                 SizedBox(height: PGSpacing.xxl * 2),
 
-                // Generate Button
-                PGButton(
-                  text: 'Generate Tour',
-                  icon: CupertinoIcons.sparkles,
-                  onPressed: _generateTour,
-                  isFullWidth: true,
-                  size: PGButtonSize.large,
-                ),
+                // ── Generate button ──────────────────────────────────────
+                _buildGenerateButton(),
                 SizedBox(height: PGSpacing.xxl),
               ],
             ),
 
             // Loading overlay
-            if (_isLoading)
-              Container(
-                color: PGColors.black.withOpacity(0.5),
-                child: Center(
-                  child: Container(
-                    padding: PGSpacing.paddingXL,
-                    decoration: BoxDecoration(
-                      color: PGColors.surface,
-                      borderRadius: PGRadius.radiusL,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CupertinoActivityIndicator(
-                          radius: 20,
-                          color: PGColors.brand,
-                        ),
-                        SizedBox(height: PGSpacing.l),
-                        Text(
-                          'Generating your tour...',
-                          style: PGTypography.headline,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            if (_isLoading) _buildLoadingOverlay(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  // ── Section components ─────────────────────────────────────────────────────
+
+  Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: PGTypography.title3,
+      style: PGTypography.title3.copyWith(
+        color: PGColors.rawiInk,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
-  Widget _buildPreferenceRow(
-    String label,
-    String currentValue,
-    Map<String, String> options,
-    Function(String) onChanged,
-  ) {
-    return Container(
-      padding: PGSpacing.paddingL,
-      decoration: BoxDecoration(
-        color: PGColors.surface,
-        borderRadius: PGRadius.radiusM,
-        border: Border.all(color: PGColors.border),
+  Widget _buildDestinationDropdown() {
+    return GestureDetector(
+      onTap: _showCityPicker,
+      child: _card(
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                _selectedCity ?? 'Select a city',
+                style: PGTypography.body.copyWith(
+                  color: _selectedCity != null
+                      ? PGColors.rawiInk
+                      : PGColors.rawiInk4,
+                ),
+              ),
+            ),
+            const Icon(
+              CupertinoIcons.chevron_down,
+              size: 18,
+              color: PGColors.rawiInk3,
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildDurationDateRow() {
+    return Row(
+      children: [
+        // Days
+        Expanded(
+          child: GestureDetector(
+            onTap: _showDaysPicker,
+            child: _card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Days',
+                    style: PGTypography.caption1.copyWith(
+                      color: PGColors.rawiInk3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$_days',
+                        style: PGTypography.body.copyWith(
+                          color: PGColors.rawiInk,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        CupertinoIcons.chevron_down,
+                        size: 14,
+                        color: PGColors.rawiInk3,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Start Date
+        Expanded(
+          child: GestureDetector(
+            onTap: () => _selectDate(context),
+            child: _card(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Start Date',
+                    style: PGTypography.caption1.copyWith(
+                      color: PGColors.rawiInk3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    DateFormat('MMM d, yyyy').format(_startDate),
+                    style: PGTypography.body.copyWith(
+                      color: PGColors.rawiInk,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInterestChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _selectedInterests.keys.map((interest) {
+        final selected = _selectedInterests[interest]!;
+        return GestureDetector(
+          onTap: () => setState(
+            () => _selectedInterests[interest] = !selected,
+          ),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? PGColors.rawiAccent : PGColors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected
+                    ? PGColors.rawiAccent
+                    : PGColors.rawiHair,
+              ),
+            ),
+            child: Text(
+              interest,
+              style: PGTypography.callout.copyWith(
+                color: selected ? PGColors.white : PGColors.rawiInk,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildSegmentCard({
+    required String label,
+    required String currentValue,
+    required Map<String, String> options,
+    required void Function(String) onChanged,
+  }) {
+    return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: PGTypography.caption1),
-          SizedBox(height: PGSpacing.s),
+          Text(
+            label,
+            style: PGTypography.caption1.copyWith(color: PGColors.rawiInk3),
+          ),
+          const SizedBox(height: 10),
           CupertinoSlidingSegmentedControl<String>(
             groupValue: currentValue,
+            thumbColor: PGColors.rawiAccent,
+            backgroundColor: PGColors.rawiPaper3,
             children: options.map(
               (key, value) => MapEntry(
                 key,
                 Padding(
-                  padding: EdgeInsets.symmetric(vertical: PGSpacing.s),
-                  child: Text(value, style: PGTypography.callout),
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    value,
+                    style: PGTypography.callout.copyWith(
+                      color: currentValue == key
+                          ? PGColors.white
+                          : PGColors.rawiInk,
+                      fontWeight: currentValue == key
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    ),
+                  ),
                 ),
               ),
             ),
-            onValueChanged: (value) {
-              if (value != null) onChanged(value);
+            onValueChanged: (v) {
+              if (v != null) onChanged(v);
             },
-            thumbColor: PGColors.brand,
-            backgroundColor: PGColors.gray100,
           ),
         ],
       ),
     );
   }
 
+  Widget _buildMustSeeRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildTextField(
+            controller: _mustSeeController,
+            placeholder: 'Enter a place name',
+            onSubmitted: (_) => _addMustSeePOI(),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: _addMustSeePOI,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: PGColors.rawiAccent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              CupertinoIcons.add,
+              color: PGColors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMustSeeTags() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _mustSeePOIs.map((poi) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: PGColors.rawiPaper3,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: PGColors.rawiHair),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                poi,
+                style: PGTypography.callout.copyWith(color: PGColors.rawiInk),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _removeMustSeePOI(poi),
+                child: const Icon(
+                  CupertinoIcons.xmark_circle_fill,
+                  size: 16,
+                  color: PGColors.rawiInk3,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDifferentEndToggle() {
+    return Row(
+      children: [
+        CupertinoSwitch(
+          value: _useDifferentEndLocation,
+          activeTrackColor: PGColors.rawiAccent,
+          onChanged: (v) => setState(() => _useDifferentEndLocation = v),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          'Different end location',
+          style: PGTypography.body.copyWith(color: PGColors.rawiInk),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGenerateButton() {
+    return GestureDetector(
+      onTap: _isLoading ? null : _generateTour,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: PGColors.rawiAccent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(CupertinoIcons.sparkles, color: PGColors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              'Generate Tour',
+              style: PGTypography.body.copyWith(
+                color: PGColors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingOverlay() {
+    return Container(
+      color: PGColors.rawiInk.withValues(alpha: 0.45),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+          decoration: BoxDecoration(
+            color: PGColors.white,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CupertinoActivityIndicator(
+                radius: 16,
+                color: PGColors.rawiAccent,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Generating your tour...',
+                style: PGTypography.body.copyWith(
+                  color: PGColors.rawiInk,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Shared card shell ──────────────────────────────────────────────────────
+
+  Widget _card({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: PGColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PGColors.rawiHair),
+      ),
+      child: child,
+    );
+  }
+
+  // ── Shared text field ──────────────────────────────────────────────────────
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String placeholder,
+    void Function(String)? onSubmitted,
+  }) {
+    return CupertinoTextField(
+      controller: controller,
+      placeholder: placeholder,
+      onSubmitted: onSubmitted,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      style: PGTypography.body.copyWith(color: PGColors.rawiInk),
+      placeholderStyle: PGTypography.body.copyWith(color: PGColors.rawiInk4),
+      decoration: BoxDecoration(
+        color: PGColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PGColors.rawiHair),
+      ),
+    );
+  }
+
+  // ── Pickers ────────────────────────────────────────────────────────────────
+
   void _showCityPicker() {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => Container(
-        height: 250,
-        color: PGColors.background,
+        height: 260,
+        color: PGColors.rawiPaper2,
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CupertinoButton(
-                  child: Text('Cancel'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                CupertinoButton(
-                  child: Text('Done'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
+            _buildPickerToolbar(context),
             Expanded(
               child: CupertinoPicker(
                 itemExtent: 40,
-                onSelectedItemChanged: (index) {
-                  setState(() {
-                    _selectedCity = _cities[index];
-                  });
-                },
+                onSelectedItemChanged: (i) =>
+                    setState(() => _selectedCity = _cities[i]),
                 scrollController: FixedExtentScrollController(
                   initialItem: _selectedCity != null
                       ? _cities.indexOf(_selectedCity!)
                       : 0,
                 ),
                 children: _cities
-                    .map((city) => Center(
-                          child: Text(city, style: PGTypography.body),
+                    .map((c) => Center(
+                          child: Text(c,
+                              style: PGTypography.body
+                                  .copyWith(color: PGColors.rawiInk)),
                         ))
                     .toList(),
               ),
@@ -666,40 +748,25 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     showCupertinoModalPopup(
       context: context,
       builder: (context) => Container(
-        height: 250,
-        color: PGColors.background,
+        height: 260,
+        color: PGColors.rawiPaper2,
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CupertinoButton(
-                  child: Text('Cancel'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                CupertinoButton(
-                  child: Text('Done'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
+            _buildPickerToolbar(context),
             Expanded(
               child: CupertinoPicker(
                 itemExtent: 40,
-                onSelectedItemChanged: (index) {
-                  setState(() {
-                    _days = index + 1;
-                  });
-                },
-                scrollController: FixedExtentScrollController(
-                  initialItem: _days - 1,
-                ),
+                onSelectedItemChanged: (i) =>
+                    setState(() => _days = i + 1),
+                scrollController:
+                    FixedExtentScrollController(initialItem: _days - 1),
                 children: List.generate(
                   14,
-                  (index) => Center(
+                  (i) => Center(
                     child: Text(
-                      '${index + 1} ${(index + 1) == 1 ? 'day' : 'days'}',
-                      style: PGTypography.body,
+                      '${i + 1} ${i == 0 ? 'day' : 'days'}',
+                      style: PGTypography.body
+                          .copyWith(color: PGColors.rawiInk),
                     ),
                   ),
                 ),
@@ -710,4 +777,31 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       ),
     );
   }
+
+  Widget _buildPickerToolbar(BuildContext ctx) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: PGColors.rawiHair)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          CupertinoButton(
+            child:
+                Text('Cancel', style: TextStyle(color: PGColors.rawiInk3)),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          CupertinoButton(
+            child: Text('Done',
+                style: TextStyle(
+                    color: PGColors.rawiAccent,
+                    fontWeight: FontWeight.w600)),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
