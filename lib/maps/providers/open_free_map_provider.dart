@@ -128,9 +128,10 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     await ctrl.addLineLayer(
       'openmaptiles',
       'path-casing',
-      const LineLayerProperties(
-        lineColor: 'rgba(27,25,21,0.14)',
-        lineWidth: 3.0,
+      LineLayerProperties(
+        lineColor: '#3C3730',
+        lineWidth: ['interpolate', ['linear'], ['zoom'],
+          12, 0.8,  14, 1.6,  16, 3.0,  18, 5.5],
         lineCap: 'round',
         lineJoin: 'round',
       ),
@@ -351,18 +352,19 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
   /// silently skipped via [_trySet].
   Future<void> _applyStyleOverrides(MapLibreMapController ctrl) async {
     // ── Base & land ──────────────────────────────────────────────────────
-    // Ground #DCD0B6 (~0.79 luminance) vs roads #FFFFFF (~1.0).
-    // The ~0.21 gap gives white roads strong contrast as bright ribbons.
+    // Ground #EFE8D8 (paper) — single consistent tone at all zooms.
+    // landuse_residential matches background exactly so it never "pops in"
+    // as a colour band when zooming through z12–16.
     // BackgroundLayerProperties is absent from maplibre_gl 0.26; use inline
     // implementation — toJson() is all setLayerProperties needs.
     await _trySet(ctrl, 'background',
-        _RawLayerProperties({'background-color': '#DCD0B6'}));
+        _RawLayerProperties({'background-color': '#EFE8D8'}));
 
     await _trySet(ctrl, 'landuse_residential',
-        const FillLayerProperties(fillColor: '#DCD0B6'));
+        const FillLayerProperties(fillColor: '#EFE8D8'));
 
     await _trySet(ctrl, 'landcover_wood',
-        const FillLayerProperties(fillColor: 'hsla(75,18%,68%,0.55)'));
+        const FillLayerProperties(fillColor: '#C2CBA6'));
 
     // Parks/grass keep a greenish tint to read as parks, just slightly darker.
     await _trySet(ctrl, 'landcover_grass',
@@ -387,7 +389,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
           const LineLayerProperties(lineColor: '#A8BBC0'));
     }
 
-    // Water labels — halo matches ground #DCD0B6.
+    // Water labels — halo matches paper ground #EFE8D8.
     for (final id in [
       'waterway_line_label',
       'water_name_point_label',
@@ -396,67 +398,170 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#6B6459',
-            textHaloColor: '#DCD0B6',
+            textHaloColor: '#EFE8D8',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
     }
 
-    // ── Roads — major fill (white ribbons on tan ground) ─────────────────
-    // Motorway tinted slightly warm so it reads as "bigger" than plain white.
+    // ── Roads — fills & casings (zoom-interpolated widths) ───────────────
+    // Invariant: casing_width > fill_width at EVERY zoom stop so the road
+    // never loses its dark ink edge — the sole readability guarantee at
+    // walking zoom (z13–17) where minor roads previously vanished.
+    //
+    // Each group sets fill + casing together so the relationship is obvious.
+    // Casings use solid #3C3730; fills use white (#FFFFFF / warm #F5EFE0).
+
+    // — Motorway —
     await _trySet(ctrl, 'road_motorway',
-        const LineLayerProperties(lineColor: '#F5EFE0'));
-
+        LineLayerProperties(
+          lineColor: '#F5EFE0',
+          lineWidth: ['interpolate', ['linear'], ['zoom'],
+            8, 0.6,  12, 2.4,  15, 6.0,  18, 15.0],
+          lineCap: 'round', lineJoin: 'round',
+        ));
+    for (final id in ['bridge_motorway', 'tunnel_motorway']) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              8, 0.6,  12, 2.4,  15, 6.0,  18, 15.0],
+            lineCap: 'round', lineJoin: 'round',
+          ));
+    }
     for (final id in [
-      'road_trunk_primary', 'road_secondary_tertiary',
+      'road_motorway_casing', 'bridge_motorway_casing', 'tunnel_motorway_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#3C3730',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              8, 1.5,  12, 4.0,  15, 8.0,  18, 18.0],
+          ));
+    }
+
+    // — Primary / trunk —
+    for (final id in [
+      'road_trunk_primary', 'bridge_trunk_primary', 'tunnel_trunk_primary',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              8, 0.6,  12, 2.4,  15, 6.0,  18, 15.0],
+            lineCap: 'round', lineJoin: 'round',
+          ));
+    }
+    for (final id in [
+      'road_trunk_primary_casing',
+      'bridge_trunk_primary_casing', 'tunnel_trunk_primary_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#3C3730',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              8, 1.5,  12, 4.0,  15, 8.0,  18, 18.0],
+          ));
+    }
+
+    // — Secondary / tertiary —
+    for (final id in [
+      'road_secondary_tertiary',
+      'bridge_secondary_tertiary', 'tunnel_secondary_tertiary',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              9, 0.4,  12, 1.6,  15, 4.0,  18, 11.0],
+            lineCap: 'round', lineJoin: 'round',
+          ));
+    }
+    for (final id in [
+      'road_secondary_tertiary_casing',
+      'bridge_secondary_tertiary_casing', 'tunnel_secondary_tertiary_casing',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#3C3730',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              9, 1.2,  12, 3.0,  15, 6.0,  18, 14.0],
+          ));
+    }
+
+    // — Link roads —
+    for (final id in [
       'road_link', 'road_motorway_link',
-      'bridge_trunk_primary', 'bridge_secondary_tertiary',
-      'bridge_link', 'bridge_motorway', 'bridge_motorway_link',
-      'tunnel_trunk_primary', 'tunnel_secondary_tertiary',
-      'tunnel_link', 'tunnel_motorway', 'tunnel_motorway_link',
+      'bridge_link', 'bridge_motorway_link',
+      'tunnel_link', 'tunnel_motorway_link',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#FFFFFF'));
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              9, 0.4,  12, 1.6,  15, 4.0,  18, 11.0],
+            lineCap: 'round', lineJoin: 'round',
+          ));
     }
-
-    // ── Roads — minor fill ───────────────────────────────────────────────
     for (final id in [
-      'road_minor', 'road_service_track', 'road_path_pedestrian',
-      'bridge_street', 'bridge_service_track', 'bridge_path_pedestrian',
-      'tunnel_minor', 'tunnel_service_track', 'tunnel_path_pedestrian',
+      'road_link_casing', 'road_motorway_link_casing',
+      'bridge_link_casing', 'bridge_motorway_link_casing',
+      'tunnel_link_casing', 'tunnel_motorway_link_casing',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#FFFFFF'));
+          LineLayerProperties(
+            lineColor: '#3C3730',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              9, 1.2,  12, 3.0,  15, 6.0,  18, 14.0],
+          ));
     }
 
-    // ── Roads — casings ──────────────────────────────────────────────────
-    // Solid near-black #3C3730 casings: dark enough to frame white fills
-    // against the tan ground without the casing disappearing at opacity.
-    // Major roads get 2 px casing each side; minor roads get 1.5 px.
+    // — Minor / service (KEY FIX: casing now visible from z11) —
     for (final id in [
-      'road_motorway_casing', 'road_trunk_primary_casing',
-      'road_secondary_tertiary_casing', 'road_link_casing',
-      'road_motorway_link_casing',
-      'bridge_motorway_casing', 'bridge_trunk_primary_casing',
-      'bridge_secondary_tertiary_casing', 'bridge_link_casing',
-      'bridge_motorway_link_casing',
-      'tunnel_motorway_casing', 'tunnel_trunk_primary_casing',
-      'tunnel_secondary_tertiary_casing', 'tunnel_link_casing',
-      'tunnel_motorway_link_casing',
+      'road_minor', 'road_service_track',
+      'bridge_street', 'bridge_service_track',
+      'tunnel_minor', 'tunnel_service_track',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#3C3730', lineWidth: 2.0));
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              11, 0.2,  13, 0.8,  15, 2.0,  17, 4.5,  19, 8.5],
+            lineCap: 'round', lineJoin: 'round',
+          ));
     }
-
     for (final id in [
       'road_minor_casing', 'road_service_track_casing',
-      'bridge_street_casing', 'bridge_path_pedestrian_casing',
-      'bridge_service_track_casing',
+      'bridge_street_casing', 'bridge_service_track_casing',
       'tunnel_street_casing', 'tunnel_service_track_casing',
     ]) {
       await _trySet(ctrl, id,
-          const LineLayerProperties(lineColor: '#3C3730', lineWidth: 1.5));
+          LineLayerProperties(
+            lineColor: '#3C3730',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              11, 1.0,  13, 2.0,  15, 4.0,  17, 7.0,  19, 12.0],
+          ));
     }
+
+    // — Path / pedestrian (non-bridge casing = custom path-casing layer) —
+    for (final id in [
+      'road_path_pedestrian',
+      'bridge_path_pedestrian', 'tunnel_path_pedestrian',
+    ]) {
+      await _trySet(ctrl, id,
+          LineLayerProperties(
+            lineColor: '#FFFFFF',
+            lineWidth: ['interpolate', ['linear'], ['zoom'],
+              12, 0.2,  14, 0.7,  16, 1.8,  18, 3.5],
+            lineCap: 'round', lineJoin: 'round',
+          ));
+    }
+    await _trySet(ctrl, 'bridge_path_pedestrian_casing',
+        LineLayerProperties(
+          lineColor: '#3C3730',
+          lineWidth: ['interpolate', ['linear'], ['zoom'],
+            12, 0.8,  14, 1.6,  16, 3.0,  18, 5.5],
+        ));
 
     // ── Rail ─────────────────────────────────────────────────────────────
     for (final id in [
@@ -472,24 +577,25 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     }
 
     // ── Buildings ────────────────────────────────────────────────────────
-    // Slightly darker than ground (#D2C6AE < #DCD0B6) so footprints read,
-    // but quieter than roads so they don't compete with the street network.
-    // Outline uses #3C3730 at ~25% alpha (hex AA = 0x40).
+    // #E4DAC6 — slightly darker than ground (#EFE8D8) so footprints read,
+    // but lighter than roads so they never compete with the street network.
+    // Same colour for both 2D and 3D layers so buildings don't shift tone
+    // when extruding at high zoom.
+    // Outline: #3C3730 at ~22% alpha (hex 38 ≈ 0.22).
     await _trySet(ctrl, 'building',
         const FillLayerProperties(
-          fillColor: '#D2C6AE',
-          fillOutlineColor: '#3C373040',
+          fillColor: '#E4DAC6',
+          fillOutlineColor: '#3C373038',
         ));
 
-    // 3D extrusion at fixed 0.65 opacity — consistent depth without fading.
     await _trySet(ctrl, 'building-3d',
         const FillExtrusionLayerProperties(
-          fillExtrusionColor: '#D2C6AE',
-          fillExtrusionOpacity: 0.65,
+          fillExtrusionColor: '#E4DAC6',
+          fillExtrusionOpacity: 0.7,
         ));
 
-    // ── Place & water labels — ink on tan ground, ensure visible ─────────
-    // Halo colour matches ground #DCD0B6.
+    // ── Place & water labels — ink on paper ground, ensure visible ───────
+    // Halo colour matches paper ground #EFE8D8.
     for (final id in [
       'label_city', 'label_city_capital',
       'label_town', 'label_village',
@@ -499,7 +605,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#1B1915',
-            textHaloColor: '#DCD0B6',
+            textHaloColor: '#EFE8D8',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -512,7 +618,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
             textColor: '#9A9285',
-            textHaloColor: '#DCD0B6',
+            textHaloColor: '#EFE8D8',
             textHaloWidth: 1.5,
           ));
       try { await ctrl.setLayerVisibility(id, true); } catch (_) {}
@@ -521,7 +627,7 @@ class _OpenFreeMapViewState extends State<_OpenFreeMapView> {
     for (final id in ['airport']) {
       await _trySet(ctrl, id,
           const SymbolLayerProperties(
-            textHaloColor: '#DCD0B6',
+            textHaloColor: '#EFE8D8',
             textHaloWidth: 1.5,
           ));
     }
