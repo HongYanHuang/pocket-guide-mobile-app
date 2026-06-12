@@ -21,7 +21,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
   String? _selectedCity;
   // Duration: starts in hours mode at 4 h.
   // Hours mode: 2–8 h. Pressing + on 8 h switches to 1 day.
-  // Days mode: 1–14 d. Pressing − on 1 day switches back to 8 h.
+  // Days mode: 1–4 d. Pressing − on 1 day switches back to 8 h.
   bool _isDayMode = false;
   int _hours = 4;
   int _days = 1;
@@ -648,7 +648,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                     GestureDetector(
                       onTap: () => setState(() {
                         if (_isDayMode) {
-                          if (_days < 14) _days++;
+                          if (_days < 4) _days++;
                         } else {
                           if (_hours < 8) {
                             _hours++;
