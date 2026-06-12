@@ -1,5 +1,6 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/cupertino.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
@@ -252,6 +253,20 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     }
   }
 
+  // ── Text style helpers (Source Sans 3 to match design font) ───────────────
+
+  TextStyle get _fieldText => GoogleFonts.sourceSans3(
+        fontSize: 15,
+        color: PGColors.rawiInk,
+        decoration: TextDecoration.none,
+      );
+
+  TextStyle get _fieldPlaceholder => GoogleFonts.sourceSans3(
+        fontSize: 15,
+        color: PGColors.rawiInk4,
+        decoration: TextDecoration.none,
+      );
+
   // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
@@ -259,7 +274,11 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
     final bottomPad = MediaQuery.of(context).padding.bottom;
     return CupertinoPageScaffold(
       backgroundColor: PGColors.rawiPaper,
-      child: Stack(
+      child: DefaultTextStyle.merge(
+        style: GoogleFonts.sourceSans3(
+          decoration: TextDecoration.none,
+        ),
+        child: Stack(
         children: [
           Column(
             children: [
@@ -388,6 +407,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
               color: PGColors.rawiInk.withValues(alpha: 0.35),
             ),
         ],
+        ),
       ),
     );
   }
@@ -725,14 +745,8 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                   controller: _customDraftController,
                   placeholder:
                       'e.g. "Caesar", "hidden courtyards"…',
-                  placeholderStyle: const TextStyle(
-                    fontSize: 15,
-                    color: PGColors.rawiInk4,
-                  ),
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: PGColors.rawiInk,
-                  ),
+                  placeholderStyle: _fieldPlaceholder,
+                  style: _fieldText,
                   padding:
                       const EdgeInsets.symmetric(vertical: 9),
                   onSubmitted: (_) => _addInterest(
@@ -1029,12 +1043,8 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
               child: CupertinoTextField(
                 controller: _mustDraftController,
                 placeholder: 'e.g. Trevi Fountain',
-                placeholderStyle: const TextStyle(
-                  fontSize: 15,
-                  color: PGColors.rawiInk4,
-                ),
-                style: const TextStyle(
-                    fontSize: 15, color: PGColors.rawiInk),
+                placeholderStyle: _fieldPlaceholder,
+                style: _fieldText,
                 padding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 13),
                 onSubmitted: (_) => _addMustSeePOI(),
@@ -1182,12 +1192,8 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
             child: CupertinoTextField(
               controller: controller,
               placeholder: placeholder,
-              placeholderStyle: const TextStyle(
-                fontSize: 15,
-                color: PGColors.rawiInk4,
-              ),
-              style: const TextStyle(
-                  fontSize: 15, color: PGColors.rawiInk),
+              placeholderStyle: _fieldPlaceholder,
+              style: _fieldText,
               padding: const EdgeInsets.symmetric(
                   vertical: 13),
               decoration: null,
