@@ -562,12 +562,16 @@ class ApiService {
     String? startLocation,
     String? endLocation,
     String? startDate,
+    String? durationMode,
+    int? hoursPerDay,
   }) async {
     try {
       print('🎨 Generating tour: $city, $days days');
       print('   Request payload:');
       print('     - city: $city');
       print('     - days: $days');
+      print('     - duration_mode: ${durationMode ?? 'days'}');
+      if (hoursPerDay != null) print('     - hours_per_day: $hoursPerDay');
       print('     - interests: $interests');
       print('     - must_see: $mustSee');
       print('     - pace: ${pace ?? 'normal'}');
@@ -585,6 +589,8 @@ class ApiService {
         data: {
           'city': city,
           'days': days,
+          if (durationMode != null) 'duration_mode': durationMode,
+          if (hoursPerDay != null) 'hours_per_day': hoursPerDay,
           if (interests != null && interests.isNotEmpty) 'interests': interests,
           if (mustSee != null && mustSee.isNotEmpty) 'must_see': mustSee,
           'pace': pace ?? 'normal',

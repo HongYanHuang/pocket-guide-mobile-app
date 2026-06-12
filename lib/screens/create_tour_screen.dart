@@ -19,6 +19,11 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
 
   // Form state
   String? _selectedCity;
+  // Duration: starts in hours mode at 4 h.
+  // Hours mode: 2–8 h. Pressing + on 8 h switches to 1 day.
+  // Days mode: 1–14 d. Pressing − on 1 day switches back to 8 h.
+  bool _isDayMode = false;
+  int _hours = 4;
   int _days = 1;
   DateTime _startDate = DateTime.now();
   String _language = 'en';
@@ -213,7 +218,9 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
       final response = await _apiService.generateTour(
         accessToken: accessToken,
         city: _selectedCity!,
-        days: _days,
+        days: _isDayMode ? _days : 1,
+        durationMode: _isDayMode ? 'days' : 'hours',
+        hoursPerDay: _isDayMode ? null : _hours,
         language: _language,
         pace: _pace,
         walking: _walking,
@@ -572,7 +579,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                 "Date checks each spot's opening hours; length sets how much we fit in."),
         Row(
           children: [
-            // Days stepper
+            // Duration stepper (hours 2–8, then days 1–14)
             Expanded(
               flex: 10,
               child: _inputBox(
@@ -583,8 +590,19 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                       MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
-                      onTap: () => setState(
-                          () => _days = (_days - 1).clamp(1, 14)),
+                      onTap: () => setState(() {
+                        if (_isDayMode) {
+                          if (_days > 1) {
+                            _days--;
+                          } else {
+                            // 1 day → 8 hours
+                            _isDayMode = false;
+                            _hours = 8;
+                          }
+                        } else {
+                          if (_hours > 2) _hours--;
+                        }
+                      }),
                       child: Container(
                         width: 32,
                         height: 32,
@@ -609,7 +627,7 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                     Column(
                       children: [
                         Text(
-                          '$_days',
+                          _isDayMode ? '$_days' : '$_hours',
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w700,
@@ -617,7 +635,9 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                           ),
                         ),
                         Text(
-                          _days == 1 ? 'day' : 'days',
+                          _isDayMode
+                              ? (_days == 1 ? 'day' : 'days')
+                              : (_hours == 1 ? 'hr' : 'hrs'),
                           style: const TextStyle(
                             fontSize: 11,
                             color: PGColors.rawiInk3,
@@ -626,8 +646,19 @@ class _CreateTourScreenState extends State<CreateTourScreen> {
                       ],
                     ),
                     GestureDetector(
-                      onTap: () => setState(
-                          () => _days = (_days + 1).clamp(1, 14)),
+                      onTap: () => setState(() {
+                        if (_isDayMode) {
+                          if (_days < 14) _days++;
+                        } else {
+                          if (_hours < 8) {
+                            _hours++;
+                          } else {
+                            // 8 hours → 1 day
+                            _isDayMode = true;
+                            _days = 1;
+                          }
+                        }
+                      }),
                       child: Container(
                         width: 32,
                         height: 32,
