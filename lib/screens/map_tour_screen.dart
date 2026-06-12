@@ -70,6 +70,7 @@ class _MapTourScreenState extends State<MapTourScreen>
   bool _autoPlayNext = true;
 
   late _SheetState _sheetState;
+  bool _finishDialogShowing = false;
 
   @override
   void initState() {
@@ -1490,6 +1491,11 @@ class _MapTourScreenState extends State<MapTourScreen>
       return;
     }
 
+    // Guard against re-entrant calls (e.g. PopScope firing while dialog is
+    // already open after Navigator.pop() is intercepted with canPop: false).
+    if (_finishDialogShowing) return;
+    _finishDialogShowing = true;
+
     final finish = await showCupertinoDialog<bool>(
       context: context,
       builder: (_) => CupertinoAlertDialog(
@@ -1509,9 +1515,16 @@ class _MapTourScreenState extends State<MapTourScreen>
       ),
     );
 
+    _finishDialogShowing = false;
+
     if (finish == true && mounted) {
       await ActiveTourService().clearActiveTour();
-      Navigator.of(context).pop();
+      // Use pushNamedAndRemoveUntil instead of pop() so this works whether the
+      // app was cold-started directly into the tour (no screen below) or
+      // entered normally via TourDetailScreen. It also bypasses PopScope
+      // (canPop: false) which would re-trigger this dialog on a plain pop().
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil('/home', (_) => false);
     }
   }
 
