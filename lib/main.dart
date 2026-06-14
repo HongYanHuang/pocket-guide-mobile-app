@@ -16,6 +16,7 @@ import 'package:pocket_guide_mobile/screens/map_tour_screen.dart';
 import 'package:pocket_guide_mobile/screens/home_screen.dart';
 import 'package:pocket_guide_mobile/screens/tour_detail_screen.dart';
 import 'package:pocket_guide_mobile/screens/account_screen.dart';
+import 'package:pocket_guide_mobile/screens/history_screen.dart';
 import 'package:pocket_guide_mobile/design_system/colors.dart';
 import 'package:pocket_guide_mobile/design_system/typography.dart';
 import 'package:pocket_guide_mobile/design_system/spacing.dart';
@@ -226,7 +227,7 @@ class _MainScreenState extends State<MainScreen> {
     final screens = <Widget>[
       HomeScreen(onTourTap: (id) => _navigateToTour(context, id)),
       const _NearbyScreen(),
-      const _SavedScreen(),
+      const HistoryScreen(),
       const AccountScreen(),
     ];
 
@@ -272,33 +273,6 @@ class _NearbyScreen extends StatelessWidget {
               const _RawiTabIcon(type: _TabIconType.compass, color: PGColors.rawiInk4),
               const SizedBox(height: 16),
               Text('Nearby', style: GoogleFonts.sourceSans3(
-                  fontSize: 22, fontWeight: FontWeight.w700, color: PGColors.rawiInk)),
-              const SizedBox(height: 6),
-              Text('Coming soon', style: GoogleFonts.sourceSans3(
-                  fontSize: 14, color: PGColors.rawiInk4)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SavedScreen extends StatelessWidget {
-  const _SavedScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: PGColors.rawiPaper,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const _RawiTabIcon(type: _TabIconType.bookmark, color: PGColors.rawiInk4),
-              const SizedBox(height: 16),
-              Text('Saved', style: GoogleFonts.sourceSans3(
                   fontSize: 22, fontWeight: FontWeight.w700, color: PGColors.rawiInk)),
               const SizedBox(height: 6),
               Text('Coming soon', style: GoogleFonts.sourceSans3(
