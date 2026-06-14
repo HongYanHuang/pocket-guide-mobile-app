@@ -13,6 +13,7 @@ import 'package:pocket_guide_mobile/services/trail_upload_manager.dart';
 import 'package:pocket_guide_mobile/services/progress_manager.dart';
 import 'package:pocket_guide_mobile/services/auth_service.dart';
 import 'package:pocket_guide_mobile/services/active_tour_service.dart';
+import 'package:pocket_guide_mobile/services/tour_session_service.dart';
 import 'package:pocket_guide_mobile/services/geofence_service.dart';
 import 'package:pocket_guide_mobile/services/notification_service.dart';
 import 'package:pocket_guide_mobile/services/api_service.dart';
@@ -72,6 +73,12 @@ class _MapTourScreenState extends State<MapTourScreen>
   late _SheetState _sheetState;
   bool _finishDialogShowing = false;
 
+  // ── Tour session tracking ──────────────────────────────────────────────────
+  TourSessionService? _sessionService;
+  String? _sessionId;
+  String? _accessToken; // cached for progress/end calls during the tour
+  final Set<String> _visitedPoiIds = {}; // POIs the user physically reached
+
   @override
   void initState() {
     super.initState();
@@ -107,6 +114,10 @@ class _MapTourScreenState extends State<MapTourScreen>
         day: _selectedDay,
       );
 
+      _accessToken = accessToken;
+      _sessionService = TourSessionService(ApiService().dio);
+      await _startTourSession();
+
       _geofenceService = GeofenceService(
         progressManager: _progressManager!,
         apiService: ApiService(),
@@ -121,6 +132,13 @@ class _MapTourScreenState extends State<MapTourScreen>
         if (!mounted) return;
         setState(() {});
         _updateMapLayers(); // current POI may have changed
+
+        if (event.type == GeofenceEventType.poiEntered) {
+          // Mark this POI as visited on the next progress update.
+          // _sendProgressUpdate's _visitedPoiIds.add() handles the one-shot flag.
+          _visitedPoiIds.remove(event.poiId); // force poi_visited: true on next send
+          _sendProgressUpdate();
+        }
       });
     }
 
@@ -134,6 +152,75 @@ class _MapTourScreenState extends State<MapTourScreen>
     final langs = widget.tourDetail.metadata.languages;
     if (langs != null && langs.isNotEmpty) return langs.first;
     return 'en';
+  }
+
+  // ── Session helpers ────────────────────────────────────────────────────────
+
+  Future<void> _startTourSession() async {
+    if (_sessionService == null || _accessToken == null) return;
+    final meta = widget.tourDetail.metadata;
+    final totalPois = widget.tourDetail.itinerary
+        .fold<int>(0, (sum, day) => sum + day.pois.length);
+    try {
+      _sessionId = await _sessionService!.startSession(
+        tourId: meta.tourId,
+        tourTitle: meta.titleDisplay ?? meta.city,
+        city: meta.city,
+        citySlug: TourSessionService.cityToSlug(meta.city),
+        language: _getTourLanguage(),
+        durationDays: widget.tourDetail.itinerary.length,
+        totalPois: totalPois,
+        accessToken: _accessToken!,
+      );
+    } catch (e) {
+      // Non-fatal — tour continues without history tracking.
+      print('⚠️  Failed to start tour session: $e');
+    }
+  }
+
+  Future<void> _sendProgressUpdate({bool completed = false}) async {
+    if (_sessionService == null || _sessionId == null || _accessToken == null) return;
+    final gs = _geofenceService;
+    if (gs == null || gs.currentPoiId == null) return;
+
+    final poiId = gs.currentPoiId!;
+    final poiName = gs.currentPoiName ?? poiId;
+    final isFirstVisit = _visitedPoiIds.add(poiId); // true only first time
+
+    final audio = BackgroundAudioService.instance;
+    final position = audio.currentPosition.inMilliseconds / 1000.0;
+    final total = (audio.duration?.inMilliseconds ?? 0) / 1000.0;
+
+    _sessionService!.updateProgress(
+      tourId: widget.tourDetail.metadata.tourId,
+      sessionId: _sessionId!,
+      poiId: poiId,
+      poiName: poiName,
+      day: _selectedDay,
+      sectionIndex: gs.currentSectionIndex,
+      positionSeconds: position,
+      totalSeconds: total,
+      completed: completed,
+      accessToken: _accessToken!,
+      poiVisited: isFirstVisit,
+    );
+  }
+
+  Future<void> _endTourSession({required bool userCompleted}) async {
+    if (_sessionService == null || _sessionId == null || _accessToken == null) return;
+
+    // Send a final progress snapshot before closing the session.
+    await _sendProgressUpdate(completed: userCompleted);
+
+    final poisCompleted = _progressManager?.currentProgress?.completedCount ?? 0;
+    await _sessionService!.endSession(
+      tourId: widget.tourDetail.metadata.tourId,
+      sessionId: _sessionId!,
+      userCompleted: userCompleted,
+      poisCompleted: poisCompleted,
+      accessToken: _accessToken!,
+    );
+    _sessionId = null;
   }
 
   Future<void> _initializeGPS() async {
@@ -1518,6 +1605,11 @@ class _MapTourScreenState extends State<MapTourScreen>
     _finishDialogShowing = false;
 
     if (finish == true && mounted) {
+      final totalPois = widget.tourDetail.itinerary
+          .fold<int>(0, (sum, day) => sum + day.pois.length);
+      final doneCount = _progressManager?.currentProgress?.completedCount ?? 0;
+      final allDone = totalPois > 0 && doneCount >= totalPois;
+      await _endTourSession(userCompleted: allDone);
       await ActiveTourService().clearActiveTour();
       await BackgroundAudioService.instance.stop();
       if (!mounted) return;
@@ -1676,6 +1768,7 @@ class _MapTourScreenState extends State<MapTourScreen>
     if (state == AppLifecycleState.paused) {
       _locationService.enterBackgroundMode();
       _geofenceService?.saveProgressSnapshot();
+      _sendProgressUpdate(); // snapshot current audio position to history API
     } else if (state == AppLifecycleState.resumed) {
       _locationService.enterForegroundMode();
     }
